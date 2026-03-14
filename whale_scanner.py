@@ -198,7 +198,29 @@ def position_check(ticker, ibkr_positions):
 
 
 def claude_analyze(opportunities):
-    if not ANTHROPIC_API_KEY or not opportunities: return ""
+    if not opportunities: 
+        print("Claude: no opportunities to analyze")
+        return ""
+    if not ANTHROPIC_API_KEY:
+        print("Claude: no API key found")
+        return ""
+    print(f"Claude: API key found (starts with: {ANTHROPIC_API_KEY[:8]}...)")
+    try:
+        r = requests.post("https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": ANTHROPIC_API_KEY,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"},
+            json={"model": "claude-sonnet-4-20250514", "max_tokens": 600,
+                  "messages": [{"role":"user","content": f"Analyze these options opportunities for a $7M portfolio and rank top 3: {json.dumps(opportunities)}"}]},
+            timeout=30)
+        print(f"Claude API response: {r.status_code}")
+        if r.status_code == 200:
+            return r.json()["content"][0]["text"]
+        else:
+            print(f"Claude error body: {r.text[:200]}")
+    except Exception as e:
+        print(f"Claude exception: {e}")
+    return ""
     prompt = f"""Expert options trader analyzing opportunities for $7M portfolio.
 Strategy: Sell CSPs/CCs for income (25-45 DTE), buy LEAPS on conviction.
 
