@@ -484,6 +484,13 @@ def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir):
 
 
 def find_best_leaps(ticker, price, contracts, ivdata, pir):
+    """
+    Deep ITM LEAPS strategy:
+    - Target delta 0.80+ (strike ~70-80% of stock price = 20-30% ITM)
+    - Minimize extrinsic value (time value paid should be <20% of premium)
+    - This gives synthetic stock exposure with defined risk
+    - Only fall back to ATM if no deep ITM contracts available
+    """
     is_spec = ticker in SPECULATIVE_TICKERS
     timing  = timing_score("LEAPS", pir, ivdata["ivp"], is_spec)
     if not timing["recommend"]: return None, timing
@@ -491,7 +498,8 @@ def find_best_leaps(ticker, price, contracts, ivdata, pir):
 
     atm_iv = ivdata["iv_current"]
     today  = datetime.now()
-    best   = None; best_score = 0
+
+    candidates = []
 
     for c in contracts:
         parsed = parse_option_symbol(c.get("option_symbol",""))
@@ -500,21 +508,61 @@ def find_best_leaps(ticker, price, contracts, ivdata, pir):
         if opt_type != "C": continue
         dte = (expiry - today).days
         if dte < LEAPS_DTE_MIN: continue
-        otm_pct = (strike - price) / price * 100
-        if not (-5 <= otm_pct <= 20): continue
+
+        # ITM % (positive = ITM, negative = OTM)
+        itm_pct = (price - strike) / price * 100
+
+        # Accept range: 15% ITM to 10% OTM — prefer deep ITM
+        if not (-10 <= itm_pct <= 40): continue
+
         bid = float(c.get("nbbo_bid",0) or 0)
         ask = float(c.get("nbbo_ask",0) or 0)
         mid = (bid + ask) / 2
         if mid < 2.0: continue
-        delta = estimate_delta(otm_pct, dte, atm_iv, "C")
-        score = (timing["score"]/100) * (1/(1+abs(otm_pct-10))) * (dte/365)
-        if score > best_score:
-            best_score = score
-            best = {"strike":strike, "expiry":expiry.strftime("%Y-%m-%d"), "dte":dte,
-                    "premium":round(mid,2), "otm_pct":round(otm_pct,1),
-                    "iv":round(atm_iv*100,1), "ivp":ivdata["ivp"], "delta":delta,
-                    "leverage":round(price/mid,1) if mid > 0 else 0,
-                    "timing":timing}
+
+        delta = estimate_delta(-itm_pct, dte, atm_iv, "C")  # note: flip sign for delta calc
+
+        # Intrinsic value = how much the option is in the money
+        intrinsic  = max(0, price - strike)
+        extrinsic  = max(0, mid - intrinsic)
+        extrinsic_pct = (extrinsic / mid * 100) if mid > 0 else 100
+
+        # Score: heavily reward low extrinsic % and high delta
+        # Deep ITM (low extrinsic) scores much higher
+        delta_score    = (delta or 0.5) * 40          # want delta close to 1.0
+        extrinsic_score= max(0, (30 - extrinsic_pct)) # reward <20% extrinsic
+        timing_s       = timing["score"] / 100
+        score          = timing_s * (delta_score + extrinsic_score) * (dte / 365)
+
+        candidates.append({
+            "strike": strike,
+            "expiry": expiry.strftime("%Y-%m-%d"),
+            "dte": dte,
+            "bid": round(bid,2), "ask": round(ask,2),
+            "premium": round(mid,2),
+            "itm_pct": round(itm_pct,1),
+            "intrinsic": round(intrinsic,2),
+            "extrinsic": round(extrinsic,2),
+            "extrinsic_pct": round(extrinsic_pct,1),
+            "iv": round(atm_iv*100,1),
+            "ivp": ivdata["ivp"],
+            "delta": delta,
+            "leverage": round(price/mid,1) if mid > 0 else 0,
+            "timing": timing,
+            "score": score
+        })
+
+    if not candidates:
+        return None, timing
+
+    # Sort by score — deep ITM wins
+    candidates.sort(key=lambda x: x["score"], reverse=True)
+    best = candidates[0]
+
+    # Only return if extrinsic is reasonable (<35% of premium)
+    if best["extrinsic_pct"] > 35:
+        return None, timing
+
     return best, timing
 
 
@@ -666,14 +714,18 @@ def fmt_cc(opp):
 
 def fmt_leaps(opp):
     t = opp["leaps"]["timing"]; s = opp["sizing"]
-    d = f" | δ {opp['leaps']['delta']}" if opp['leaps'].get('delta') else ""
+    l = opp["leaps"]
+    d = f" | δ {l['delta']}" if l.get('delta') else ""
+    itm_label = f"{l['itm_pct']}% ITM" if l['itm_pct'] > 0 else f"{abs(l['itm_pct'])}% OTM"
     return "\n".join([
         f"🚀 *LEAPS — {opp['ticker']} @ ${opp['price']}*",
         f"_{t['signal']}_",
-        f"  52w range: ${opp['w52_low']} — ${opp['w52_high']} (at {opp['pir']*100:.0f}%)",
-        f"  Buy Call ${opp['leaps']['strike']} | {opp['leaps']['expiry']} | {opp['leaps']['dte']} DTE",
-        f"  Cost: ${opp['leaps']['premium']} | {opp['leaps']['otm_pct']}% OTM | IVP: {opp['leaps']['ivp']:.0f}%{d}",
-        f"  Leverage: {opp['leaps']['leverage']}x",
+        f"  52w: ${opp['w52_low']} — ${opp['w52_high']} (at {opp['pir']*100:.0f}%)",
+        f"  Buy Call ${l['strike']} | {l['expiry']} | {l['dte']} DTE",
+        f"  Bid ${l['bid']} / Ask ${l['ask']} | Cost ${l['premium']}",
+        f"  {itm_label} | IVP: {l['ivp']:.0f}%{d}",
+        f"  Intrinsic: ${l['intrinsic']} | Extrinsic: ${l['extrinsic']} ({l['extrinsic_pct']}% of cost)",
+        f"  Leverage: {l['leverage']}x",
         f"  Tier: {s['tier']} | Room: ${s['room_usd']:,.0f}",
         f"_Scanned {datetime.now().strftime('%b %d %H:%M')} ET_"
     ])
