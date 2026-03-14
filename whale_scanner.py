@@ -803,16 +803,38 @@ def find_best_leaps(ticker, price, contracts, ivdata, pir):
         intrinsic     = max(0, price - strike)
         extrinsic     = max(0, mid - intrinsic)
         extrinsic_pct = (extrinsic / mid * 100) if mid > 0 else 100
-        if extrinsic_pct > 30: continue  # reject if >30% extrinsic
-        delta_score    = delta * 40
-        extrinsic_s    = max(0, 30 - extrinsic_pct)
-        score          = (timing["score"]/100) * (delta_score + extrinsic_s) * (dte/365)
+        if extrinsic_pct > 30: continue  # hard reject — usually too expensive
+
+        # Extrinsic quality label (from framework)
+        if extrinsic_pct < 10:
+            ext_label = "🔥 Excellent (<10%)"
+        elif extrinsic_pct < 20:
+            ext_label = "✅ Good (10-20%)"
+        elif extrinsic_pct < 30:
+            ext_label = "⚠️ Acceptable (20-30%)"
+        else:
+            ext_label = "❌ Too expensive (>30%)"
+
+        # Score heavily penalizes high extrinsic — prefers <20% target
+        # <10%: full score, 10-20%: slight penalty, 20-30%: significant penalty
+        if extrinsic_pct < 10:
+            ext_score = 30
+        elif extrinsic_pct < 20:
+            ext_score = 20
+        elif extrinsic_pct < 30:
+            ext_score = 8
+        else:
+            ext_score = 0
+
+        delta_score = delta * 40
+        score       = (timing["score"]/100) * (delta_score + ext_score) * (dte/365)
         candidates.append({
             "strike":strike,"expiry":expiry.strftime("%Y-%m-%d"),"dte":dte,
             "bid":round(bid,2),"ask":round(ask,2),"premium":round(mid,2),
             "itm_pct":round(itm_pct,1),"delta":delta,
             "intrinsic":round(intrinsic,2),"extrinsic":round(extrinsic,2),
             "extrinsic_pct":round(extrinsic_pct,1),
+            "ext_label":ext_label,
             "iv":round(atm_iv*100,1),"ivp":ivdata["ivp"],
             "leverage":round(price/mid,1) if mid > 0 else 0,
             "timing":timing,"score":score
@@ -1113,7 +1135,7 @@ def fmt_leaps(opp) -> str:
         f"  Buy Call ${l['strike']} | {l['expiry']} | {l['dte']} DTE",
         f"  Bid ${l['bid']} / Ask ${l['ask']} | Cost ${l['premium']}",
         f"  {itm} | IVP {l['ivp']:.0f}%{d}",
-        f"  Intrinsic: ${l['intrinsic']} | Extrinsic: ${l['extrinsic']} ({l['extrinsic_pct']}%)",
+        f"  Intrinsic: ${l['intrinsic']} | Extrinsic: ${l['extrinsic']} — {l.get('ext_label', str(l['extrinsic_pct'])+'%')}",
         f"  Leverage: {l['leverage']}x | Tier: {s['tier']} | Room: ${s['room_usd']:,.0f}",
         f"_Scanned {datetime.now().strftime('%b %d %H:%M')} ET_"
     ])
