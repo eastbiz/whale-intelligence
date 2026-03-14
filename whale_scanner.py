@@ -1,588 +1,354 @@
 """
 Whale Intelligence — Personal Options Trading Scanner
-Scans watchlist for CSP, CC, and LEAPS opportunities
-Sends Telegram alerts for exceptional setups
+v2 — Fixed price extraction via Yahoo Finance, IBKR Flex integrated
 """
 
 import os
 import json
 import requests
-from datetime import datetime, timedelta
+import xml.etree.ElementTree as ET
+from datetime import datetime
 from typing import Optional
-
-# ============================================================
-# CONFIGURATION — Edit these
-# ============================================================
 
 UNUSUAL_WHALES_API_KEY = os.environ.get("UW_API_KEY", "")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+IBKR_FLEX_TOKEN = os.environ.get("IBKR_FLEX_TOKEN", "")
+IBKR_FLEX_QUERY_ID = os.environ.get("IBKR_FLEX_QUERY_ID", "")
 
 PORTFOLIO_SIZE = 7_000_000
-
-# Core stocks — always scan these
-CORE_STOCKS = [
-    "AAPL", "AMZN", "ASML", "BRK.B", "GOOGL",
-    "IBKR", "MELI", "MU", "NVDA", "NVO", "TSM"
-]
-
-# Opportunistic — scan only when flow is exceptional
-OPPORTUNISTIC_STOCKS = [
-    "BABA", "CLS", "CRDO", "DDOG", "FIX", "GRB", "KNX",
-    "LULU", "LNFLX", "NOW", "POWL", "UBER", "VNA", "VONOVIA",
-    "VRT", "VRTX", "ANGI", "CPRT", "CRSP", "GRAB", "IBIT",
-    "NBIS", "PATH", "PLTR", "TSLA"
-]
-
-# Options strategy preferences
 CSP_DTE_MIN = 25
 CSP_DTE_MAX = 45
-CSP_DELTA_TARGET = 0.25   # ~25 delta for CSPs
-CC_DELTA_TARGET = 0.30    # ~30 delta for CCs
-MAX_POSITION_PCT = 0.05   # Max 5% of portfolio per position ($350K)
-ALERT_PREMIUM_MIN = 1.0   # Minimum premium worth alerting ($1.00)
-IV_RANK_ALERT = 50        # Alert when IV rank above this
+MAX_POSITION_PCT = 0.05
+ALERT_PREMIUM_MIN = 1.0
+
+CORE_STOCKS = ["AAPL","AMZN","ASML","BRK-B","GOOGL","IBKR","MELI","MU","NVDA","NVO","TSM"]
+OPPORTUNISTIC_STOCKS = ["BABA","CLS","CRDO","DDOG","FIX","KNX","LULU","NFLX","NOW","POWL",
+                        "UBER","VRT","VRTX","CPRT","CRSP","GRAB","IBIT","NBIS","PATH","PLTR","TSLA"]
 
 UW_BASE = "https://api.unusualwhales.com"
-HEADERS = {"Authorization": f"Bearer {UNUSUAL_WHALES_API_KEY}"}
+UW_HEADERS = {"Authorization": f"Bearer {UNUSUAL_WHALES_API_KEY}"}
 
 
-# ============================================================
-# UNUSUAL WHALES API
-# ============================================================
-
-def get_flow_alerts(ticker: str) -> list:
-    """Fetch options flow alerts for a ticker."""
-    try:
-        r = requests.get(
-            f"{UW_BASE}/api/option-trades/flow-alerts",
-            headers=HEADERS,
-            params={"ticker": ticker},
-            timeout=10
-        )
-        if r.status_code == 200:
-            return r.json().get("data", [])
-    except Exception as e:
-        print(f"  Flow fetch error for {ticker}: {e}")
-    return []
-
-
-def get_stock_info(ticker: str) -> dict:
-    """Fetch stock info including IV data."""
-    try:
-        r = requests.get(
-            f"{UW_BASE}/api/stock/{ticker}/info",
-            headers=HEADERS,
-            timeout=10
-        )
-        if r.status_code == 200:
-            data = r.json()
-            return data.get("data", data)
-    except Exception as e:
-        print(f"  Stock info error for {ticker}: {e}")
-    return {}
-
-
-def get_option_contracts(ticker: str) -> list:
-    """Fetch available option contracts."""
-    try:
-        r = requests.get(
-            f"{UW_BASE}/api/stock/{ticker}/option-contracts",
-            headers=HEADERS,
-            timeout=10
-        )
-        if r.status_code == 200:
-            data = r.json()
-            return data.get("data", [])
-    except Exception as e:
-        print(f"  Contracts error for {ticker}: {e}")
-    return []
-
-
-def get_darkpool(ticker: str) -> list:
-    """Fetch dark pool trades for a ticker."""
-    try:
-        r = requests.get(
-            f"{UW_BASE}/api/darkpool/{ticker}",
-            headers=HEADERS,
-            timeout=10
-        )
-        if r.status_code == 200:
-            return r.json().get("data", [])
-    except Exception as e:
-        print(f"  Darkpool error for {ticker}: {e}")
-    return []
-
-
-# ============================================================
-# ANALYSIS HELPERS
-# ============================================================
-
-def score_flow(flow_alerts: list, ticker: str) -> dict:
-    """Score options flow for a ticker. Returns sentiment score and key trades."""
-    if not flow_alerts:
-        return {"score": 0, "bullish": 0, "bearish": 0, "top_trades": [], "total_premium": 0}
-
-    bullish_premium = 0
-    bearish_premium = 0
-    top_trades = []
-
-    for alert in flow_alerts:
-        if alert.get("ticker") != ticker:
-            continue
-        premium = float(alert.get("total_premium", 0))
-        trade_type = alert.get("type", "")
-        if trade_type == "call":
-            bullish_premium += premium
-        elif trade_type == "put":
-            bearish_premium += premium
-
-        if premium > 100_000:
-            top_trades.append({
-                "type": trade_type,
-                "strike": alert.get("strike"),
-                "expiry": alert.get("expiry"),
-                "premium": premium,
-                "rule": alert.get("alert_rule", ""),
-                "iv": float(alert.get("iv_end", 0))
-            })
-
-    total = bullish_premium + bearish_premium
-    score = 0
-    if total > 0:
-        score = (bullish_premium - bearish_premium) / total * 100
-
-    return {
-        "score": round(score, 1),
-        "bullish": bullish_premium,
-        "bearish": bearish_premium,
-        "top_trades": sorted(top_trades, key=lambda x: x["premium"], reverse=True)[:3],
-        "total_premium": total
-    }
-
-
-def find_csp_opportunity(ticker: str, stock_price: float, contracts: list) -> Optional[dict]:
-    """Find best CSP opportunity in 30-40 DTE range."""
-    if not contracts or stock_price <= 0:
-        return None
-
-    today = datetime.now()
-    best = None
-    best_score = 0
-
-    for contract in contracts:
+def get_prices(tickers):
+    prices = {}
+    for ticker in tickers:
+        yf_ticker = ticker.replace("BRK-B","BRK-B").replace("BRK.B","BRK-B")
         try:
-            if contract.get("option_type", "").lower() != "put":
-                continue
-
-            expiry_str = contract.get("expiry", "")
-            if not expiry_str:
-                continue
-            expiry = datetime.strptime(expiry_str[:10], "%Y-%m-%d")
-            dte = (expiry - today).days
-
-            if not (CSP_DTE_MIN <= dte <= CSP_DTE_MAX):
-                continue
-
-            strike = float(contract.get("strike", 0))
-            if strike <= 0:
-                continue
-
-            # Prefer strikes at 5-15% OTM (sweet spot for CSP income)
-            otm_pct = (stock_price - strike) / stock_price * 100
-            if not (3 <= otm_pct <= 20):
-                continue
-
-            mid_price = (float(contract.get("bid", 0)) + float(contract.get("ask", 0))) / 2
-            if mid_price < ALERT_PREMIUM_MIN:
-                continue
-
-            # Score: prefer 30-40 DTE, 5-15% OTM, higher premium
-            dte_score = 1 - abs(dte - 35) / 35
-            otm_score = 1 - abs(otm_pct - 10) / 10
-            score = dte_score * otm_score * mid_price
-
-            if score > best_score:
-                best_score = score
-                annualized_return = (mid_price / strike) * (365 / dte) * 100
-                max_contracts = int((PORTFOLIO_SIZE * MAX_POSITION_PCT) / (strike * 100))
-                best = {
-                    "strike": strike,
-                    "expiry": expiry_str[:10],
-                    "dte": dte,
-                    "premium": round(mid_price, 2),
-                    "otm_pct": round(otm_pct, 1),
-                    "annualized_return": round(annualized_return, 1),
-                    "max_contracts": max_contracts,
-                    "max_premium": round(mid_price * max_contracts * 100, 0)
-                }
-        except Exception:
-            continue
-
-    return best
+            r = requests.get(
+                f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_ticker}",
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=10
+            )
+            data = r.json()
+            price = data["chart"]["result"][0]["meta"]["regularMarketPrice"]
+            prices[ticker] = round(float(price), 2)
+        except Exception as e:
+            prices[ticker] = 0
+    return prices
 
 
-def find_leaps_opportunity(ticker: str, stock_price: float, contracts: list) -> Optional[dict]:
-    """Find best LEAPS call opportunity (1+ year out)."""
-    if not contracts or stock_price <= 0:
-        return None
-
-    today = datetime.now()
-    best = None
-    best_score = 0
-
-    for contract in contracts:
-        try:
-            if contract.get("option_type", "").lower() != "call":
-                continue
-
-            expiry_str = contract.get("expiry", "")
-            if not expiry_str:
-                continue
-            expiry = datetime.strptime(expiry_str[:10], "%Y-%m-%d")
-            dte = (expiry - today).days
-
-            if dte < 300:  # LEAPS = 300+ days
-                continue
-
-            strike = float(contract.get("strike", 0))
-            if strike <= 0:
-                continue
-
-            # LEAPS: prefer slightly OTM to ATM (0-20% OTM)
-            otm_pct = (strike - stock_price) / stock_price * 100
-            if not (-5 <= otm_pct <= 25):
-                continue
-
-            mid_price = (float(contract.get("bid", 0)) + float(contract.get("ask", 0))) / 2
-            if mid_price < 2.0:
-                continue
-
-            iv = float(contract.get("iv", 0))
-            score = (1 / (1 + abs(otm_pct - 10))) * (dte / 365)
-
-            if score > best_score:
-                best_score = score
-                best = {
-                    "strike": strike,
-                    "expiry": expiry_str[:10],
-                    "dte": dte,
-                    "premium": round(mid_price, 2),
-                    "otm_pct": round(otm_pct, 1),
-                    "iv": round(iv * 100, 1) if iv else None,
-                    "leverage": round(stock_price / mid_price, 1)
-                }
-        except Exception:
-            continue
-
-    return best
-
-
-def position_size_check(ticker: str, stock_price: float, ibkr_positions: dict) -> dict:
-    """Check if adding position would be over/under weight."""
-    current_value = ibkr_positions.get(ticker, {}).get("market_value", 0)
-    current_pct = (current_value / PORTFOLIO_SIZE) * 100
-    max_value = PORTFOLIO_SIZE * MAX_POSITION_PCT
-
-    return {
-        "current_value": current_value,
-        "current_pct": round(current_pct, 2),
-        "max_pct": MAX_POSITION_PCT * 100,
-        "room_usd": max(0, max_value - current_value),
-        "status": "OVERWEIGHT" if current_pct > MAX_POSITION_PCT * 100 * 1.2
-                  else "FULL" if current_pct > MAX_POSITION_PCT * 100 * 0.9
-                  else "ROOM" if current_pct > 0
-                  else "NEW"
-    }
-
-
-# ============================================================
-# CLAUDE ANALYSIS
-# ============================================================
-
-def claude_analyze(opportunities: list, market_context: str) -> str:
-    """Send opportunities to Claude for final analysis and ranking."""
-    if not ANTHROPIC_API_KEY or not opportunities:
-        return ""
-
-    prompt = f"""You are an expert options trader analyzing these opportunities for a $7M portfolio.
-The trader sells Cash-Secured Puts (CSP) and Covered Calls (CC) for income (30-40 DTE preferred),
-and buys LEAPS on high-conviction stocks.
-
-Market context from options flow: {market_context}
-
-Opportunities found today:
-{json.dumps(opportunities, indent=2)}
-
-Please:
-1. Rank the top 3 opportunities overall
-2. Flag any exceptional setups (high IV rank + bullish flow + good premium)
-3. Note any position sizing concerns
-4. Give a one-line market sentiment summary
-
-Be concise and direct. Focus on actionable insights."""
-
-    try:
-        r = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json"
-            },
-            json={
-                "model": "claude-sonnet-4-20250514",
-                "max_tokens": 800,
-                "messages": [{"role": "user", "content": prompt}]
-            },
-            timeout=30
-        )
-        if r.status_code == 200:
-            return r.json()["content"][0]["text"]
-    except Exception as e:
-        print(f"Claude analysis error: {e}")
-    return ""
-
-
-# ============================================================
-# TELEGRAM
-# ============================================================
-
-def send_telegram(message: str):
-    """Send message to Telegram."""
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        print("Telegram not configured — printing alert instead:")
-        print(message)
-        return
-
-    try:
-        r = requests.post(
-            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-            json={
-                "chat_id": TELEGRAM_CHAT_ID,
-                "text": message,
-                "parse_mode": "Markdown"
-            },
-            timeout=10
-        )
-        if r.status_code == 200:
-            print("✅ Telegram alert sent!")
-        else:
-            print(f"Telegram error: {r.text}")
-    except Exception as e:
-        print(f"Telegram send error: {e}")
-
-
-def format_alert(ticker: str, stock_price: float, flow: dict,
-                 csp: dict, leaps: dict, sizing: dict) -> str:
-    """Format a Telegram alert message."""
-    sentiment = "🟢 Bullish" if flow["score"] > 20 else "🔴 Bearish" if flow["score"] < -20 else "⚪ Neutral"
-    lines = [
-        f"🐋 *WHALE ALERT — {ticker}* @ ${stock_price:.2f}",
-        f"Flow Sentiment: {sentiment} (score: {flow['score']})",
-        f"Total Premium Activity: ${flow['total_premium']:,.0f}",
-        ""
-    ]
-
-    if csp:
-        lines += [
-            f"💰 *CSP Opportunity*",
-            f"  Strike: ${csp['strike']} | Expiry: {csp['expiry']} ({csp['dte']} DTE)",
-            f"  Premium: ${csp['premium']} | {csp['otm_pct']}% OTM",
-            f"  Annualized: {csp['annualized_return']}% | Max {csp['max_contracts']} contracts",
-            ""
-        ]
-
-    if leaps:
-        lines += [
-            f"🚀 *LEAPS Opportunity*",
-            f"  Strike: ${leaps['strike']} | Expiry: {leaps['expiry']} ({leaps['dte']} DTE)",
-            f"  Cost: ${leaps['premium']} | {leaps['otm_pct']}% OTM | {leaps['leverage']}x leverage",
-            ""
-        ]
-
-    if sizing["status"] == "OVERWEIGHT":
-        lines.append(f"⚠️ Position sizing: *OVERWEIGHT* ({sizing['current_pct']}% of portfolio)")
-    elif sizing["status"] == "FULL":
-        lines.append(f"📊 Position: Nearly full ({sizing['current_pct']}% of portfolio)")
-    elif sizing["room_usd"] > 0:
-        lines.append(f"✅ Room to add: ${sizing['room_usd']:,.0f} ({sizing['current_pct']}% currently)")
-    else:
-        lines.append(f"🆕 New position — up to ${PORTFOLIO_SIZE * MAX_POSITION_PCT:,.0f} (5% max)")
-
-    lines.append(f"\n_Scanned {datetime.now().strftime('%Y-%m-%d %H:%M')} ET_")
-    return "\n".join(lines)
-
-
-# ============================================================
-# IBKR (Client Portal API — optional)
-# ============================================================
-
-def get_ibkr_positions(gateway_url: str = "https://localhost:5000") -> dict:
-    """
-    Fetch positions from IBKR Client Portal API.
-    Requires IBKR Client Portal Gateway running locally.
-    Returns dict of {ticker: {market_value, quantity, avg_cost}}
-    """
+def get_ibkr_positions():
     positions = {}
+    if not IBKR_FLEX_TOKEN or not IBKR_FLEX_QUERY_ID:
+        return positions
     try:
-        # Get account ID first
-        r = requests.get(f"{gateway_url}/v1/api/portfolio/accounts",
-                        verify=False, timeout=5)
-        if r.status_code != 200:
-            return positions
-
-        accounts = r.json()
-        account_id = accounts[0].get("accountId", "")
-
-        # Get positions
-        r2 = requests.get(
-            f"{gateway_url}/v1/api/portfolio/{account_id}/positions/0",
-            verify=False, timeout=5
+        r = requests.get(
+            f"https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.SendRequest"
+            f"?t={IBKR_FLEX_TOKEN}&q={IBKR_FLEX_QUERY_ID}&v=3",
+            timeout=15
         )
-        if r2.status_code == 200:
-            for pos in r2.json():
-                ticker = pos.get("ticker", pos.get("contractDesc", "")).split()[0]
-                positions[ticker] = {
-                    "market_value": float(pos.get("mktValue", 0)),
-                    "quantity": float(pos.get("position", 0)),
-                    "avg_cost": float(pos.get("avgCost", 0))
-                }
-    except Exception:
-        # IBKR gateway not running — return empty (script continues without it)
-        pass
+        root = ET.fromstring(r.text)
+        ref_code = root.findtext("ReferenceCode")
+        if root.findtext("Status") != "Success" or not ref_code:
+            return positions
+        import time; time.sleep(5)
+        r2 = requests.get(
+            f"https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.GetStatement"
+            f"?t={IBKR_FLEX_TOKEN}&q={ref_code}&v=3",
+            timeout=15
+        )
+        root2 = ET.fromstring(r2.text)
+        for pos in root2.iter("OpenPosition"):
+            ticker = pos.get("symbol","")
+            if not ticker: continue
+            positions[ticker] = {
+                "market_value": float(pos.get("positionValue",0) or 0),
+                "quantity": float(pos.get("position",0) or 0),
+                "avg_cost": float(pos.get("costBasisPrice",0) or 0),
+                "pct_nav": float(pos.get("percentOfNAV",0) or 0),
+                "asset_class": pos.get("assetClass","")
+            }
+        print(f"   IBKR: {len(positions)} positions loaded")
+    except Exception as e:
+        print(f"   IBKR error: {e}")
     return positions
 
 
-# ============================================================
-# MAIN SCANNER
-# ============================================================
+def get_option_contracts(ticker):
+    try:
+        r = requests.get(f"{UW_BASE}/api/stock/{ticker}/option-contracts",
+                        headers=UW_HEADERS, timeout=15)
+        if r.status_code == 200:
+            return r.json().get("data", [])
+    except: pass
+    return []
 
-def scan_ticker(ticker: str, ibkr_positions: dict, is_core: bool = True) -> Optional[dict]:
-    """Full scan of a single ticker. Returns opportunity dict if notable."""
-    print(f"  Scanning {ticker}...")
 
-    # Get flow data
-    flow_alerts = get_flow_alerts(ticker)
-    flow = score_flow(flow_alerts, ticker)
+def get_darkpool(ticker):
+    try:
+        r = requests.get(f"{UW_BASE}/api/darkpool/{ticker}",
+                        headers=UW_HEADERS, timeout=10)
+        if r.status_code == 200:
+            return r.json().get("data", [])
+    except: pass
+    return []
 
-    # Skip opportunistic stocks with no meaningful flow
-    if not is_core and flow["total_premium"] < 200_000:
-        return None
 
-    # Get stock info
-    info = get_stock_info(ticker)
-    stock_price = float(info.get("close", info.get("last_price", 0)))
-    if stock_price <= 0:
-        # Try to extract from flow data
-        for alert in flow_alerts:
-            if alert.get("ticker") == ticker:
-                p = float(alert.get("underlying_price", 0))
-                if p > 0:
-                    stock_price = p
-                    break
+def find_best_csp(ticker, stock_price, contracts):
+    if not contracts or stock_price <= 0: return None
+    today = datetime.now()
+    best = None; best_score = 0
+    for c in contracts:
+        try:
+            sym = c.get("option_symbol","")
+            if "P" not in sym: continue
+            exp_str = sym[len(ticker):len(ticker)+6]
+            expiry = datetime.strptime("20"+exp_str, "%Y%m%d")
+            dte = (expiry - today).days
+            if not (CSP_DTE_MIN <= dte <= CSP_DTE_MAX): continue
+            strike = int(sym[-8:]) / 1000
+            otm_pct = (stock_price - strike) / stock_price * 100
+            if not (3 <= otm_pct <= 20): continue
+            bid = float(c.get("nbbo_bid",0) or 0)
+            ask = float(c.get("nbbo_ask",0) or 0)
+            mid = (bid + ask) / 2
+            if mid < ALERT_PREMIUM_MIN: continue
+            iv = float(c.get("implied_volatility",0) or 0)
+            annualized = (mid / strike) * (365 / dte) * 100
+            max_contracts = int((PORTFOLIO_SIZE * MAX_POSITION_PCT) / (strike * 100))
+            score = (1 - abs(dte-35)/35) * (1 - abs(otm_pct-10)/10) * mid * (1+iv)
+            if score > best_score:
+                best_score = score
+                best = {"strike": strike, "expiry": expiry.strftime("%Y-%m-%d"),
+                        "dte": dte, "bid": bid, "ask": ask, "premium": round(mid,2),
+                        "otm_pct": round(otm_pct,1), "iv": round(iv*100,1),
+                        "annualized_return": round(annualized,1),
+                        "max_contracts": max_contracts,
+                        "collateral": round(strike*100*max_contracts,0)}
+        except: continue
+    return best
 
-    if stock_price <= 0:
-        print(f"    No price data for {ticker}")
-        return None
 
-    # Get option contracts
-    contracts = get_option_contracts(ticker)
+def find_best_leaps(ticker, stock_price, contracts):
+    if not contracts or stock_price <= 0: return None
+    today = datetime.now()
+    best = None; best_score = 0
+    for c in contracts:
+        try:
+            sym = c.get("option_symbol","")
+            if "C" not in sym: continue
+            exp_str = sym[len(ticker):len(ticker)+6]
+            expiry = datetime.strptime("20"+exp_str, "%Y%m%d")
+            dte = (expiry - today).days
+            if dte < 300: continue
+            strike = int(sym[-8:]) / 1000
+            otm_pct = (strike - stock_price) / stock_price * 100
+            if not (-5 <= otm_pct <= 25): continue
+            bid = float(c.get("nbbo_bid",0) or 0)
+            ask = float(c.get("nbbo_ask",0) or 0)
+            mid = (bid + ask) / 2
+            if mid < 2.0: continue
+            score = (1/(1+abs(otm_pct-10))) * (dte/365)
+            if score > best_score:
+                best_score = score
+                best = {"strike": strike, "expiry": expiry.strftime("%Y-%m-%d"),
+                        "dte": dte, "premium": round(mid,2),
+                        "otm_pct": round(otm_pct,1),
+                        "leverage": round(stock_price/mid,1) if mid > 0 else 0}
+        except: continue
+    return best
 
-    # Find opportunities
-    csp = find_csp_opportunity(ticker, stock_price, contracts)
-    leaps = find_leaps_opportunity(ticker, stock_price, contracts)
 
-    # Position sizing
-    sizing = position_size_check(ticker, stock_price, ibkr_positions)
+def score_darkpool(trades):
+    if not trades: return {"score": 50, "total_notional": 0}
+    total = bullish = 0
+    for t in trades[:20]:
+        notional = float(t.get("size",0)) * float(t.get("price",0))
+        total += notional
+        if float(t.get("price",0)) >= float(t.get("vwap", t.get("price",0))):
+            bullish += notional
+    score = (bullish/total*100) if total > 0 else 50
+    return {"score": round(score,1), "total_notional": round(total,0)}
 
-    # Skip if no options opportunities found and flow is neutral
-    if not csp and not leaps and abs(flow["score"]) < 30:
-        return None
 
-    # Skip overweight positions for new additions
-    if sizing["status"] == "OVERWEIGHT":
-        print(f"    {ticker} is overweight — skipping")
-        return None
-
-    result = {
-        "ticker": ticker,
-        "price": stock_price,
-        "is_core": is_core,
-        "flow": flow,
-        "csp": csp,
-        "leaps": leaps,
-        "sizing": sizing,
-        "score": abs(flow["score"]) + (50 if csp else 0) + (30 if leaps else 0)
+def position_check(ticker, ibkr_positions):
+    pos = ibkr_positions.get(ticker, {})
+    val = pos.get("market_value", 0)
+    pct = (val / PORTFOLIO_SIZE) * 100
+    max_val = PORTFOLIO_SIZE * MAX_POSITION_PCT
+    return {
+        "current_value": val, "current_pct": round(pct,2),
+        "room_usd": max(0, round(max_val - val, 0)),
+        "status": "OVERWEIGHT" if pct > MAX_POSITION_PCT*100*1.2
+                  else "FULL" if pct > MAX_POSITION_PCT*100*0.9
+                  else "HAS ROOM" if val > 0 else "NEW POSITION"
     }
 
-    return result
+
+def claude_analyze(opportunities):
+    if not ANTHROPIC_API_KEY or not opportunities: return ""
+    prompt = f"""Expert options trader analyzing opportunities for $7M portfolio.
+Strategy: Sell CSPs/CCs for income (25-45 DTE), buy LEAPS on conviction.
+
+Top opportunities found today:
+{json.dumps(opportunities, indent=2)}
+
+Rank top 3 trades with specific reasoning. Note exceptional setups.
+Flag any position sizing concerns. Give overall market sentiment.
+Be direct and actionable."""
+    try:
+        r = requests.post("https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": ANTHROPIC_API_KEY,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"},
+            json={"model": "claude-sonnet-4-20250514", "max_tokens": 600,
+                  "messages": [{"role":"user","content":prompt}]},
+            timeout=30)
+        if r.status_code == 200:
+            return r.json()["content"][0]["text"]
+    except Exception as e:
+        print(f"Claude error: {e}")
+    return ""
+
+
+def send_telegram(message):
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        print(f"[TELEGRAM]\n{message}\n")
+        return
+    try:
+        r = requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+            json={"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"},
+            timeout=10)
+        print("✅ Telegram sent!" if r.status_code == 200 else f"Telegram error: {r.text}")
+    except Exception as e:
+        print(f"Telegram error: {e}")
+
+
+def format_alert(opp):
+    t = opp["ticker"]; p = opp["price"]
+    csp = opp["csp"]; leaps = opp["leaps"]
+    dp = opp["darkpool"]; sz = opp["sizing"]
+    lines = [f"🐋 *{t}* @ ${p}"]
+    if dp["total_notional"] > 0:
+        sent = "🟢 Bullish" if dp["score"]>55 else "🔴 Bearish" if dp["score"]<45 else "⚪ Neutral"
+        lines.append(f"Dark Pool: {sent} | ${dp['total_notional']:,.0f}")
+    lines.append("")
+    if csp:
+        lines += [f"💰 *CSP — Sell Put*",
+                  f"  ${csp['strike']} | {csp['expiry']} | {csp['dte']} DTE",
+                  f"  Premium: ${csp['premium']} | {csp['otm_pct']}% OTM | IV: {csp['iv']}%",
+                  f"  Annualized: {csp['annualized_return']}% | Max {csp['max_contracts']} contracts",
+                  f"  Collateral: ${csp['collateral']:,.0f}", ""]
+    if leaps:
+        lines += [f"🚀 *LEAPS — Buy Call*",
+                  f"  ${leaps['strike']} | {leaps['expiry']} | {leaps['dte']} DTE",
+                  f"  Cost: ${leaps['premium']} | {leaps['otm_pct']}% OTM | {leaps['leverage']}x leverage", ""]
+    emoji = "⚠️" if sz["status"]=="OVERWEIGHT" else "✅"
+    lines.append(f"{emoji} {sz['status']} | Current: ${sz['current_value']:,.0f} | Room: ${sz['room_usd']:,.0f}")
+    lines.append(f"\n_Scanned {datetime.now().strftime('%b %d %H:%M')} ET_")
+    return "\n".join(lines)
 
 
 def run_scanner():
-    """Main entry point — runs full scan and sends alerts."""
     print(f"\n{'='*60}")
-    print(f"🐋 WHALE INTELLIGENCE SCANNER")
+    print(f"🐋 WHALE INTELLIGENCE SCANNER v2")
     print(f"   {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ET")
     print(f"   Portfolio: ${PORTFOLIO_SIZE:,.0f}")
     print(f"{'='*60}\n")
 
-    # Try to get IBKR positions (optional — continues if not available)
     print("📊 Fetching IBKR positions...")
-    ibkr_positions = get_ibkr_positions()
-    if ibkr_positions:
-        print(f"   Found {len(ibkr_positions)} positions in IBKR")
-    else:
-        print("   IBKR gateway not available — position sizing uses estimates")
+    ibkr = get_ibkr_positions()
+    if not ibkr:
+        print("   IBKR not available — using estimates")
+
+    all_tickers = CORE_STOCKS + OPPORTUNISTIC_STOCKS
+    print(f"\n💹 Fetching prices ({len(all_tickers)} stocks)...")
+    prices = get_prices(all_tickers)
+    found = sum(1 for v in prices.values() if v > 0)
+    print(f"   Got prices for {found}/{len(all_tickers)} stocks")
 
     opportunities = []
 
-    # Scan core stocks
-    print(f"\n🎯 Scanning {len(CORE_STOCKS)} CORE stocks...")
+    print(f"\n🎯 Scanning CORE stocks...")
     for ticker in CORE_STOCKS:
-        result = scan_ticker(ticker, ibkr_positions, is_core=True)
-        if result:
-            opportunities.append(result)
+        price = prices.get(ticker, 0)
+        print(f"  {ticker} @ ${price}...")
+        if price <= 0:
+            print(f"    No price, skipping")
+            continue
+        contracts = get_option_contracts(ticker)
+        if not contracts:
+            print(f"    No contracts")
+            continue
+        csp = find_best_csp(ticker, price, contracts)
+        leaps = find_best_leaps(ticker, price, contracts)
+        dp = score_darkpool(get_darkpool(ticker))
+        sz = position_check(ticker, ibkr)
+        if sz["status"] == "OVERWEIGHT":
+            print(f"    OVERWEIGHT — skipping")
+            continue
+        if csp or leaps:
+            score = (50 if csp else 0) + (30 if leaps else 0) + dp["score"]
+            print(f"    ✅ CSP={csp is not None} LEAPS={leaps is not None} score={score:.0f}")
+            opportunities.append({"ticker":ticker,"price":price,"is_core":True,
+                                  "csp":csp,"leaps":leaps,"darkpool":dp,"sizing":sz,"score":score})
+        else:
+            print(f"    No qualifying opportunities")
 
-    # Scan opportunistic stocks (only if flow is notable)
-    print(f"\n🔍 Scanning {len(OPPORTUNISTIC_STOCKS)} OPPORTUNISTIC stocks...")
+    print(f"\n🔍 Scanning OPPORTUNISTIC stocks...")
     for ticker in OPPORTUNISTIC_STOCKS:
-        result = scan_ticker(ticker, ibkr_positions, is_core=False)
-        if result:
-            opportunities.append(result)
+        price = prices.get(ticker, 0)
+        if price <= 0: continue
+        contracts = get_option_contracts(ticker)
+        if not contracts: continue
+        csp = find_best_csp(ticker, price, contracts)
+        leaps = find_best_leaps(ticker, price, contracts)
+        if not csp and not leaps: continue
+        dp = score_darkpool(get_darkpool(ticker))
+        sz = position_check(ticker, ibkr)
+        if sz["status"] == "OVERWEIGHT": continue
+        score = (50 if csp else 0) + (30 if leaps else 0) + dp["score"]
+        print(f"  {ticker} @ ${price} ✅ score={score:.0f}")
+        opportunities.append({"ticker":ticker,"price":price,"is_core":False,
+                              "csp":csp,"leaps":leaps,"darkpool":dp,"sizing":sz,"score":score})
 
     if not opportunities:
-        print("\n✅ No exceptional opportunities today. No alert sent.")
+        print("\n✅ No qualifying opportunities today.")
         return
 
-    # Sort by score
     opportunities.sort(key=lambda x: x["score"], reverse=True)
     top = opportunities[:5]
 
-    print(f"\n🏆 Found {len(opportunities)} opportunities, top {len(top)} being analyzed...")
+    print(f"\n🏆 TOP {len(top)} OPPORTUNITIES:")
+    for o in top:
+        ann = f" | CSP {o['csp']['annualized_return']}% ann." if o['csp'] else ""
+        print(f"   {o['ticker']} @ ${o['price']}{ann} | score={o['score']:.0f}")
 
-    # Claude analysis
-    market_flow = get_flow_alerts("")  # market-wide
-    market_context = f"Market-wide flow fetched. Top opportunities: {[o['ticker'] for o in top]}"
-    analysis = claude_analyze(top, market_context)
-
-    # Send Telegram alerts for top opportunities
-    for opp in top[:3]:  # Max 3 alerts per run
-        if opp["flow"]["total_premium"] > 100_000 or opp["csp"] or opp["leaps"]:
-            msg = format_alert(
-                opp["ticker"], opp["price"],
-                opp["flow"], opp["csp"], opp["leaps"], opp["sizing"]
-            )
-            send_telegram(msg)
-
-    # Send Claude's summary analysis
+    print("\n🧠 Claude analysis...")
+    analysis = claude_analyze(top)
     if analysis:
-        summary = f"🧠 *Claude's Daily Summary*\n\n{analysis}"
-        send_telegram(summary)
+        print(f"\n{analysis}")
 
-    print("\n✅ Scan complete!")
-    return opportunities
+    print("\n📱 Sending alerts...")
+    for opp in top[:3]:
+        send_telegram(format_alert(opp))
+    if analysis:
+        send_telegram(f"🧠 *Claude's Summary*\n\n{analysis}")
+
+    print("\n✅ Done!")
 
 
 if __name__ == "__main__":
