@@ -106,6 +106,52 @@ def get_darkpool(ticker):
     return []
 
 
+def parse_option_symbol(sym):
+    """
+    Parse OCC option symbol: AAPL260417P00215000
+    Returns (expiry_date, option_type, strike) or None
+    Format: TICKER + YYMMDD + C/P + 8-digit strike (strike * 1000)
+    """
+    try:
+        import re
+        m = re.match(r'^([A-Z.\-]+)(\d{6})([CP])(\d{8})$', sym)
+        if not m:
+            return None
+        exp_str = m.group(2)
+        opt_type = m.group(3)
+        strike = int(m.group(4)) / 1000
+        expiry = datetime.strptime("20" + exp_str, "%Y%m%d")
+        return expiry, opt_type, strike
+    except:
+        return None
+
+
+def estimate_delta(otm_pct, dte, iv, option_type):
+    """
+    Rough delta estimate using normal approximation.
+    Not Black-Scholes but good enough for screening.
+    Put delta is negative, we return absolute value.
+    """
+    import math
+    try:
+        if iv <= 0 or dte <= 0:
+            return None
+        t = dte / 365
+        sigma_sqrt_t = iv * math.sqrt(t)
+        if sigma_sqrt_t == 0:
+            return None
+        # d1 approximation using moneyness
+        moneyness = -otm_pct / 100  # negative for OTM puts
+        d1 = moneyness / sigma_sqrt_t + 0.5 * sigma_sqrt_t
+        # Normal CDF approximation
+        delta = 0.5 * (1 + math.erf(d1 / math.sqrt(2)))
+        if option_type == "P":
+            delta = 1 - delta  # put delta (absolute value)
+        return round(delta, 2)
+    except:
+        return None
+
+
 def find_best_csp(ticker, stock_price, contracts):
     if not contracts or stock_price <= 0: return None
     today = datetime.now()
@@ -113,27 +159,33 @@ def find_best_csp(ticker, stock_price, contracts):
     for c in contracts:
         try:
             sym = c.get("option_symbol","")
-            if "P" not in sym: continue
-            exp_str = sym[len(ticker):len(ticker)+6]
-            expiry = datetime.strptime("20"+exp_str, "%Y%m%d")
+            parsed = parse_option_symbol(sym)
+            if not parsed: continue
+            expiry, opt_type, strike = parsed
+            if opt_type != "P": continue
             dte = (expiry - today).days
             if not (CSP_DTE_MIN <= dte <= CSP_DTE_MAX): continue
-            strike = int(sym[-8:]) / 1000
             otm_pct = (stock_price - strike) / stock_price * 100
             if not (3 <= otm_pct <= 20): continue
             bid = float(c.get("nbbo_bid",0) or 0)
             ask = float(c.get("nbbo_ask",0) or 0)
             mid = (bid + ask) / 2
             if mid < ALERT_PREMIUM_MIN: continue
+            # Sanity check — premium can't be more than 30% of strike
+            if mid > strike * 0.30: continue
             iv = float(c.get("implied_volatility",0) or 0)
-            annualized = (mid / strike) * (365 / dte) * 100
+            annualized = min((mid / strike) * (365 / dte) * 100, 150)  # cap at 150%
             max_contracts = int((PORTFOLIO_SIZE * MAX_POSITION_PCT) / (strike * 100))
+            if max_contracts < 1: max_contracts = 1
+            delta = estimate_delta(otm_pct, dte, iv, "P")
             score = (1 - abs(dte-35)/35) * (1 - abs(otm_pct-10)/10) * mid * (1+iv)
             if score > best_score:
                 best_score = score
                 best = {"strike": strike, "expiry": expiry.strftime("%Y-%m-%d"),
-                        "dte": dte, "bid": bid, "ask": ask, "premium": round(mid,2),
+                        "dte": dte, "bid": round(bid,2), "ask": round(ask,2),
+                        "premium": round(mid,2),
                         "otm_pct": round(otm_pct,1), "iv": round(iv*100,1),
+                        "delta": delta,
                         "annualized_return": round(annualized,1),
                         "max_contracts": max_contracts,
                         "collateral": round(strike*100*max_contracts,0)}
@@ -148,24 +200,27 @@ def find_best_leaps(ticker, stock_price, contracts):
     for c in contracts:
         try:
             sym = c.get("option_symbol","")
-            if "C" not in sym: continue
-            exp_str = sym[len(ticker):len(ticker)+6]
-            expiry = datetime.strptime("20"+exp_str, "%Y%m%d")
+            parsed = parse_option_symbol(sym)
+            if not parsed: continue
+            expiry, opt_type, strike = parsed
+            if opt_type != "C": continue
             dte = (expiry - today).days
             if dte < 300: continue
-            strike = int(sym[-8:]) / 1000
             otm_pct = (strike - stock_price) / stock_price * 100
             if not (-5 <= otm_pct <= 25): continue
             bid = float(c.get("nbbo_bid",0) or 0)
             ask = float(c.get("nbbo_ask",0) or 0)
             mid = (bid + ask) / 2
             if mid < 2.0: continue
+            iv = float(c.get("implied_volatility",0) or 0)
+            delta = estimate_delta(otm_pct, dte, iv, "C")
             score = (1/(1+abs(otm_pct-10))) * (dte/365)
             if score > best_score:
                 best_score = score
                 best = {"strike": strike, "expiry": expiry.strftime("%Y-%m-%d"),
                         "dte": dte, "premium": round(mid,2),
                         "otm_pct": round(otm_pct,1),
+                        "delta": delta,
                         "leverage": round(stock_price/mid,1) if mid > 0 else 0}
         except: continue
     return best
@@ -198,29 +253,7 @@ def position_check(ticker, ibkr_positions):
 
 
 def claude_analyze(opportunities):
-    if not opportunities: 
-        print("Claude: no opportunities to analyze")
-        return ""
-    if not ANTHROPIC_API_KEY:
-        print("Claude: no API key found")
-        return ""
-    print(f"Claude: API key found (starts with: {ANTHROPIC_API_KEY[:8]}...)")
-    try:
-        r = requests.post("https://api.anthropic.com/v1/messages",
-            headers={"x-api-key": ANTHROPIC_API_KEY,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json"},
-            json={"model": "claude-sonnet-4-20250514", "max_tokens": 600,
-                  "messages": [{"role":"user","content": f"Analyze these options opportunities for a $7M portfolio and rank top 3: {json.dumps(opportunities)}"}]},
-            timeout=30)
-        print(f"Claude API response: {r.status_code}")
-        if r.status_code == 200:
-            return r.json()["content"][0]["text"]
-        else:
-            print(f"Claude error body: {r.text[:200]}")
-    except Exception as e:
-        print(f"Claude exception: {e}")
-    return ""
+    if not ANTHROPIC_API_KEY or not opportunities: return ""
     prompt = f"""Expert options trader analyzing opportunities for $7M portfolio.
 Strategy: Sell CSPs/CCs for income (25-45 DTE), buy LEAPS on conviction.
 
@@ -265,19 +298,23 @@ def format_alert(opp):
     dp = opp["darkpool"]; sz = opp["sizing"]
     lines = [f"🐋 *{t}* @ ${p}"]
     if dp["total_notional"] > 0:
-        sent = "🟢 Bullish" if dp["score"]>55 else "🔴 Bearish" if dp["score"]<45 else "⚪ Neutral"
-        lines.append(f"Dark Pool: {sent} | ${dp['total_notional']:,.0f}")
+        sent = "🟢 Institutions buying" if dp["score"]>55 else "🔴 Institutions selling" if dp["score"]<45 else "⚪ Mixed"
+        lines.append(f"Dark Pool: {sent} | ${dp['total_notional']:,.0f} notional")
     lines.append("")
     if csp:
+        delta_str = f" | Delta: {csp['delta']}" if csp.get('delta') else ""
         lines += [f"💰 *CSP — Sell Put*",
                   f"  ${csp['strike']} | {csp['expiry']} | {csp['dte']} DTE",
-                  f"  Premium: ${csp['premium']} | {csp['otm_pct']}% OTM | IV: {csp['iv']}%",
+                  f"  Bid/Ask: ${csp['bid']}/${csp['ask']} | Mid: ${csp['premium']}",
+                  f"  {csp['otm_pct']}% OTM | IV: {csp['iv']}%{delta_str}",
                   f"  Annualized: {csp['annualized_return']}% | Max {csp['max_contracts']} contracts",
                   f"  Collateral: ${csp['collateral']:,.0f}", ""]
     if leaps:
+        delta_str = f" | Delta: {leaps['delta']}" if leaps.get('delta') else ""
         lines += [f"🚀 *LEAPS — Buy Call*",
                   f"  ${leaps['strike']} | {leaps['expiry']} | {leaps['dte']} DTE",
-                  f"  Cost: ${leaps['premium']} | {leaps['otm_pct']}% OTM | {leaps['leverage']}x leverage", ""]
+                  f"  Cost: ${leaps['premium']} | {leaps['otm_pct']}% OTM{delta_str}",
+                  f"  Leverage: {leaps['leverage']}x", ""]
     emoji = "⚠️" if sz["status"]=="OVERWEIGHT" else "✅"
     lines.append(f"{emoji} {sz['status']} | Current: ${sz['current_value']:,.0f} | Room: ${sz['room_usd']:,.0f}")
     lines.append(f"\n_Scanned {datetime.now().strftime('%b %d %H:%M')} ET_")
