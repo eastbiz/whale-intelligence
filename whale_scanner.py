@@ -248,6 +248,203 @@ def get_flow_alerts_market() -> list:
             return r.json().get("data", [])
     except: pass
     return []
+# ════════════════════════════════════════════════════════════
+# MARKET INTELLIGENCE (Tide, OI Change, Expiry Breakdown)
+# ════════════════════════════════════════════════════════════
+
+def get_market_tide() -> dict:
+    """
+    Market Tide = net options premium flow (calls - puts) market-wide.
+    Positive = call premium dominating = bullish environment
+    Negative = put premium dominating = bearish/hedging environment
+    Returns score -100 to +100 and a human label.
+    """
+    try:
+        r = requests.get(f"{UW_BASE}/api/market/market-tide",
+                         headers=UW_HEADERS, timeout=10)
+        if r.status_code != 200:
+            return {"score": 0, "label": "Unknown", "raw": {}, "available": False}
+        data = r.json()
+        # UW returns array of {timestamp, call_premium, put_premium, net}
+        items = data.get("data", data.get("results", []))
+        if not items:
+            return {"score": 0, "label": "Unknown", "raw": {}, "available": False}
+
+        # Use most recent entry
+        latest = items[-1] if isinstance(items, list) else items
+        call_prem = float(latest.get("call_premium", latest.get("calls", 0)) or 0)
+        put_prem  = float(latest.get("put_premium",  latest.get("puts",  0)) or 0)
+        net       = float(latest.get("net", call_prem - put_prem) or 0)
+        total     = call_prem + put_prem
+
+        # Normalize to -100/+100
+        score = round((net / total * 100), 1) if total > 0 else 0
+
+        if score > 20:
+            label = f"🟢 BULLISH TIDE ({score:+.0f}) — Call premium dominating, good for CSP"
+        elif score > 5:
+            label = f"🟡 MILD BULLISH TIDE ({score:+.0f}) — Slight call premium edge"
+        elif score > -5:
+            label = f"⚪ NEUTRAL TIDE ({score:+.0f}) — Balanced, selective trades only"
+        elif score > -20:
+            label = f"🟠 MILD BEARISH TIDE ({score:+.0f}) — Put premium building, be cautious"
+        else:
+            label = f"🔴 BEARISH TIDE ({score:+.0f}) — Put premium dominating, avoid new CSPs"
+
+        return {
+            "score": score,
+            "label": label,
+            "call_premium": round(call_prem/1e6, 1),
+            "put_premium":  round(put_prem/1e6, 1),
+            "net_million":  round(net/1e6, 1),
+            "available": True
+        }
+    except Exception as e:
+        print(f"   Market tide error: {e}")
+        return {"score": 0, "label": "Tide data unavailable", "available": False}
+
+
+def get_oi_change() -> dict:
+    """
+    Overnight OI change — which strikes saw largest new positioning.
+    Large put OI increase on a ticker = warning for CSP sellers.
+    Large call OI increase = institutions opening new bullish bets.
+    Returns dict of {ticker: {call_oi_change, put_oi_change, net_signal}}
+    """
+    try:
+        r = requests.get(f"{UW_BASE}/api/market/oi-change",
+                         headers=UW_HEADERS, timeout=10)
+        if r.status_code != 200:
+            return {}
+        items = r.json().get("data", r.json().get("results", []))
+        if not items:
+            return {}
+
+        oi_signals = {}
+        for item in items[:50]:  # top 50 by OI change
+            ticker = item.get("ticker","")
+            if not ticker: continue
+            call_oi = float(item.get("call_oi_change", item.get("calls_oi_change", 0)) or 0)
+            put_oi  = float(item.get("put_oi_change",  item.get("puts_oi_change",  0)) or 0)
+            if abs(call_oi) < 100 and abs(put_oi) < 100: continue
+            net = call_oi - put_oi
+            oi_signals[ticker] = {
+                "call_oi_change": int(call_oi),
+                "put_oi_change":  int(put_oi),
+                "net": int(net),
+                "signal": ("🟢 Bullish OI" if net > 500
+                           else "🔴 Bearish OI" if net < -500
+                           else "⚪ Neutral OI")
+            }
+        return oi_signals
+    except Exception as e:
+        print(f"   OI change error: {e}")
+        return {}
+
+
+def get_expiry_breakdown(ticker: str) -> dict:
+    """
+    Where is OI concentrated by strike and expiry?
+    Used to avoid selling CSP/CC at strikes targeted by heavy put OI.
+    Returns max_pain strike and risky put strikes to avoid.
+    """
+    try:
+        r = requests.get(f"{UW_BASE}/api/stock/{ticker}/expiry-breakdown",
+                         headers=UW_HEADERS, timeout=10)
+        if r.status_code != 200:
+            return {}
+        items = r.json().get("data", [])
+        if not items:
+            return {}
+
+        # Find expiry with most total OI (most relevant)
+        best_expiry = None
+        best_oi     = 0
+        for item in items:
+            total_oi = int(item.get("total_oi", 0) or 0)
+            if total_oi > best_oi:
+                best_oi     = total_oi
+                best_expiry = item
+
+        if not best_expiry:
+            return {}
+
+        # Max pain = strike where total option value is minimized
+        # Approximate: weighted average of put/call OI
+        call_oi = float(best_expiry.get("call_oi", 0) or 0)
+        put_oi  = float(best_expiry.get("put_oi",  0) or 0)
+        max_pain_strike = float(best_expiry.get("max_pain_strike",
+                                best_expiry.get("strike", 0)) or 0)
+
+        return {
+            "expiry":          best_expiry.get("expiry",""),
+            "max_pain_strike": max_pain_strike,
+            "call_oi":         int(call_oi),
+            "put_oi":          int(put_oi),
+            "put_call_ratio":  round(put_oi/call_oi, 2) if call_oi > 0 else 0,
+            "high_put_oi":     put_oi > call_oi * 1.5  # warning: heavy put side
+        }
+    except Exception as e:
+        return {}
+
+
+def market_go_nogo(tide: dict, oi_signals: dict) -> dict:
+    """
+    Master go/no-go decision for the day.
+    Framework: only trade when opportunity is really good.
+
+    Returns:
+      sell_premium: bool  — ok to sell CSP/CC today?
+      buy_leaps:    bool  — ok to buy LEAPS today?
+      score:        0-100 — overall market quality score
+      reason:       str   — human explanation
+    """
+    tide_score = tide.get("score", 0)
+
+    # Count bullish vs bearish OI signals in our watchlists
+    all_tickers = set(CORE_STOCKS + OPPORTUNISTIC_STOCKS)
+    bull_oi = sum(1 for t,v in oi_signals.items()
+                  if t in all_tickers and v["net"] > 500)
+    bear_oi = sum(1 for t,v in oi_signals.items()
+                  if t in all_tickers and v["net"] < -500)
+
+    # Overall market score (0-100)
+    # Tide contributes 60%, OI breadth 40%
+    tide_component = min(100, max(0, (tide_score + 50)))  # -50→0, 0→50, +50→100
+    oi_component   = 50 + (bull_oi - bear_oi) * 5
+    oi_component   = min(100, max(0, oi_component))
+    market_score   = round(tide_component * 0.6 + oi_component * 0.4, 1)
+
+    # Decision logic
+    if market_score >= 65 and tide_score > 5:
+        sell_premium = True
+        buy_leaps    = False  # when tide is bullish, options are more expensive
+        quality      = "🔥 EXCELLENT DAY — Strong bullish conditions for premium selling"
+    elif market_score >= 50:
+        sell_premium = True
+        buy_leaps    = True
+        quality      = "✅ GOOD DAY — Conditions support selective premium selling"
+    elif market_score >= 40:
+        sell_premium = False
+        buy_leaps    = True
+        quality      = "⚠️ CAUTIOUS DAY — Skip new CSPs, LEAPS/spreads only"
+    else:
+        sell_premium = False
+        buy_leaps    = True  # market fear = cheap options = good LEAPS entry
+        quality      = "🔴 POOR DAY FOR PREMIUM SELLING — Consider LEAPS on quality names"
+
+    return {
+        "sell_premium": sell_premium,
+        "buy_leaps":    buy_leaps,
+        "score":        market_score,
+        "tide_score":   tide_score,
+        "bull_oi_count":bull_oi,
+        "bear_oi_count":bear_oi,
+        "quality":      quality,
+        "tide_label":   tide.get("label",""),
+    }
+
+
 
 
 # ════════════════════════════════════════════════════════════
@@ -880,6 +1077,10 @@ def fmt_csp(opp) -> str:
         f"  {opp['csp']['otm_pct']}% OTM | IV {opp['csp']['iv']}% | IVP {opp['csp']['ivp']:.0f}%{d}",
         f"  Annualized: {opp['csp']['annualized_return']}% | {opp['csp']['max_contracts']} contracts",
         f"  Collateral: ${opp['csp']['collateral']:,.0f} | Room: ${s['room_usd']:,.0f}",
+        *([f"  ⚠️ OI Signal: {opp['oi_signal']['signal']} (calls {opp['oi_signal']['call_oi_change']:+,} / puts {opp['oi_signal']['put_oi_change']:+,})"]
+           if opp.get("oi_signal") else []),
+        *([f"  📍 Max Pain: ${opp['expiry_breakdown']['max_pain_strike']} | P/C ratio: {opp['expiry_breakdown']['put_call_ratio']}"]
+           if opp.get("expiry_breakdown") and opp["expiry_breakdown"].get("max_pain_strike") else []),
         f"_Scanned {datetime.now().strftime('%b %d %H:%M')} ET_"
     ])
 
@@ -969,8 +1170,44 @@ def run_scanner():
     ok  = sum(1 for v in mkt.values() if v["price"]>0)
     print(f"   {ok}/{len(all_tickers)} prices ✓")
 
-    print("🌊 Market flow for Peter Lynch screen...")
-    flow = get_flow_alerts_market()
+    print("🌊 Market intelligence...")
+    flow       = get_flow_alerts_market()
+
+    print("   📊 Fetching Market Tide...")
+    tide       = get_market_tide()
+    print(f"   {tide['label']}")
+
+    print("   📈 Fetching OI Changes...")
+    oi_signals = get_oi_change()
+    print(f"   OI data for {len(oi_signals)} tickers")
+
+    # ── GO / NO-GO DECISION ──────────────────────────────────
+    gng = market_go_nogo(tide, oi_signals)
+    print(f"\n{'='*50}")
+    print(f"📡 MARKET QUALITY SCORE: {gng['score']}/100")
+    print(f"   {gng['quality']}")
+    print(f"   Tide: {gng['tide_score']:+.1f} | Bull OI: {gng['bull_oi_count']} | Bear OI: {gng['bear_oi_count']}")
+    print(f"   Sell Premium: {'✅ YES' if gng['sell_premium'] else '❌ NO'}")
+    print(f"   Buy LEAPS:    {'✅ YES' if gng['buy_leaps'] else '❌ NO'}")
+    print(f"{'='*50}\n")
+
+    # Send morning market briefing to Telegram
+    morning_msg = (
+        f"📡 *Market Intelligence — {datetime.now().strftime('%b %d %H:%M')} ET*\n\n"
+        f"{tide['label']}\n"
+        f"Market Score: {gng['score']}/100\n"
+        f"{gng['quality']}\n\n"
+        f"Sell Premium: {'✅ YES' if gng['sell_premium'] else '❌ SKIP TODAY'}\n"
+        f"Buy LEAPS: {'✅ YES' if gng['buy_leaps'] else '⏳ WAIT'}"
+    )
+    send_telegram(morning_msg)
+    time.sleep(2)
+
+    # If market conditions are poor — skip premium selling, maybe skip entirely
+    if not gng["sell_premium"] and not gng["buy_leaps"]:
+        print("🚫 Market conditions too poor. No scan today.")
+        send_telegram("🚫 *No trades today* — Market conditions don't meet quality threshold.")
+        return
 
     csp_opps = []; cc_opps  = []; leaps_opps = []
     pmcc_opps= []; bcs_opps = []
@@ -1000,14 +1237,26 @@ def run_scanner():
         dp         = score_darkpool(get_darkpool(ticker))
         dp_boost   = 1.2 if dp["score"] > 55 else 0.9 if dp["score"] < 45 else 1.0
 
+        # OI signal for this ticker — warns if puts are being targeted
+        oi_sig     = oi_signals.get(ticker, {})
+        oi_warning = oi_sig.get("net", 0) < -500  # heavy new put OI = warning
+
+        # Expiry breakdown — find max pain and risky strikes
+        exp_bdown  = get_expiry_breakdown(ticker)
+
         base = {"ticker":ticker,"price":price,"pir":pir,
                 "w52_low":w52l,"w52_high":w52h,
                 "pullback_pct":round(pullback*100,1),
                 "ivp":ivdata["ivp"],"quality":quality,
-                "sizing":sizing,"darkpool":dp}
+                "sizing":sizing,"darkpool":dp,
+                "oi_signal":oi_sig,"expiry_breakdown":exp_bdown,
+                "oi_warning":oi_warning}
 
         # ── CSP ──────────────────────────────────────────
-        if sizing["status"] != "OVERWEIGHT" and quality["checks"].get("earnings_ok",True):
+        if (gng["sell_premium"]
+                and sizing["status"] != "OVERWEIGHT"
+                and quality["checks"].get("earnings_ok",True)
+                and not oi_warning):  # skip if heavy new put OI
             csp, _ = find_best_csp(ticker, price, contracts, ivdata, pir, quality)
             if csp:
                 csp_opps.append({**base,"csp":csp,
@@ -1017,7 +1266,9 @@ def run_scanner():
         # ── CC ───────────────────────────────────────────
         holding = stk_hold.get(ticker,{})
         qty = holding.get("quantity",0); avg = holding.get("avg_cost",0)
-        if qty >= 100 and quality["checks"].get("earnings_ok",True):
+        if (gng["sell_premium"]
+                and qty >= 100
+                and quality["checks"].get("earnings_ok",True)):
             cc, _ = find_best_cc(ticker, price, qty, avg, contracts, ivdata, pir)
             if cc:
                 cc_opps.append({**base,"cc":cc,
@@ -1025,7 +1276,10 @@ def run_scanner():
                 print(f"  {ticker}: 📈 CC  ${cc['strike']} {cc['annualized_return']}% ann δ{cc['delta']}")
 
         # ── LEAPS ────────────────────────────────────────
-        leaps, _ = find_best_leaps(ticker, price, contracts, ivdata, pir)
+        if gng["buy_leaps"]:
+         leaps, _ = find_best_leaps(ticker, price, contracts, ivdata, pir)
+        else:
+         leaps = None
         if leaps:
             leaps_opps.append({**base,"leaps":leaps,
                 "score":leaps["timing"]["score"]*(1/max(0.01,leaps["extrinsic_pct"]))*leaps["delta"]})
