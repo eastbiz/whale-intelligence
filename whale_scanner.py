@@ -342,11 +342,16 @@ def run_scanner():
     if analysis:
         print(f"\n{analysis}")
 
-    print("\n📱 Sending alerts...")
+print("\n📱 Sending alerts...")
+    import time
     for opp in top[:3]:
         send_telegram(format_alert(opp))
+        time.sleep(2)
     if analysis:
+        print("📱 Sending Claude summary...")
         send_telegram(f"🧠 *Claude's Summary*\n\n{analysis}")
+    else:
+        send_telegram("🧠 *No Claude summary available*")
 
     print("\n✅ Done!")
 
