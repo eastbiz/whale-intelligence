@@ -37,8 +37,8 @@ LEAPS_DTE_MIN         = 500   # 2+ years
 CSP_DELTA_MIN         = 0.20; CSP_DELTA_MAX   = 0.30   # standard
 CC_DELTA_MIN          = 0.15; CC_DELTA_MAX    = 0.25
 LEAPS_DELTA_MIN       = 0.80; LEAPS_DELTA_MAX = 0.90
-CSP_MIN_ANNUALIZED    = 15.0  # preferred minimum
-CC_MIN_ANNUALIZED     = 10.0
+CSP_MIN_ANNUALIZED    = 20.0  # preferred minimum
+CC_MIN_ANNUALIZED     = 15.0
 MAX_ANNUALIZED        = 120.0 # cap bad data
 IVP_MIN_SELL          = 30    # min IVP to sell premium
 IVP_MAX_BUY           = 50    # max IVP to buy LEAPS
