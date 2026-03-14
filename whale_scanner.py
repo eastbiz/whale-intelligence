@@ -1,15 +1,18 @@
 """
 Whale Intelligence — Personal Options Trading Scanner
-v4 — Tiered position sizing, IVP proxy, delta fix,
-     Peter Lynch discovery, quality-aware filtering
+v5 — Full framework implementation:
+     Earnings blackout, pullback filter, 200MA, PMCC detection,
+     Bull Call Spread, tiered position sizing, IVP, deep ITM LEAPS,
+     deal quality checklist, Peter Lynch discovery
 """
 
 import os, json, re, math, time
 import requests
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
+# ── API Keys ────────────────────────────────────────────────
 UNUSUAL_WHALES_API_KEY = os.environ.get("UW_API_KEY", "")
 TELEGRAM_BOT_TOKEN     = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID       = os.environ.get("TELEGRAM_CHAT_ID", "")
@@ -21,97 +24,113 @@ PORTFOLIO_SIZE = 7_000_000
 
 # ── Tiered position limits ──────────────────────────────────
 POSITION_TIERS = {
-    # Mega cap — highest conviction, highest allocation
-    "AAPL":  0.08, "AMZN": 0.08, "GOOGL": 0.08,
-    "NVDA":  0.08, "MSFT": 0.08,
-    # Quality core
-    "ASML":  0.06, "TSM":  0.06, "MELI":  0.06,
-    "NVO":   0.06, "BRK-B":0.06,
-    # Standard core
-    "IBKR":  0.04, "MU":   0.04,
-    # Default for opportunistic
+    "AAPL": 0.08, "AMZN": 0.08, "GOOGL": 0.08, "NVDA": 0.08, "MSFT": 0.08,
+    "ASML": 0.06, "TSM":  0.06, "MELI":  0.06, "NVO":  0.06, "BRK-B": 0.06,
+    "IBKR": 0.04, "MU":   0.04,
     "__DEFAULT__": 0.025
 }
 
-# ── Strategy parameters ─────────────────────────────────────
-CSP_DTE_MIN       = 25
-CSP_DTE_MAX       = 45
-CC_DTE_MIN        = 25
-CC_DTE_MAX        = 45
-LEAPS_DTE_MIN     = 300
-CSP_DELTA_MAX     = 0.32
-CC_DELTA_MAX      = 0.35
-ALERT_PREMIUM_MIN = 1.00
-MIN_ANNUALIZED    = 15.0
-MAX_ANNUALIZED    = 120.0
-IVP_MIN_TO_SELL   = 40      # Min IV percentile to sell premium (CSP/CC)
-IVP_MAX_TO_BUY    = 50      # Max IV percentile to buy LEAPS
+# ── Strategy parameters (from framework doc) ────────────────
+CSP_DTE_MIN           = 30;   CSP_DTE_MAX     = 45
+CC_DTE_MIN            = 30;   CC_DTE_MAX      = 45
+LEAPS_DTE_MIN         = 500   # 2+ years
+CSP_DELTA_MIN         = 0.20; CSP_DELTA_MAX   = 0.30   # standard
+CC_DELTA_MIN          = 0.15; CC_DELTA_MAX    = 0.25
+LEAPS_DELTA_MIN       = 0.80; LEAPS_DELTA_MAX = 0.90
+CSP_MIN_ANNUALIZED    = 15.0  # preferred minimum
+CC_MIN_ANNUALIZED     = 10.0
+MAX_ANNUALIZED        = 120.0 # cap bad data
+IVP_MIN_SELL          = 30    # min IVP to sell premium
+IVP_MAX_BUY           = 50    # max IVP to buy LEAPS
+EARNINGS_BLACKOUT     = 14    # skip CSP/CC if earnings within N days
+PULLBACK_MIN          = 0.15  # stock must be ≥15% below 52w high
+PULLBACK_MAX          = 0.65  # but not >65% (company may be broken)
+BCS_MIN_ROR           = 0.80  # Bull Call Spread min return on risk
 
-# ── Watchlists ──────────────────────────────────────────────
-CORE_STOCKS = [
-    "AAPL","AMZN","ASML","BRK-B","GOOGL",
-    "IBKR","MELI","MU","NVDA","NVO","TSM"
-]
+CORE_STOCKS = ["AAPL","AMZN","ASML","BRK-B","GOOGL","IBKR","MELI","MU","NVDA","NVO","TSM"]
 OPPORTUNISTIC_STOCKS = [
-    "BABA","CLS","CRDO","DDOG","FIX","KNX","LULU","NFLX","NOW",
-    "POWL","UBER","VRT","VRTX","CPRT","CRSP","GRAB","IBIT",
-    "NBIS","PATH","PLTR","TSLA"
+    "BABA","CLS","CRDO","DDOG","FIX","KNX","LULU","NFLX","NOW","POWL",
+    "UBER","VRT","VRTX","CPRT","CRSP","GRAB","IBIT","NBIS","PATH","PLTR","TSLA"
 ]
-# Biotech/speculative — require wider OTM buffer
-SPECULATIVE_TICKERS = {"VRTX","CRSP","NBIS","GRAB","PATH","IBIT","PLTR","BABA","CRDO"}
+SPECULATIVE = {"VRTX","CRSP","NBIS","GRAB","PATH","IBIT","PLTR","BABA","CRDO"}
 
 UW_BASE    = "https://api.unusualwhales.com"
 UW_HEADERS = {"Authorization": f"Bearer {UNUSUAL_WHALES_API_KEY}"}
 
 
-# ─────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════
 # MARKET DATA
-# ─────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════
 
 def get_market_data(tickers: list) -> dict:
+    """Price, 52w range, volume, earnings date, 200-day MA proxy."""
     data = {}
     for ticker in tickers:
         yf = ticker.replace("BRK.B","BRK-B")
         try:
             r = requests.get(
-                f"https://query1.finance.yahoo.com/v8/finance/chart/{yf}",
-                headers={"User-Agent":"Mozilla/5.0"}, timeout=10
+                f"https://query1.finance.yahoo.com/v8/finance/chart/{yf}"
+                f"?range=1y&interval=1d",
+                headers={"User-Agent":"Mozilla/5.0"}, timeout=12
             )
-            j    = r.json()
-            meta = j["chart"]["result"][0]["meta"]
+            j    = r.json()["chart"]["result"][0]
+            meta = j["meta"]
+            closes = j.get("indicators",{}).get("quote",[{}])[0].get("close",[])
+            closes = [c for c in closes if c]
+
+            ma200 = sum(closes[-200:]) / min(200, len(closes)) if closes else 0
+            price = float(meta.get("regularMarketPrice",0))
+
             data[ticker] = {
-                "price":       round(float(meta.get("regularMarketPrice",0)),2),
-                "week52_high": round(float(meta.get("fiftyTwoWeekHigh",0)),2),
-                "week52_low":  round(float(meta.get("fiftyTwoWeekLow",0)),2),
-                "avg_volume":  int(meta.get("averageDailyVolume3Month",0)),
+                "price":        round(price, 2),
+                "week52_high":  round(float(meta.get("fiftyTwoWeekHigh", price)), 2),
+                "week52_low":   round(float(meta.get("fiftyTwoWeekLow",  price)), 2),
+                "avg_volume":   int(meta.get("averageDailyVolume3Month", 0)),
+                "ma200":        round(ma200, 2),
+                "above_ma200":  price >= ma200 * 0.97,  # within 3% counts as near MA
             }
-        except:
-            data[ticker] = {"price":0,"week52_high":0,"week52_low":0,"avg_volume":0}
+        except Exception as e:
+            data[ticker] = {"price":0,"week52_high":0,"week52_low":0,
+                            "avg_volume":0,"ma200":0,"above_ma200":False}
     return data
 
 
-def get_fundamentals(ticker: str) -> dict:
-    """Fetch P/E, EPS growth, PEG for Peter Lynch screening."""
+def get_earnings_date(ticker: str) -> Optional[datetime]:
+    """Fetch next earnings date from Yahoo Finance."""
     try:
         r = requests.get(
             f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{ticker}"
-            f"?modules=defaultKeyStatistics,financialData,earningsTrend",
-            headers={"User-Agent":"Mozilla/5.0"}, timeout=10
+            f"?modules=calendarEvents",
+            headers={"User-Agent":"Mozilla/5.0"}, timeout=8
         )
         j   = r.json().get("quoteSummary",{}).get("result",[{}])[0]
-        ks  = j.get("defaultKeyStatistics",{})
-        fd  = j.get("financialData",{})
+        ts  = j.get("calendarEvents",{}).get("earnings",{}).get("earningsDate",[])
+        if ts:
+            return datetime.fromtimestamp(ts[0].get("raw",0))
+    except: pass
+    return None
+
+
+def get_fundamentals(ticker: str) -> dict:
+    """PEG, EPS growth, revenue growth, profit margin for Peter Lynch screen."""
+    try:
+        r = requests.get(
+            f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{ticker}"
+            f"?modules=defaultKeyStatistics,financialData",
+            headers={"User-Agent":"Mozilla/5.0"}, timeout=8
+        )
+        j  = r.json().get("quoteSummary",{}).get("result",[{}])[0]
+        ks = j.get("defaultKeyStatistics",{})
+        fd = j.get("financialData",{})
         return {
-            "peg_ratio":       ks.get("pegRatio",{}).get("raw"),
-            "forward_pe":      ks.get("forwardPE",{}).get("raw"),
-            "eps_growth":      fd.get("earningsGrowth",{}).get("raw"),
-            "revenue_growth":  fd.get("revenueGrowth",{}).get("raw"),
-            "profit_margin":   fd.get("profitMargins",{}).get("raw"),
-            "debt_to_equity":  fd.get("debtToEquity",{}).get("raw"),
-            "return_on_equity":fd.get("returnOnEquity",{}).get("raw"),
+            "peg_ratio":      ks.get("pegRatio",{}).get("raw"),
+            "forward_pe":     ks.get("forwardPE",{}).get("raw"),
+            "eps_growth":     fd.get("earningsGrowth",{}).get("raw"),
+            "revenue_growth": fd.get("revenueGrowth",{}).get("raw"),
+            "profit_margin":  fd.get("profitMargins",{}).get("raw"),
+            "market_cap":     ks.get("enterpriseValue",{}).get("raw"),
         }
-    except:
-        return {}
+    except: return {}
 
 
 def position_in_range(price, w52_low, w52_high) -> float:
@@ -119,9 +138,15 @@ def position_in_range(price, w52_low, w52_high) -> float:
     return round((price - w52_low) / (w52_high - w52_low), 2)
 
 
-# ─────────────────────────────────────────────
+def pullback_from_high(price, w52_high) -> float:
+    """How far is price from 52w high. 0.20 = 20% below high."""
+    if w52_high <= 0: return 0
+    return round((w52_high - price) / w52_high, 3)
+
+
+# ════════════════════════════════════════════════════════════
 # IBKR
-# ─────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════
 
 def get_ibkr_positions() -> dict:
     positions = {}
@@ -155,6 +180,10 @@ def get_ibkr_positions() -> dict:
                 "avg_cost":     float(pos.get("costBasisPrice", 0) or 0),
                 "pct_nav":      float(pos.get("percentOfNAV",   0) or 0),
                 "asset_class":  pos.get("assetClass",""),
+                "strike":       pos.get("strike",""),
+                "expiry":       pos.get("expiry",""),
+                "put_call":     pos.get("putCall",""),
+                "underlying":   pos.get("underlyingSymbol", sym),
             }
         stk = sum(1 for v in positions.values() if v["asset_class"]=="STK")
         opt = sum(1 for v in positions.values() if v["asset_class"]=="OPT")
@@ -164,9 +193,32 @@ def get_ibkr_positions() -> dict:
     return positions
 
 
-# ─────────────────────────────────────────────
+def find_existing_leaps(ticker: str, ibkr_positions: dict) -> Optional[dict]:
+    """Check if we already own a LEAPS call on this ticker (for PMCC)."""
+    today = datetime.now()
+    for sym, pos in ibkr_positions.items():
+        if (pos.get("asset_class") == "OPT"
+                and pos.get("underlying","").upper() == ticker.upper()
+                and pos.get("put_call","").upper() == "C"
+                and pos.get("quantity", 0) > 0):
+            try:
+                exp = datetime.strptime(pos["expiry"], "%Y%m%d")
+                dte = (exp - today).days
+                if dte >= 300:  # it's a LEAPS
+                    return {
+                        "strike":   float(pos.get("strike", 0) or 0),
+                        "expiry":   exp.strftime("%Y-%m-%d"),
+                        "dte":      dte,
+                        "quantity": int(pos.get("quantity", 0)),
+                        "avg_cost": float(pos.get("avg_cost", 0) or 0),
+                    }
+            except: continue
+    return None
+
+
+# ════════════════════════════════════════════════════════════
 # UNUSUAL WHALES
-# ─────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════
 
 def get_option_contracts(ticker: str) -> list:
     try:
@@ -189,7 +241,6 @@ def get_darkpool(ticker: str) -> list:
 
 
 def get_flow_alerts_market() -> list:
-    """Market-wide flow for Peter Lynch discovery."""
     try:
         r = requests.get(f"{UW_BASE}/api/option-trades/flow-alerts",
                          headers=UW_HEADERS, timeout=10)
@@ -199,17 +250,37 @@ def get_flow_alerts_market() -> list:
     return []
 
 
-# ─────────────────────────────────────────────
-# IV PERCENTILE PROXY
-# ─────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════
+# OPTION MATH
+# ════════════════════════════════════════════════════════════
 
-def calculate_ivp(contracts: list, target_dte_min=20, target_dte_max=50) -> dict:
-    """
-    Calculate IV percentile proxy from option chain.
-    Uses ATM options in target DTE range.
-    IVP = where current IV sits vs the range of IVs in the chain.
-    Returns iv_current, iv_low, iv_high, ivp (0-100)
-    """
+def parse_option_symbol(sym: str):
+    try:
+        m = re.match(r'^([A-Z.\-]+)(\d{6})([CP])(\d{8})$', sym)
+        if not m: return None
+        return datetime.strptime("20"+m.group(2), "%Y%m%d"), m.group(3), int(m.group(4))/1000
+    except: return None
+
+
+def norm_cdf(x):
+    return 0.5 * (1 + math.erf(x / math.sqrt(2)))
+
+
+def estimate_delta(spot, strike, dte, iv, opt_type) -> Optional[float]:
+    """Black-Scholes delta using actual spot and strike."""
+    try:
+        if iv <= 0 or dte <= 0 or iv > 5: return None
+        t   = dte / 365
+        sst = iv * math.sqrt(t)
+        if sst == 0: return None
+        d1  = (math.log(spot / strike) + 0.5 * iv**2 * t) / sst
+        delta = norm_cdf(d1) if opt_type == "C" else norm_cdf(d1) - 1
+        return round(abs(delta), 2)
+    except: return None
+
+
+def calculate_ivp(contracts: list) -> dict:
+    """IV percentile from ATM contracts in 25-50 DTE range."""
     today = datetime.now()
     ivs   = []
     for c in contracts:
@@ -217,54 +288,18 @@ def calculate_ivp(contracts: list, target_dte_min=20, target_dte_max=50) -> dict
         if not parsed: continue
         expiry, _, _ = parsed
         dte = (expiry - today).days
-        if not (target_dte_min <= dte <= target_dte_max): continue
+        if not (25 <= dte <= 50): continue
         iv = float(c.get("implied_volatility",0) or 0)
-        if 0.05 < iv < 5.0:   # sanity range
+        if 0.05 < iv < 5.0:
             ivs.append(iv)
-
     if not ivs:
-        return {"iv_current": 0.30, "iv_low": 0.20, "iv_high": 0.60, "ivp": 50}
-
-    iv_sorted = sorted(ivs)
-    iv_low    = iv_sorted[0]
-    iv_high   = iv_sorted[-1]
-    iv_median = iv_sorted[len(iv_sorted)//2]
-    iv_range  = iv_high - iv_low
-    ivp       = round((iv_median - iv_low) / iv_range * 100, 1) if iv_range > 0 else 50
-
-    return {
-        "iv_current": round(iv_median, 3),
-        "iv_low":     round(iv_low, 3),
-        "iv_high":    round(iv_high, 3),
-        "ivp":        ivp
-    }
-
-
-# ─────────────────────────────────────────────
-# OPTION MATH
-# ─────────────────────────────────────────────
-
-def parse_option_symbol(sym: str):
-    try:
-        m = re.match(r'^([A-Z.\-]+)(\d{6})([CP])(\d{8})$', sym)
-        if not m: return None
-        expiry = datetime.strptime("20"+m.group(2), "%Y%m%d")
-        return expiry, m.group(3), int(m.group(4))/1000
-    except: return None
-
-
-def estimate_delta(otm_pct: float, dte: int, iv: float, opt_type: str) -> Optional[float]:
-    """Delta approximation using ATM IV only."""
-    try:
-        if iv <= 0 or dte <= 0 or iv > 3.0: return None
-        t   = dte / 365
-        sst = iv * math.sqrt(t)
-        if sst == 0: return None
-        moneyness = -otm_pct / 100
-        d1  = moneyness / sst + 0.5 * sst
-        cdf = 0.5 * (1 + math.erf(d1 / math.sqrt(2)))
-        return round((1 - cdf) if opt_type == "P" else cdf, 2)
-    except: return None
+        return {"iv_current":0.30,"iv_low":0.20,"iv_high":0.60,"ivp":50}
+    s       = sorted(ivs)
+    iv_med  = s[len(s)//2]
+    iv_rng  = s[-1] - s[0]
+    ivp     = round((iv_med - s[0]) / iv_rng * 100, 1) if iv_rng > 0 else 50
+    return {"iv_current":round(iv_med,3),"iv_low":round(s[0],3),
+            "iv_high":round(s[-1],3),"ivp":ivp}
 
 
 def score_darkpool(trades: list) -> dict:
@@ -274,139 +309,199 @@ def score_darkpool(trades: list) -> dict:
     for t in trades[:20]:
         n = float(t.get("size",0)) * float(t.get("price",0))
         total += n
-        if float(t.get("price",0)) >= float(t.get("vwap",t.get("price",0))):
+        if float(t.get("price",0)) >= float(t.get("vwap", t.get("price",0))):
             bullish += n
     score = (bullish/total*100) if total > 0 else 50
-    label = ("🟢 Institutions accumulating" if score > 55
-             else "🔴 Institutions distributing" if score < 45
-             else "⚪ Mixed institutional activity")
-    return {"score":round(score,1),"total_notional":round(total,0),"label":label}
-
-
-def get_max_allocation(ticker: str) -> float:
-    return POSITION_TIERS.get(ticker, POSITION_TIERS["__DEFAULT__"])
-
-
-def position_check(ticker, ibkr_positions):
-    pos  = ibkr_positions.get(ticker, {})
-    val  = pos.get("market_value", 0)
-    qty  = pos.get("quantity", 0)
-    avg  = pos.get("avg_cost", 0)
-    pct  = (val / PORTFOLIO_SIZE) * 100
-    max_pct = get_max_allocation(ticker) * 100
-    max_val = PORTFOLIO_SIZE * get_max_allocation(ticker)
-    room = max(0, round(max_val - val, 0))
-    tier = ("Mega cap" if get_max_allocation(ticker) >= 0.08
-            else "Quality core" if get_max_allocation(ticker) >= 0.06
-            else "Standard core" if get_max_allocation(ticker) >= 0.04
-            else "Opportunistic")
     return {
-        "current_value": round(val,0), "quantity": qty, "avg_cost": avg,
-        "current_pct": round(pct,2), "max_pct": round(max_pct,1),
-        "room_usd": room, "tier": tier,
-        "status": ("OVERWEIGHT" if pct > max_pct * 1.2
-                   else "FULL"     if pct > max_pct * 0.9
-                   else "HAS ROOM" if val > 0
-                   else "NEW POSITION")
+        "score": round(score,1),
+        "total_notional": round(total,0),
+        "label": ("🟢 Institutions accumulating" if score > 55
+                  else "🔴 Institutions distributing" if score < 45
+                  else "⚪ Mixed")
     }
 
 
-# ─────────────────────────────────────────────
-# MARKET TIMING INTELLIGENCE
-# ─────────────────────────────────────────────
+def get_max_alloc(ticker): return POSITION_TIERS.get(ticker, POSITION_TIERS["__DEFAULT__"])
 
-def timing_score(strategy: str, pir: float, ivp: float, is_speculative: bool = False) -> dict:
+
+def position_check(ticker, ibkr):
+    pos  = ibkr.get(ticker,{})
+    val  = pos.get("market_value",0)
+    qty  = pos.get("quantity",0)
+    avg  = pos.get("avg_cost",0)
+    pct  = (val / PORTFOLIO_SIZE) * 100
+    max_a= get_max_alloc(ticker)
+    room = max(0, round(PORTFOLIO_SIZE * max_a - val, 0))
+    tier = ("Mega cap" if max_a >= 0.08 else "Quality core" if max_a >= 0.06
+            else "Standard core" if max_a >= 0.04 else "Opportunistic")
+    return {
+        "current_value":round(val,0), "quantity":qty, "avg_cost":avg,
+        "current_pct":round(pct,2), "max_pct":round(max_a*100,1),
+        "room_usd":room, "tier":tier,
+        "status":("OVERWEIGHT" if pct > max_a*100*1.2
+                  else "FULL"  if pct > max_a*100*0.9
+                  else "HAS ROOM" if val > 0 else "NEW POSITION")
+    }
+
+
+# ════════════════════════════════════════════════════════════
+# STOCK QUALITY GATE
+# Framework: quality stock → pullback → check option yield
+# ════════════════════════════════════════════════════════════
+
+def stock_quality_check(ticker, md, earnings_date) -> dict:
     """
-    Score timing using IVP (IV percentile) and price position in 52w range.
-    pir: 0=52w low, 1=52w high
-    ivp: 0-100 (how elevated IV is vs recent history)
+    Returns quality score and pass/fail for each criterion.
+    Bad traders: scan → highest premium → trade
+    Good traders: quality stock → pullback → check option yield
     """
-    high_ivp  = ivp >= IVP_MIN_TO_SELL   # IV elevated vs history
-    low_ivp   = ivp <= IVP_MAX_TO_BUY    # IV cheap vs history
+    price    = md["price"]
+    w52h     = md["week52_high"]
+    w52l     = md["week52_low"]
+    pullback = pullback_from_high(price, w52h)
+    vol      = md["avg_volume"]
+    above_ma = md["above_ma200"]
+    ma200    = md["ma200"]
+
+    checks = {}
+
+    # Price > $20
+    checks["price_ok"]    = price >= 20
+
+    # Volume > 1M
+    checks["volume_ok"]   = vol >= 1_000_000
+
+    # Pullback 15-65% from high (opportunity zone)
+    checks["pullback_ok"] = PULLBACK_MIN <= pullback <= PULLBACK_MAX
+
+    # Above 200MA or within 5% of it (near support)
+    checks["ma200_ok"]    = above_ma or (ma200 > 0 and price >= ma200 * 0.95)
+
+    # Not in earnings blackout
+    days_to_earnings = None
+    if earnings_date:
+        days_to_earnings = (earnings_date - datetime.now()).days
+        checks["earnings_ok"] = days_to_earnings > EARNINGS_BLACKOUT or days_to_earnings < 0
+    else:
+        checks["earnings_ok"] = True
+
+    # Quality score: sum of passes (0-5)
+    quality_score = sum(checks.values())
+
+    return {
+        "checks": checks,
+        "quality_score": quality_score,
+        "pullback": pullback,
+        "pullback_pct": round(pullback * 100, 1),
+        "days_to_earnings": days_to_earnings,
+        "passes": quality_score >= 3,  # need at least 3/5 to proceed
+    }
+
+
+# ════════════════════════════════════════════════════════════
+# TIMING INTELLIGENCE (IVP + price position)
+# ════════════════════════════════════════════════════════════
+
+def timing_score(strategy, pir, ivp, is_spec=False) -> dict:
+    high_ivp  = ivp >= IVP_MIN_SELL
+    low_ivp   = ivp <= IVP_MAX_BUY
     near_low  = pir < 0.30
     near_high = pir > 0.70
-    mid_range = 0.30 <= pir <= 0.70
-
-    # Extra OTM buffer for speculative names
-    spec_note = " (speculative — use wider strikes)" if is_speculative else ""
+    spec = " (use wider strikes — speculative)" if is_spec else ""
 
     if strategy == "CSP":
         if high_ivp and near_low:
-            return {"score":95, "recommend":True,
-                    "signal":f"🔥 EXCELLENT — High IVP ({ivp:.0f}%) + near 52w low = ideal CSP entry{spec_note}"}
-        elif high_ivp and mid_range:
-            return {"score":80, "recommend":True,
-                    "signal":f"✅ GOOD — High IVP ({ivp:.0f}%), reasonable price level{spec_note}"}
+            return {"score":95,"recommend":True,
+                    "signal":f"🔥 EXCELLENT — IVP {ivp:.0f}% + near 52w low{spec}"}
+        elif high_ivp and not near_high:
+            return {"score":80,"recommend":True,
+                    "signal":f"✅ GOOD — IVP {ivp:.0f}%, healthy price level{spec}"}
         elif high_ivp and near_high:
-            return {"score":55, "recommend":True,
-                    "signal":f"⚠️ CAUTION — High IVP ({ivp:.0f}%) but stock near 52w high{spec_note}"}
-        elif not high_ivp and near_low:
-            return {"score":40, "recommend":False,
-                    "signal":f"⚠️ WEAK — Low IVP ({ivp:.0f}%), poor premium despite low price"}
-        else:
-            return {"score":25, "recommend":False,
-                    "signal":f"❌ POOR — Low IVP ({ivp:.0f}%), thin premium. Wait for higher IV"}
+            return {"score":55,"recommend":True,
+                    "signal":f"⚠️ CAUTION — IVP {ivp:.0f}% but near 52w high{spec}"}
+        elif not high_ivp:
+            return {"score":20,"recommend":False,
+                    "signal":f"❌ SKIP — IVP {ivp:.0f}% too low for premium selling"}
 
     elif strategy == "CC":
         if near_low:
-            return {"score":10, "recommend":False,
-                    "signal":f"❌ AVOID — Never sell CC near 52w low (locks in loss potential)"}
+            return {"score":5,"recommend":False,
+                    "signal":"❌ AVOID — Never sell CC near 52w low (limits upside in recovery)"}
         elif near_high and high_ivp:
-            return {"score":90, "recommend":True,
-                    "signal":f"🔥 EXCELLENT — Stock near highs + high IVP ({ivp:.0f}%) = fat CC premium"}
-        elif near_high and not high_ivp:
-            return {"score":75, "recommend":True,
-                    "signal":f"✅ GOOD — Stock near highs, decent CC level"}
-        elif mid_range and high_ivp:
-            return {"score":65, "recommend":True,
-                    "signal":f"✅ OK — Elevated IVP ({ivp:.0f}%) boosts CC premium"}
+            return {"score":90,"recommend":True,
+                    "signal":f"🔥 EXCELLENT — Near highs + IVP {ivp:.0f}%"}
+        elif near_high:
+            return {"score":75,"recommend":True,
+                    "signal":f"✅ GOOD — Stock near highs, income opportunity"}
+        elif high_ivp:
+            return {"score":65,"recommend":True,
+                    "signal":f"✅ OK — IVP {ivp:.0f}% boosts CC premium"}
         else:
-            return {"score":35, "recommend":False,
-                    "signal":f"⚠️ WEAK — Low IVP ({ivp:.0f}%) + mid range. Skip CC"}
+            return {"score":30,"recommend":False,
+                    "signal":f"⚠️ WEAK — IVP {ivp:.0f}% too low for CC"}
 
     elif strategy == "LEAPS":
-        if is_speculative and near_high:
-            return {"score":10, "recommend":False,
-                    "signal":f"❌ AVOID — Speculative stock near highs, wait for bigger drawdown"}
+        if is_spec and near_high:
+            return {"score":5,"recommend":False,
+                    "signal":"❌ AVOID — Speculative + near highs, wait for bigger drawdown"}
         elif low_ivp and near_low:
-            return {"score":95, "recommend":True,
-                    "signal":f"🔥 EXCEPTIONAL — Low IVP ({ivp:.0f}%) + near 52w low = cheapest LEAPS entry"}
-        elif low_ivp and mid_range:
-            return {"score":78, "recommend":True,
-                    "signal":f"✅ GOOD — Low IVP ({ivp:.0f}%) = reasonably priced LEAPS"}
-        elif low_ivp and near_high:
-            return {"score":40, "recommend":False,
-                    "signal":f"⚠️ WEAK — Low IV but stock stretched near highs"}
+            return {"score":95,"recommend":True,
+                    "signal":f"🔥 EXCEPTIONAL — IVP {ivp:.0f}% (cheap) + near 52w low"}
+        elif low_ivp and not near_high:
+            return {"score":78,"recommend":True,
+                    "signal":f"✅ GOOD — Low IVP {ivp:.0f}% = reasonably priced LEAPS"}
         elif not low_ivp and near_low:
-            return {"score":55, "recommend":True,
-                    "signal":f"⚠️ MIXED — Good price level but IVP ({ivp:.0f}%) makes LEAPS pricey"}
-        elif high_ivp and near_high:
-            return {"score":5, "recommend":False,
-                    "signal":f"❌ POOR — Expensive options + high price. Don't buy LEAPS"}
+            return {"score":52,"recommend":True,
+                    "signal":f"⚠️ MIXED — Good price but IVP {ivp:.0f}% makes options pricey"}
         else:
-            return {"score":45, "recommend":False,
-                    "signal":f"⚠️ NEUTRAL — IVP {ivp:.0f}%, wait for better entry"}
+            return {"score":15,"recommend":False,
+                    "signal":f"❌ POOR — IVP {ivp:.0f}% too high to buy LEAPS"}
 
-    return {"score":50, "recommend":True, "signal":"Neutral"}
+    elif strategy == "PMCC":
+        # PMCC short call — same as CC but we own LEAPS not stock
+        if near_low:
+            return {"score":5,"recommend":False,"signal":"❌ AVOID — Don't sell calls near lows"}
+        elif high_ivp:
+            return {"score":82,"recommend":True,
+                    "signal":f"✅ GOOD — IVP {ivp:.0f}% gives fat PMCC premium"}
+        else:
+            return {"score":40,"recommend":False,
+                    "signal":f"⚠️ WEAK — Low IVP {ivp:.0f}% for PMCC short call"}
+
+    elif strategy == "BCS":
+        # Bull call spread — want moderate to high IVP, near lows preferred
+        if near_low and not high_ivp:
+            return {"score":88,"recommend":True,
+                    "signal":f"✅ GOOD — Near lows + IVP {ivp:.0f}%, directional setup"}
+        elif near_low and high_ivp:
+            return {"score":70,"recommend":True,
+                    "signal":f"✅ OK — Near lows but IVP {ivp:.0f}% makes spread wider"}
+        elif near_high:
+            return {"score":20,"recommend":False,
+                    "signal":"❌ AVOID — Don't buy bull spreads near 52w highs"}
+        else:
+            return {"score":55,"recommend":True,
+                    "signal":f"⚠️ NEUTRAL — Moderate timing for bull spread"}
+
+    return {"score":50,"recommend":True,"signal":"Neutral"}
 
 
-# ─────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════
 # OPPORTUNITY FINDERS
-# ─────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════
 
-def find_best_csp(ticker, price, contracts, ivdata, pir):
-    is_spec = ticker in SPECULATIVE_TICKERS
-    otm_min = 10 if is_spec else 3    # wider buffer for speculative
-    otm_max = 25 if is_spec else 18
-
-    timing = timing_score("CSP", pir, ivdata["ivp"], is_spec)
+def find_best_csp(ticker, price, contracts, ivdata, pir, quality):
+    timing = timing_score("CSP", pir, ivdata["ivp"], ticker in SPECULATIVE)
     if not timing["recommend"]: return None, timing
     if not contracts or price <= 0: return None, timing
 
-    # Use ATM IV for accurate delta calculation
     atm_iv = ivdata["iv_current"]
     today  = datetime.now()
     best   = None; best_score = 0
+
+    # Wider OTM for speculative names
+    otm_min = 10 if ticker in SPECULATIVE else 3
+    otm_max = 20
 
     for c in contracts:
         parsed = parse_option_symbol(c.get("option_symbol",""))
@@ -420,21 +515,20 @@ def find_best_csp(ticker, price, contracts, ivdata, pir):
         bid = float(c.get("nbbo_bid",0) or 0)
         ask = float(c.get("nbbo_ask",0) or 0)
         mid = (bid + ask) / 2
-        if mid < ALERT_PREMIUM_MIN: continue
+        if mid < 1.0: continue
         if mid > strike * 0.25: continue
-        # Use ATM IV for delta — much more accurate
-        delta = estimate_delta(otm_pct, dte, atm_iv, "P")
-        if delta and delta > CSP_DELTA_MAX: continue
+        delta = estimate_delta(price, strike, dte, atm_iv, "P")
+        if delta is None or not (CSP_DELTA_MIN <= delta <= CSP_DELTA_MAX): continue
         annualized = (mid / strike) * (365 / dte) * 100
-        if not (MIN_ANNUALIZED <= annualized <= MAX_ANNUALIZED): continue
-        max_contracts = max(1, int((PORTFOLIO_SIZE * get_max_allocation(ticker)) / (strike * 100)))
-        score = (timing["score"]/100) * (1 - abs(dte-35)/35) * (1 - abs(otm_pct-10)/10) * mid * (1 + atm_iv)
+        if not (CSP_MIN_ANNUALIZED <= annualized <= MAX_ANNUALIZED): continue
+        max_contracts = max(1, int((PORTFOLIO_SIZE * get_max_alloc(ticker)) / (strike * 100)))
+        score = (timing["score"]/100) * (quality["quality_score"]/5) * mid * (1 + atm_iv) * (1 - abs(dte-37)/37)
         if score > best_score:
             best_score = score
-            best = {"strike":strike, "expiry":expiry.strftime("%Y-%m-%d"), "dte":dte,
-                    "bid":round(bid,2), "ask":round(ask,2), "premium":round(mid,2),
-                    "otm_pct":round(otm_pct,1), "iv":round(atm_iv*100,1),
-                    "ivp":ivdata["ivp"], "delta":delta,
+            best = {"strike":strike,"expiry":expiry.strftime("%Y-%m-%d"),"dte":dte,
+                    "bid":round(bid,2),"ask":round(ask,2),"premium":round(mid,2),
+                    "otm_pct":round(otm_pct,1),"iv":round(atm_iv*100,1),
+                    "ivp":ivdata["ivp"],"delta":delta,
                     "annualized_return":round(annualized,1),
                     "max_contracts":max_contracts,
                     "collateral":round(strike*100*max_contracts,0),
@@ -443,7 +537,7 @@ def find_best_csp(ticker, price, contracts, ivdata, pir):
 
 
 def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir):
-    timing = timing_score("CC", pir, ivdata["ivp"], ticker in SPECULATIVE_TICKERS)
+    timing = timing_score("CC", pir, ivdata["ivp"])
     if not timing["recommend"]: return None, timing
     if not contracts or price <= 0 or qty < 100: return None, timing
 
@@ -461,44 +555,37 @@ def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir):
         if not (CC_DTE_MIN <= dte <= CC_DTE_MAX): continue
         otm_pct = (strike - price) / price * 100
         if not (1 <= otm_pct <= 15): continue
-        if avg_cost > 0 and strike < avg_cost * 1.02: continue  # protect cost basis
+        if avg_cost > 0 and strike < avg_cost * 1.01: continue  # protect cost basis
         bid = float(c.get("nbbo_bid",0) or 0)
         ask = float(c.get("nbbo_ask",0) or 0)
         mid = (bid + ask) / 2
-        if mid < ALERT_PREMIUM_MIN: continue
-        delta = estimate_delta(otm_pct, dte, atm_iv, "C")
-        if delta and delta > CC_DELTA_MAX: continue
+        if mid < 1.0: continue
+        delta = estimate_delta(price, strike, dte, atm_iv, "C")
+        if delta is None or not (CC_DELTA_MIN <= delta <= CC_DELTA_MAX): continue
         annualized = (mid / price) * (365 / dte) * 100
-        if not (MIN_ANNUALIZED <= annualized <= MAX_ANNUALIZED): continue
-        score = (timing["score"]/100) * (1 - abs(dte-35)/35) * mid * (1 + atm_iv)
+        if not (CC_MIN_ANNUALIZED <= annualized <= MAX_ANNUALIZED): continue
+        score = (timing["score"]/100) * mid * (1 + atm_iv) * (1 - abs(dte-37)/37)
         if score > best_score:
             best_score = score
-            best = {"strike":strike, "expiry":expiry.strftime("%Y-%m-%d"), "dte":dte,
-                    "bid":round(bid,2), "ask":round(ask,2), "premium":round(mid,2),
-                    "otm_pct":round(otm_pct,1), "iv":round(atm_iv*100,1),
-                    "ivp":ivdata["ivp"], "delta":delta,
+            best = {"strike":strike,"expiry":expiry.strftime("%Y-%m-%d"),"dte":dte,
+                    "bid":round(bid,2),"ask":round(ask,2),"premium":round(mid,2),
+                    "otm_pct":round(otm_pct,1),"iv":round(atm_iv*100,1),
+                    "ivp":ivdata["ivp"],"delta":delta,
                     "annualized_return":round(annualized,1),
-                    "max_contracts":max_contracts, "avg_cost":round(avg_cost,2),
+                    "max_contracts":max_contracts,"avg_cost":round(avg_cost,2),
                     "timing":timing}
     return best, timing
 
 
 def find_best_leaps(ticker, price, contracts, ivdata, pir):
-    """
-    Deep ITM LEAPS strategy:
-    - Target delta 0.80+ (strike ~70-80% of stock price = 20-30% ITM)
-    - Minimize extrinsic value (time value paid should be <20% of premium)
-    - This gives synthetic stock exposure with defined risk
-    - Only fall back to ATM if no deep ITM contracts available
-    """
-    is_spec = ticker in SPECULATIVE_TICKERS
+    """Deep ITM LEAPS — delta 0.80-0.90, minimize extrinsic."""
+    is_spec = ticker in SPECULATIVE
     timing  = timing_score("LEAPS", pir, ivdata["ivp"], is_spec)
     if not timing["recommend"]: return None, timing
     if not contracts or price <= 0: return None, timing
 
     atm_iv = ivdata["iv_current"]
     today  = datetime.now()
-
     candidates = []
 
     for c in contracts:
@@ -508,141 +595,229 @@ def find_best_leaps(ticker, price, contracts, ivdata, pir):
         if opt_type != "C": continue
         dte = (expiry - today).days
         if dte < LEAPS_DTE_MIN: continue
-
-        # ITM % (positive = ITM, negative = OTM)
-        itm_pct = (price - strike) / price * 100
-
-        # Accept range: 15% ITM to 10% OTM — prefer deep ITM
-        if not (-10 <= itm_pct <= 40): continue
-
+        itm_pct = (price - strike) / price * 100  # positive = ITM
+        if not (-5 <= itm_pct <= 35): continue
         bid = float(c.get("nbbo_bid",0) or 0)
         ask = float(c.get("nbbo_ask",0) or 0)
         mid = (bid + ask) / 2
-        if mid < 2.0: continue
-
-        delta = estimate_delta(-itm_pct, dte, atm_iv, "C")  # note: flip sign for delta calc
-
-        # Intrinsic value = how much the option is in the money
-        intrinsic  = max(0, price - strike)
-        extrinsic  = max(0, mid - intrinsic)
+        if mid < 5.0: continue
+        delta = estimate_delta(price, strike, dte, atm_iv, "C")
+        if delta is None or not (LEAPS_DELTA_MIN <= delta <= 0.98): continue
+        intrinsic     = max(0, price - strike)
+        extrinsic     = max(0, mid - intrinsic)
         extrinsic_pct = (extrinsic / mid * 100) if mid > 0 else 100
-
-        # Score: heavily reward low extrinsic % and high delta
-        # Deep ITM (low extrinsic) scores much higher
-        delta_score    = (delta or 0.5) * 40          # want delta close to 1.0
-        extrinsic_score= max(0, (30 - extrinsic_pct)) # reward <20% extrinsic
-        timing_s       = timing["score"] / 100
-        score          = timing_s * (delta_score + extrinsic_score) * (dte / 365)
-
+        if extrinsic_pct > 30: continue  # reject if >30% extrinsic
+        delta_score    = delta * 40
+        extrinsic_s    = max(0, 30 - extrinsic_pct)
+        score          = (timing["score"]/100) * (delta_score + extrinsic_s) * (dte/365)
         candidates.append({
-            "strike": strike,
-            "expiry": expiry.strftime("%Y-%m-%d"),
-            "dte": dte,
-            "bid": round(bid,2), "ask": round(ask,2),
-            "premium": round(mid,2),
-            "itm_pct": round(itm_pct,1),
-            "intrinsic": round(intrinsic,2),
-            "extrinsic": round(extrinsic,2),
-            "extrinsic_pct": round(extrinsic_pct,1),
-            "iv": round(atm_iv*100,1),
-            "ivp": ivdata["ivp"],
-            "delta": delta,
-            "leverage": round(price/mid,1) if mid > 0 else 0,
-            "timing": timing,
-            "score": score
+            "strike":strike,"expiry":expiry.strftime("%Y-%m-%d"),"dte":dte,
+            "bid":round(bid,2),"ask":round(ask,2),"premium":round(mid,2),
+            "itm_pct":round(itm_pct,1),"delta":delta,
+            "intrinsic":round(intrinsic,2),"extrinsic":round(extrinsic,2),
+            "extrinsic_pct":round(extrinsic_pct,1),
+            "iv":round(atm_iv*100,1),"ivp":ivdata["ivp"],
+            "leverage":round(price/mid,1) if mid > 0 else 0,
+            "timing":timing,"score":score
         })
 
-    if not candidates:
-        return None, timing
-
-    # Sort by score — deep ITM wins
+    if not candidates: return None, timing
     candidates.sort(key=lambda x: x["score"], reverse=True)
-    best = candidates[0]
+    return candidates[0], timing
 
-    # Only return if extrinsic is reasonable (<35% of premium)
-    if best["extrinsic_pct"] > 35:
-        return None, timing
 
+def find_pmcc_short_call(ticker, price, existing_leaps, contracts, ivdata, pir):
+    """Find best short call to sell against an existing LEAPS position."""
+    timing = timing_score("PMCC", pir, ivdata["ivp"])
+    if not timing["recommend"]: return None, timing
+    if not existing_leaps or not contracts: return None, timing
+
+    atm_iv      = ivdata["iv_current"]
+    today       = datetime.now()
+    leaps_strike= existing_leaps["strike"]
+    best        = None; best_score = 0
+
+    for c in contracts:
+        parsed = parse_option_symbol(c.get("option_symbol",""))
+        if not parsed: continue
+        expiry, opt_type, strike = parsed
+        if opt_type != "C": continue
+        dte = (expiry - today).days
+        if not (CC_DTE_MIN <= dte <= CC_DTE_MAX): continue
+        # Short call must be below LEAPS strike (spread protection)
+        if strike >= leaps_strike: continue
+        otm_pct = (strike - price) / price * 100
+        if not (1 <= otm_pct <= 15): continue
+        bid = float(c.get("nbbo_bid",0) or 0)
+        ask = float(c.get("nbbo_ask",0) or 0)
+        mid = (bid + ask) / 2
+        if mid < 0.50: continue
+        delta = estimate_delta(price, strike, dte, atm_iv, "C")
+        if delta is None or not (CC_DELTA_MIN <= delta <= CC_DELTA_MAX): continue
+        # Annualized based on LEAPS cost
+        leaps_cost = existing_leaps["avg_cost"] * 100
+        if leaps_cost > 0:
+            months_to_recover = leaps_cost / (mid * 100 * existing_leaps["quantity"])
+        else:
+            months_to_recover = 999
+        score = (timing["score"]/100) * mid * (1 + atm_iv)
+        if score > best_score:
+            best_score = score
+            annualized = (mid / price) * (365 / dte) * 100
+            best = {"strike":strike,"expiry":expiry.strftime("%Y-%m-%d"),"dte":dte,
+                    "bid":round(bid,2),"ask":round(ask,2),"premium":round(mid,2),
+                    "otm_pct":round(otm_pct,1),"delta":delta,
+                    "iv":round(atm_iv*100,1),"ivp":ivdata["ivp"],
+                    "annualized_return":round(annualized,1),
+                    "leaps_strike":leaps_strike,
+                    "months_to_recover":round(months_to_recover,1) if months_to_recover < 100 else "N/A",
+                    "max_contracts":existing_leaps["quantity"],
+                    "timing":timing}
     return best, timing
 
 
-# ─────────────────────────────────────────────
-# PETER LYNCH DISCOVERY
-# ─────────────────────────────────────────────
+def find_bull_call_spread(ticker, price, contracts, ivdata, pir, quality):
+    """
+    Bull Call Spread: buy ITM call, sell OTM call.
+    Target ROR ≥ 80%, prefer 100-200%.
+    Rank by: stock quality → pullback → ROR → liquidity
+    """
+    timing = timing_score("BCS", pir, ivdata["ivp"])
+    if not timing["recommend"]: return None, timing
+    if not contracts or price <= 0: return None, timing
 
-def peter_lynch_screen(known_tickers: list, flow_data: list) -> list:
-    """
-    Find stocks NOT on watchlist that appear in whale flow
-    and pass basic Peter Lynch quality checks:
-    - PEG ratio < 1.5 (growth at reasonable price)
-    - EPS growth > 15%
-    - Reasonable debt
-    Returns list of interesting discoveries.
-    """
-    # Find tickers in flow not on our list
-    flow_tickers = set()
+    atm_iv = ivdata["iv_current"]
+    today  = datetime.now()
+    best   = None; best_score = 0
+
+    # Get calls in 30-60 DTE range
+    calls = []
+    for c in contracts:
+        parsed = parse_option_symbol(c.get("option_symbol",""))
+        if not parsed: continue
+        expiry, opt_type, strike = parsed
+        if opt_type != "C": continue
+        dte = (expiry - today).days
+        if not (30 <= dte <= 60): continue
+        bid = float(c.get("nbbo_bid",0) or 0)
+        ask = float(c.get("nbbo_ask",0) or 0)
+        mid = (bid + ask) / 2
+        if mid < 0.10: continue
+        calls.append({"strike":strike,"dte":dte,"expiry":expiry,
+                      "bid":bid,"ask":ask,"mid":mid})
+
+    # Try all ITM long + OTM short combinations
+    for long_c in calls:
+        if long_c["strike"] >= price: continue  # long must be ITM
+        for short_c in calls:
+            if short_c["strike"] <= price: continue  # short must be OTM
+            if short_c["strike"] <= long_c["strike"]: continue
+            if short_c["dte"] != long_c["dte"]: continue  # same expiry
+            if short_c["strike"] - long_c["strike"] > price * 0.15: continue  # not too wide
+
+            debit = long_c["mid"] - short_c["mid"]
+            if debit <= 0: continue
+            width = short_c["strike"] - long_c["strike"]
+            max_profit = width - debit
+            if max_profit <= 0: continue
+            ror = max_profit / debit  # return on risk
+
+            if ror < BCS_MIN_ROR: continue
+
+            score = (timing["score"]/100) * (quality["quality_score"]/5) * ror * quality["pullback"]
+            if score > best_score:
+                best_score = score
+                best = {
+                    "long_strike": long_c["strike"],
+                    "short_strike": short_c["strike"],
+                    "expiry": long_c["expiry"].strftime("%Y-%m-%d"),
+                    "dte": long_c["dte"],
+                    "debit": round(debit,2),
+                    "max_profit": round(max_profit,2),
+                    "max_risk": round(debit,2),
+                    "ror": round(ror*100,1),
+                    "breakeven": round(long_c["strike"] + debit, 2),
+                    "iv": round(atm_iv*100,1),
+                    "ivp": ivdata["ivp"],
+                    "timing": timing
+                }
+    return best, timing
+
+
+# ════════════════════════════════════════════════════════════
+# PETER LYNCH DISCOVERY
+# ════════════════════════════════════════════════════════════
+
+def peter_lynch_screen(known_tickers, flow_data) -> list:
+    flow_tickers = {}
     for alert in flow_data:
-        t = alert.get("ticker","")
+        t       = alert.get("ticker","")
         premium = float(alert.get("total_premium",0) or 0)
-        if t and t not in known_tickers and premium > 500_000:
-            if alert.get("type") == "call":  # bullish flow only
-                flow_tickers.add(t)
+        if (t and t not in known_tickers and premium > 500_000
+                and alert.get("type") == "call"):
+            flow_tickers[t] = flow_tickers.get(t,0) + premium
 
     discoveries = []
-    for ticker in list(flow_tickers)[:10]:  # check top 10
+    for ticker in sorted(flow_tickers, key=flow_tickers.get, reverse=True)[:8]:
         try:
             fund = get_fundamentals(ticker)
             peg  = fund.get("peg_ratio")
             eps  = fund.get("eps_growth")
-            roe  = fund.get("return_on_equity")
-            if peg and eps and 0 < peg < 1.5 and eps > 0.15:
+            mcap = fund.get("market_cap",0) or 0
+            if peg and eps and 0 < peg < 1.5 and eps > 0.15 and mcap > 5_000_000_000:
                 discoveries.append({
                     "ticker": ticker,
                     "peg_ratio": round(peg,2),
                     "eps_growth": round(eps*100,1),
-                    "roe": round(roe*100,1) if roe else None,
-                    "why": f"PEG {peg:.1f} + {eps*100:.0f}% EPS growth + whale call flow"
+                    "whale_flow": f"${flow_tickers[ticker]:,.0f}",
+                    "why": f"PEG {peg:.1f}, EPS +{eps*100:.0f}%, whale call flow ${flow_tickers[ticker]/1e6:.1f}M"
                 })
         except: continue
-
     return sorted(discoveries, key=lambda x: x.get("peg_ratio",99))[:3]
 
 
-# ─────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════
 # CLAUDE ANALYSIS
-# ─────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════
 
-def claude_analyze(csps, ccs, leaps_list, discoveries):
+def claude_analyze(csps, ccs, leaps_list, pmccs, bcss, discoveries) -> str:
     if not ANTHROPIC_API_KEY: return ""
-    all_opps = csps + ccs + leaps_list
+    all_opps = csps + ccs + leaps_list + pmccs + bcss
     if not all_opps: return ""
 
-    disc_text = json.dumps(discoveries, indent=2) if discoveries else "None found today"
-    prompt = f"""You are an expert options income trader managing a $7M portfolio.
-Strategy: Sell CSPs/CCs (25-45 DTE, delta 0.20-0.30) for income. Buy LEAPS on conviction.
-Position sizing is tiered: mega cap 8%, quality core 6%, standard 4%, opportunistic 2.5%.
+    prompt = f"""Expert options income trader, $7M portfolio. Framework:
+- Quality stock first, premium is secondary
+- CSP: delta 0.20-0.30, 30-45 DTE, ≥15% annualized, IVP≥30
+- CC: delta 0.15-0.25, ≥10% annualized, only when not near 52w low
+- LEAPS: delta 0.80-0.90, deep ITM, <25% extrinsic, 2+ years
+- PMCC: sell 30-45 DTE calls against existing LEAPS
+- Bull Call Spread: ROR≥80%, rank by quality→pullback→ROR
+- Earnings blackout: no CSP/CC within 14 days of earnings
 
-SCREENED CSP OPPORTUNITIES (already filtered by IVP, delta, timing):
-{json.dumps(csps, indent=2)}
+Deal quality checklist:
+1. Would I be happy owning at strike price?
+2. Is return worth the risk?
+3. Is volatility helping?
+4. Is chain liquid?
+5. Is strike near real support?
 
-COVERED CALL OPPORTUNITIES (only on held stocks):
-{json.dumps(ccs, indent=2)}
+CSPs: {json.dumps(csps,indent=2)}
+CCs: {json.dumps(ccs,indent=2)}
+LEAPS: {json.dumps(leaps_list,indent=2)}
+PMCCs: {json.dumps(pmccs,indent=2)}
+Bull Call Spreads: {json.dumps(bcss,indent=2)}
+Peter Lynch Discoveries: {json.dumps(discoveries,indent=2) if discoveries else 'None'}
 
-LEAPS OPPORTUNITIES:
-{json.dumps(leaps_list, indent=2)}
+Give:
+1. Best CSP — exact trade, checklist pass/fail, execution price
+2. Best CC (if any)
+3. Best LEAPS or PMCC (if any)
+4. Best Bull Call Spread (if any, ROR focus)
+5. Any Peter Lynch discovery worth investigating
+6. One-line IVP environment summary
+7. Hard pass on anything that fails quality check
 
-PETER LYNCH DISCOVERIES (not on watchlist, whale flow + quality fundamentals):
-{disc_text}
-
-Provide:
-1. Best CSP trade — exact strike, expiry, why, execution tip
-2. Best CC trade — exact details (if any)
-3. Best LEAPS trade — exact details (if any)
-4. Any Peter Lynch discovery worth investigating
-5. One-line market timing summary (IVP environment)
-6. Hard pass on anything that looks wrong
-
-Be direct and specific. No fluff."""
+Direct, specific, no fluff."""
 
     try:
         r = requests.post(
@@ -650,228 +825,277 @@ Be direct and specific. No fluff."""
             headers={"x-api-key":ANTHROPIC_API_KEY,
                      "anthropic-version":"2023-06-01",
                      "content-type":"application/json"},
-            json={"model":"claude-sonnet-4-20250514","max_tokens":800,
+            json={"model":"claude-sonnet-4-20250514","max_tokens":900,
                   "messages":[{"role":"user","content":prompt}]},
             timeout=30
         )
         if r.status_code == 200:
             return r.json()["content"][0]["text"]
-        print(f"Claude error {r.status_code}: {r.text[:200]}")
+        print(f"Claude {r.status_code}: {r.text[:100]}")
     except Exception as e:
-        print(f"Claude exception: {e}")
+        print(f"Claude error: {e}")
     return ""
 
 
-# ─────────────────────────────────────────────
-# TELEGRAM FORMATTERS
-# ─────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════
+# TELEGRAM
+# ════════════════════════════════════════════════════════════
 
-def send_telegram(message: str):
+def send_telegram(msg: str):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        print(f"[TELEGRAM]\n{message}\n"); return
+        print(f"[TG]\n{msg}\n"); return
     try:
         r = requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-            json={"chat_id":TELEGRAM_CHAT_ID,"text":message,"parse_mode":"Markdown"},
+            json={"chat_id":TELEGRAM_CHAT_ID,"text":msg,"parse_mode":"Markdown"},
             timeout=10
         )
-        print("✅ Sent!" if r.status_code==200 else f"TG error: {r.text[:80]}")
+        print("✅" if r.status_code==200 else f"TG err: {r.text[:80]}")
     except Exception as e:
-        print(f"TG error: {e}")
+        print(f"TG: {e}")
 
 
-def fmt_csp(opp):
-    t = opp["csp"]["timing"]; s = opp["sizing"]
-    d = f" | δ {opp['csp']['delta']}" if opp['csp'].get('delta') else ""
+def fmt_quality(q) -> str:
+    c = q["checks"]
+    flags = []
+    if not c.get("pullback_ok"):  flags.append(f"⚠️ Pullback {q['pullback_pct']}% (need 15-65%)")
+    if not c.get("ma200_ok"):     flags.append("⚠️ Below 200MA")
+    if not c.get("volume_ok"):    flags.append("⚠️ Low volume")
+    if q.get("days_to_earnings") and 0 < q["days_to_earnings"] <= EARNINGS_BLACKOUT:
+        flags.append(f"🚨 Earnings in {q['days_to_earnings']} days!")
+    return (" | ".join(flags)) if flags else f"✅ Quality score {q['quality_score']}/5 | {q['pullback_pct']}% off highs"
+
+
+def fmt_csp(opp) -> str:
+    t = opp["csp"]["timing"]; s = opp["sizing"]; q = opp["quality"]
+    d = f" | δ{opp['csp']['delta']}" if opp['csp'].get('delta') else ""
     return "\n".join([
         f"💰 *CSP — {opp['ticker']} @ ${opp['price']}*",
         f"_{t['signal']}_",
-        f"  Tier: {s['tier']} | Max: {s['max_pct']}% (${PORTFOLIO_SIZE*s['max_pct']/100:,.0f})",
+        f"  {fmt_quality(q)}",
+        f"  Tier: {s['tier']} | Max: {s['max_pct']}%",
         f"  Sell Put ${opp['csp']['strike']} | {opp['csp']['expiry']} | {opp['csp']['dte']} DTE",
-        f"  Bid ${opp['csp']['bid']} / Ask ${opp['csp']['ask']} | Mid ${opp['csp']['premium']}",
-        f"  {opp['csp']['otm_pct']}% OTM | IV: {opp['csp']['iv']}% | IVP: {opp['csp']['ivp']:.0f}%{d}",
-        f"  Annualized: {opp['csp']['annualized_return']}% | Max {opp['csp']['max_contracts']} contracts",
-        f"  Collateral: ${opp['csp']['collateral']:,.0f}",
-        f"  Current: ${s['current_value']:,.0f} ({s['current_pct']}%) | Room: ${s['room_usd']:,.0f}",
+        f"  Bid ${opp['csp']['bid']} / Ask ${opp['csp']['ask']}",
+        f"  {opp['csp']['otm_pct']}% OTM | IV {opp['csp']['iv']}% | IVP {opp['csp']['ivp']:.0f}%{d}",
+        f"  Annualized: {opp['csp']['annualized_return']}% | {opp['csp']['max_contracts']} contracts",
+        f"  Collateral: ${opp['csp']['collateral']:,.0f} | Room: ${s['room_usd']:,.0f}",
         f"_Scanned {datetime.now().strftime('%b %d %H:%M')} ET_"
     ])
 
 
-def fmt_cc(opp):
+def fmt_cc(opp) -> str:
     t = opp["cc"]["timing"]; s = opp["sizing"]
-    d = f" | δ {opp['cc']['delta']}" if opp['cc'].get('delta') else ""
+    d = f" | δ{opp['cc']['delta']}" if opp['cc'].get('delta') else ""
     return "\n".join([
         f"📈 *CC — {opp['ticker']} @ ${opp['price']}*",
         f"_{t['signal']}_",
-        f"  You hold {int(s['quantity'])} shares @ ${opp['cc']['avg_cost']} avg cost",
+        f"  Hold {int(s['quantity'])} shares @ ${opp['cc']['avg_cost']} avg",
         f"  Sell Call ${opp['cc']['strike']} | {opp['cc']['expiry']} | {opp['cc']['dte']} DTE",
-        f"  Bid ${opp['cc']['bid']} / Ask ${opp['cc']['ask']} | Mid ${opp['cc']['premium']}",
-        f"  {opp['cc']['otm_pct']}% OTM | IV: {opp['cc']['iv']}% | IVP: {opp['cc']['ivp']:.0f}%{d}",
+        f"  Bid ${opp['cc']['bid']} / Ask ${opp['cc']['ask']}",
+        f"  {opp['cc']['otm_pct']}% OTM | IV {opp['cc']['iv']}% | IVP {opp['cc']['ivp']:.0f}%{d}",
         f"  Annualized: {opp['cc']['annualized_return']}% | {opp['cc']['max_contracts']} contracts",
         f"_Scanned {datetime.now().strftime('%b %d %H:%M')} ET_"
     ])
 
 
-def fmt_leaps(opp):
-    t = opp["leaps"]["timing"]; s = opp["sizing"]
-    l = opp["leaps"]
-    d = f" | δ {l['delta']}" if l.get('delta') else ""
-    itm_label = f"{l['itm_pct']}% ITM" if l['itm_pct'] > 0 else f"{abs(l['itm_pct'])}% OTM"
+def fmt_leaps(opp) -> str:
+    t = opp["leaps"]["timing"]; s = opp["sizing"]; l = opp["leaps"]
+    d = f" | δ{l['delta']}" if l.get('delta') else ""
+    itm = f"{l['itm_pct']}% ITM" if l['itm_pct'] > 0 else f"{abs(l['itm_pct'])}% OTM"
     return "\n".join([
         f"🚀 *LEAPS — {opp['ticker']} @ ${opp['price']}*",
         f"_{t['signal']}_",
-        f"  52w: ${opp['w52_low']} — ${opp['w52_high']} (at {opp['pir']*100:.0f}%)",
+        f"  52w: ${opp['w52_low']} — ${opp['w52_high']} | {opp['pullback_pct']}% off high",
         f"  Buy Call ${l['strike']} | {l['expiry']} | {l['dte']} DTE",
         f"  Bid ${l['bid']} / Ask ${l['ask']} | Cost ${l['premium']}",
-        f"  {itm_label} | IVP: {l['ivp']:.0f}%{d}",
-        f"  Intrinsic: ${l['intrinsic']} | Extrinsic: ${l['extrinsic']} ({l['extrinsic_pct']}% of cost)",
-        f"  Leverage: {l['leverage']}x",
-        f"  Tier: {s['tier']} | Room: ${s['room_usd']:,.0f}",
+        f"  {itm} | IVP {l['ivp']:.0f}%{d}",
+        f"  Intrinsic: ${l['intrinsic']} | Extrinsic: ${l['extrinsic']} ({l['extrinsic_pct']}%)",
+        f"  Leverage: {l['leverage']}x | Tier: {s['tier']} | Room: ${s['room_usd']:,.0f}",
         f"_Scanned {datetime.now().strftime('%b %d %H:%M')} ET_"
     ])
 
 
-# ─────────────────────────────────────────────
-# MAIN
-# ─────────────────────────────────────────────
+def fmt_pmcc(opp) -> str:
+    t = opp["pmcc"]["timing"]; p = opp["pmcc"]; l = opp["existing_leaps"]
+    d = f" | δ{p['delta']}" if p.get('delta') else ""
+    return "\n".join([
+        f"⚡ *PMCC — {opp['ticker']} @ ${opp['price']}*",
+        f"_{t['signal']}_",
+        f"  You own: LEAPS ${l['strike']} call ({l['dte']}DTE, {l['quantity']} contracts)",
+        f"  Sell Call ${p['strike']} | {p['expiry']} | {p['dte']} DTE",
+        f"  Bid ${p['bid']} / Ask ${p['ask']}",
+        f"  {p['otm_pct']}% OTM | IVP {p['ivp']:.0f}%{d}",
+        f"  Annualized: {p['annualized_return']}% | Months to recover LEAPS: {p['months_to_recover']}",
+        f"_Scanned {datetime.now().strftime('%b %d %H:%M')} ET_"
+    ])
+
+
+def fmt_bcs(opp) -> str:
+    t = opp["bcs"]["timing"]; b = opp["bcs"]; q = opp["quality"]
+    return "\n".join([
+        f"📊 *Bull Call Spread — {opp['ticker']} @ ${opp['price']}*",
+        f"_{t['signal']}_",
+        f"  {fmt_quality(q)}",
+        f"  Buy ${b['long_strike']} Call / Sell ${b['short_strike']} Call",
+        f"  Expiry: {b['expiry']} | {b['dte']} DTE",
+        f"  Debit: ${b['debit']} | Max Profit: ${b['max_profit']}",
+        f"  Return on Risk: {b['ror']}% | Breakeven: ${b['breakeven']}",
+        f"  IVP: {b['ivp']:.0f}%",
+        f"_Scanned {datetime.now().strftime('%b %d %H:%M')} ET_"
+    ])
+
+
+# ════════════════════════════════════════════════════════════
+# MAIN SCANNER
+# ════════════════════════════════════════════════════════════
 
 def run_scanner():
     print(f"\n{'='*60}")
-    print(f"🐋 WHALE INTELLIGENCE SCANNER v4")
-    print(f"   {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ET")
+    print(f"🐋 WHALE INTELLIGENCE v5 — {datetime.now().strftime('%Y-%m-%d %H:%M')} ET")
+    print(f"   Framework: Quality → Pullback → Option Yield")
     print(f"{'='*60}\n")
 
-    print("📊 Fetching IBKR positions...")
-    ibkr         = get_ibkr_positions()
-    stk_holdings = {k:v for k,v in ibkr.items() if v.get("asset_class")=="STK"}
+    print("📊 IBKR positions...")
+    ibkr     = get_ibkr_positions()
+    stk_hold = {k:v for k,v in ibkr.items() if v.get("asset_class")=="STK"}
 
-    all_tickers  = CORE_STOCKS + OPPORTUNISTIC_STOCKS
-    print(f"\n💹 Fetching market data ({len(all_tickers)} stocks)...")
-    mkt  = get_market_data(all_tickers)
-    ok   = sum(1 for v in mkt.values() if v["price"]>0)
-    print(f"   {ok}/{len(all_tickers)} prices obtained")
+    all_tickers = CORE_STOCKS + OPPORTUNISTIC_STOCKS
+    print(f"💹 Market data ({len(all_tickers)} stocks)...")
+    mkt = get_market_data(all_tickers)
+    ok  = sum(1 for v in mkt.values() if v["price"]>0)
+    print(f"   {ok}/{len(all_tickers)} prices ✓")
 
-    print("\n🌊 Fetching market-wide flow for Peter Lynch discovery...")
-    flow_data    = get_flow_alerts_market()
-    known        = set(all_tickers)
+    print("🌊 Market flow for Peter Lynch screen...")
+    flow = get_flow_alerts_market()
 
-    csp_opps  = []
-    cc_opps   = []
-    leaps_opps= []
+    csp_opps = []; cc_opps  = []; leaps_opps = []
+    pmcc_opps= []; bcs_opps = []
 
-    print(f"\n🔍 Scanning stocks...")
+    print(f"\n🔍 Scanning {len(all_tickers)} stocks...")
     for ticker in all_tickers:
-        is_core = ticker in CORE_STOCKS
-        md      = mkt.get(ticker,{})
-        price   = md.get("price",0)
+        md    = mkt.get(ticker,{})
+        price = md.get("price",0)
         if price <= 0: continue
 
-        w52h = md.get("week52_high", price)
-        w52l = md.get("week52_low",  price)
-        pir  = position_in_range(price, w52l, w52h)
+        w52h       = md.get("week52_high", price)
+        w52l       = md.get("week52_low",  price)
+        pir        = position_in_range(price, w52l, w52h)
+        pullback   = pullback_from_high(price, w52h)
 
-        contracts = get_option_contracts(ticker)
+        # Earnings check
+        earn_date  = get_earnings_date(ticker)
+
+        # Stock quality gate — framework step 1
+        quality    = stock_quality_check(ticker, md, earn_date)
+
+        contracts  = get_option_contracts(ticker)
         if not contracts: continue
 
-        ivdata = calculate_ivp(contracts)
+        ivdata     = calculate_ivp(contracts)
+        sizing     = position_check(ticker, ibkr)
 
-        sizing = position_check(ticker, ibkr)
+        base = {"ticker":ticker,"price":price,"pir":pir,
+                "w52_low":w52l,"w52_high":w52h,
+                "pullback_pct":round(pullback*100,1),
+                "ivp":ivdata["ivp"],"quality":quality,"sizing":sizing}
 
-        # ── CSP ──
-        if sizing["status"] != "OVERWEIGHT":
-            csp, _ = find_best_csp(ticker, price, contracts, ivdata, pir)
+        # ── CSP ──────────────────────────────────────────
+        if sizing["status"] != "OVERWEIGHT" and quality["checks"].get("earnings_ok",True):
+            csp, _ = find_best_csp(ticker, price, contracts, ivdata, pir, quality)
             if csp:
-                csp_opps.append({
-                    "ticker":ticker, "price":price, "pir":pir,
-                    "w52_low":w52l, "w52_high":w52h,
-                    "csp":csp, "sizing":sizing,
-                    "score": csp["timing"]["score"] + csp["annualized_return"]*0.5
-                })
-                print(f"  {ticker}: 💰 CSP ${csp['strike']} | {csp['annualized_return']}% | δ{csp['delta']} | IVP {ivdata['ivp']:.0f}%")
+                csp_opps.append({**base,"csp":csp,
+                    "score":csp["timing"]["score"]*quality["quality_score"]*csp["annualized_return"]})
+                print(f"  {ticker}: 💰 CSP ${csp['strike']} {csp['annualized_return']}% ann δ{csp['delta']} IVP{ivdata['ivp']:.0f}%")
 
-        # ── CC (held stocks only) ──
-        holding = stk_holdings.get(ticker,{})
-        qty = holding.get("quantity",0)
-        avg = holding.get("avg_cost",0)
-        if qty >= 100:
+        # ── CC ───────────────────────────────────────────
+        holding = stk_hold.get(ticker,{})
+        qty = holding.get("quantity",0); avg = holding.get("avg_cost",0)
+        if qty >= 100 and quality["checks"].get("earnings_ok",True):
             cc, _ = find_best_cc(ticker, price, qty, avg, contracts, ivdata, pir)
             if cc:
-                cc_opps.append({
-                    "ticker":ticker, "price":price, "pir":pir,
-                    "cc":cc, "sizing":sizing,
-                    "score": cc["timing"]["score"] + cc["annualized_return"]*0.5
-                })
-                print(f"  {ticker}: 📈 CC  ${cc['strike']} | {cc['annualized_return']}% | δ{cc['delta']} | IVP {ivdata['ivp']:.0f}%")
+                cc_opps.append({**base,"cc":cc,
+                    "score":cc["timing"]["score"]*cc["annualized_return"]})
+                print(f"  {ticker}: 📈 CC  ${cc['strike']} {cc['annualized_return']}% ann δ{cc['delta']}")
 
-        # ── LEAPS ──
+        # ── LEAPS ────────────────────────────────────────
         leaps, _ = find_best_leaps(ticker, price, contracts, ivdata, pir)
         if leaps:
-            leaps_opps.append({
-                "ticker":ticker, "price":price, "pir":pir,
-                "w52_low":w52l, "w52_high":w52h,
-                "leaps":leaps, "sizing":sizing,
-                "score": leaps["timing"]["score"] + leaps["leverage"]*2
-            })
-            print(f"  {ticker}: 🚀 LEAPS ${leaps['strike']} | {leaps['dte']}DTE | δ{leaps['delta']} | IVP {ivdata['ivp']:.0f}%")
+            leaps_opps.append({**base,"leaps":leaps,
+                "score":leaps["timing"]["score"]*(1/max(0.01,leaps["extrinsic_pct"]))*leaps["delta"]})
+            print(f"  {ticker}: 🚀 LEAPS ${leaps['strike']} δ{leaps['delta']} ext{leaps['extrinsic_pct']}% IVP{ivdata['ivp']:.0f}%")
 
-    # Sort and take top 3 each
-    csp_opps.sort(   key=lambda x: x["score"], reverse=True)
-    cc_opps.sort(    key=lambda x: x["score"], reverse=True)
-    leaps_opps.sort( key=lambda x: x["score"], reverse=True)
-    top_csps  = csp_opps[:3]
-    top_ccs   = cc_opps[:3]
-    top_leaps = leaps_opps[:3]
+        # ── PMCC ─────────────────────────────────────────
+        existing_leaps = find_existing_leaps(ticker, ibkr)
+        if existing_leaps:
+            pmcc, _ = find_pmcc_short_call(ticker, price, existing_leaps, contracts, ivdata, pir)
+            if pmcc:
+                pmcc_opps.append({**base,"pmcc":pmcc,"existing_leaps":existing_leaps,
+                    "score":pmcc["timing"]["score"]*pmcc["annualized_return"]})
+                print(f"  {ticker}: ⚡ PMCC ${pmcc['strike']} {pmcc['annualized_return']}% ann")
 
-    # Peter Lynch discovery
-    print("\n🔬 Running Peter Lynch screen...")
-    discoveries = peter_lynch_screen(known, flow_data)
+        # ── Bull Call Spread ──────────────────────────────
+        if quality["passes"] and pullback >= PULLBACK_MIN:
+            bcs, _ = find_bull_call_spread(ticker, price, contracts, ivdata, pir, quality)
+            if bcs:
+                bcs_opps.append({**base,"bcs":bcs,
+                    "score":quality["quality_score"]*bcs["ror"]*pullback})
+                print(f"  {ticker}: 📊 BCS ROR {bcs['ror']}% | debit ${bcs['debit']}")
+
+    # ── Sort & top 3 each ─────────────────────────────────
+    for lst in [csp_opps,cc_opps,leaps_opps,pmcc_opps,bcs_opps]:
+        lst.sort(key=lambda x: x["score"], reverse=True)
+
+    top_csps  = csp_opps[:3];  top_ccs   = cc_opps[:3]
+    top_leaps = leaps_opps[:3];top_pmccs = pmcc_opps[:3]
+    top_bcss  = bcs_opps[:3]
+
+    total = sum(len(x) for x in [top_csps,top_ccs,top_leaps,top_pmccs,top_bcss])
+    print(f"\n🏆 {len(top_csps)} CSPs | {len(top_ccs)} CCs | {len(top_leaps)} LEAPS | "
+          f"{len(top_pmccs)} PMCCs | {len(top_bcss)} Spreads")
+
+    # ── Peter Lynch ───────────────────────────────────────
+    print("🔬 Peter Lynch screen...")
+    discoveries = peter_lynch_screen(set(all_tickers), flow)
     if discoveries:
-        print(f"   Found {len(discoveries)} interesting names: {[d['ticker'] for d in discoveries]}")
+        print(f"   Found: {[d['ticker'] for d in discoveries]}")
 
-    total = len(top_csps)+len(top_ccs)+len(top_leaps)
-    if total == 0:
-        print("\n✅ No qualifying opportunities today (all filtered by IVP/timing/delta).")
-        if discoveries:
-            send_telegram(f"🔬 *Peter Lynch Watch*\n\n" +
-                         "\n".join([f"*{d['ticker']}* — {d['why']}" for d in discoveries]))
+    if total == 0 and not discoveries:
+        print("✅ No qualifying opportunities today.")
         return
 
-    print(f"\n🏆 {len(top_csps)} CSPs | {len(top_ccs)} CCs | {len(top_leaps)} LEAPS")
-
-    # Claude
-    print("\n🧠 Claude analysis...")
-    analysis = claude_analyze(top_csps, top_ccs, top_leaps, discoveries)
+    # ── Claude analysis ───────────────────────────────────
+    print("🧠 Claude analysis...")
+    analysis = claude_analyze(top_csps,top_ccs,top_leaps,top_pmccs,top_bcss,discoveries)
     if analysis: print(f"\n{analysis}")
 
-    # Send Telegram
-    print("\n📱 Sending alerts...")
+    # ── Telegram ─────────────────────────────────────────
+    print("\n📱 Sending...")
     if top_csps:
         send_telegram("📋 *TOP CSP OPPORTUNITIES*"); time.sleep(1)
-        for o in top_csps:
-            send_telegram(fmt_csp(o)); time.sleep(2)
-
+        for o in top_csps: send_telegram(fmt_csp(o)); time.sleep(2)
     if top_ccs:
         send_telegram("📋 *TOP COVERED CALL OPPORTUNITIES*"); time.sleep(1)
-        for o in top_ccs:
-            send_telegram(fmt_cc(o)); time.sleep(2)
-
+        for o in top_ccs: send_telegram(fmt_cc(o)); time.sleep(2)
     if top_leaps:
         send_telegram("📋 *TOP LEAPS OPPORTUNITIES*"); time.sleep(1)
-        for o in top_leaps:
-            send_telegram(fmt_leaps(o)); time.sleep(2)
-
+        for o in top_leaps: send_telegram(fmt_leaps(o)); time.sleep(2)
+    if top_pmccs:
+        send_telegram("📋 *PMCC — SELL CALLS AGAINST YOUR LEAPS*"); time.sleep(1)
+        for o in top_pmccs: send_telegram(fmt_pmcc(o)); time.sleep(2)
+    if top_bcss:
+        send_telegram("📋 *TOP BULL CALL SPREADS*"); time.sleep(1)
+        for o in top_bcss: send_telegram(fmt_bcs(o)); time.sleep(2)
     if discoveries:
         time.sleep(2)
-        disc_msg = "🔬 *Peter Lynch Discoveries*\n_Not on your watchlist — whale flow + quality fundamentals_\n\n"
+        msg = "🔬 *Peter Lynch Discoveries*\n_Not on watchlist — quality fundamentals + whale flow_\n\n"
         for d in discoveries:
-            disc_msg += f"*{d['ticker']}* — PEG {d['peg_ratio']} | EPS growth {d['eps_growth']}%\n_{d['why']}_\n\n"
-        send_telegram(disc_msg)
-
+            msg += f"*{d['ticker']}* — PEG {d['peg_ratio']} | EPS +{d['eps_growth']}% | Flow {d['whale_flow']}\n"
+        send_telegram(msg)
     if analysis:
         time.sleep(2)
-        send_telegram(f"🧠 *Claude's Summary*\n\n{analysis}")
+        send_telegram(f"🧠 *Claude Summary*\n\n{analysis}")
 
-    print("\n✅ Scan complete!")
+    print("\n✅ Done!")
 
 
 if __name__ == "__main__":
