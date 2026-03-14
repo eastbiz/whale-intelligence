@@ -302,6 +302,81 @@ def get_market_tide() -> dict:
     except Exception as e:
         print(f"   Market tide error: {e}")
         return {"score": 0, "label": "Tide data unavailable", "available": False}
+def get_vix() -> dict:
+    """Fetch VIX from Yahoo Finance. VIX = market fear gauge."""
+    try:
+        r = requests.get(
+            "https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX",
+            headers={"User-Agent":"Mozilla/5.0"}, timeout=8
+        )
+        price = r.json()["chart"]["result"][0]["meta"]["regularMarketPrice"]
+        vix = round(float(price), 2)
+
+        if vix < 15:
+            label = f"😴 VIX {vix} — Very low fear. Market complacent. Poor time to sell premium."
+            regime = "low"
+        elif vix < 20:
+            label = f"😊 VIX {vix} — Low-moderate fear. Decent but not ideal for premium selling."
+            regime = "low_moderate"
+        elif vix < 25:
+            label = f"😐 VIX {vix} — Moderate fear. Reasonable premium selling conditions."
+            regime = "moderate"
+        elif vix < 35:
+            label = f"😬 VIX {vix} — Elevated fear. Good premium selling opportunity."
+            regime = "elevated"
+        else:
+            label = f"😱 VIX {vix} — Extreme fear. Exceptional CSP/CC premiums but manage size carefully."
+            regime = "extreme"
+
+        return {"vix": vix, "label": label, "regime": regime}
+    except Exception as e:
+        return {"vix": 0, "label": "VIX unavailable", "regime": "unknown"}
+
+
+def get_spike() -> dict:
+    """
+    Fetch SPIKE index from Unusual Whales.
+    SPIKE is UW's proprietary fear gauge based on options flow.
+    Similar to VIX but calculated from actual order flow, not just prices.
+    High SPIKE = market fear elevated = great time to sell CSP/CC premium.
+    Low SPIKE = complacency = avoid selling premium, consider buying LEAPS.
+    """
+    try:
+        r = requests.get(f"{UW_BASE}/api/market/spike",
+                         headers=UW_HEADERS, timeout=8)
+        if r.status_code != 200:
+            return {"spike": 0, "label": "SPIKE unavailable", "available": False}
+        data  = r.json()
+        items = data.get("data", data.get("results", []))
+        if not items:
+            return {"spike": 0, "label": "SPIKE unavailable", "available": False}
+
+        latest = items[-1] if isinstance(items, list) else items
+        spike  = float(latest.get("spike", latest.get("value", 0)) or 0)
+
+        if spike < 20:
+            label  = f"😴 SPIKE {spike:.1f} — Low fear (options flow calm). Avoid selling premium."
+            regime = "low"
+            action = "Consider LEAPS — options are cheap"
+        elif spike < 30:
+            label  = f"😐 SPIKE {spike:.1f} — Moderate fear. Selective premium selling OK."
+            regime = "moderate"
+            action = "Selective CSP/CC on strongest setups only"
+        elif spike < 40:
+            label  = f"😬 SPIKE {spike:.1f} — Elevated fear. Good CSP/CC opportunity."
+            regime = "elevated"
+            action = "Good time to sell premium on quality stocks"
+        else:
+            label  = f"😱 SPIKE {spike:.1f} — Extreme fear. Exceptional premium opportunity."
+            regime = "extreme"
+            action = "Excellent CSP/CC conditions — be selective on quality"
+
+        return {"spike": spike, "label": label, "regime": regime,
+                "action": action, "available": True}
+    except Exception as e:
+        return {"spike": 0, "label": "SPIKE unavailable", "available": False}
+
+
 
 
 def get_oi_change() -> dict:
@@ -388,60 +463,78 @@ def get_expiry_breakdown(ticker: str) -> dict:
         return {}
 
 
-def market_go_nogo(tide: dict, oi_signals: dict) -> dict:
+def market_go_nogo(tide: dict, oi_signals: dict,
+                   vix_data: dict, spike_data: dict) -> dict:
     """
-    Master go/no-go decision for the day.
+    Master go/no-go decision using VIX + SPIKE + Market Tide + OI breadth.
     Framework: only trade when opportunity is really good.
-
-    Returns:
-      sell_premium: bool  — ok to sell CSP/CC today?
-      buy_leaps:    bool  — ok to buy LEAPS today?
-      score:        0-100 — overall market quality score
-      reason:       str   — human explanation
     """
-    tide_score = tide.get("score", 0)
+    tide_score  = tide.get("score", 0)
+    vix         = vix_data.get("vix", 20)
+    spike       = spike_data.get("spike", 25)
+    vix_regime  = vix_data.get("regime", "moderate")
+    spike_regime= spike_data.get("regime", "moderate")
 
-    # Count bullish vs bearish OI signals in our watchlists
     all_tickers = set(CORE_STOCKS + OPPORTUNISTIC_STOCKS)
     bull_oi = sum(1 for t,v in oi_signals.items()
                   if t in all_tickers and v["net"] > 500)
     bear_oi = sum(1 for t,v in oi_signals.items()
                   if t in all_tickers and v["net"] < -500)
 
-    # Overall market score (0-100)
-    # Tide contributes 60%, OI breadth 40%
-    tide_component = min(100, max(0, (tide_score + 50)))  # -50→0, 0→50, +50→100
-    oi_component   = 50 + (bull_oi - bear_oi) * 5
-    oi_component   = min(100, max(0, oi_component))
-    market_score   = round(tide_component * 0.6 + oi_component * 0.4, 1)
+    # Component scores (0-100 each)
+    # VIX: higher = better for premium selling
+    vix_score = (0 if vix < 12 else 20 if vix < 15 else
+                 35 if vix < 20 else 60 if vix < 25 else
+                 80 if vix < 35 else 95)
 
-    # Decision logic
-    if market_score >= 65 and tide_score > 5:
+    # SPIKE: higher = better for premium selling
+    spike_score = (0 if spike < 15 else 20 if spike < 20 else
+                   45 if spike < 30 else 75 if spike < 40 else 95)
+
+    # Tide: positive = good for selling
+    tide_component = min(100, max(0, tide_score + 50))
+
+    # OI breadth
+    oi_component = min(100, max(0, 50 + (bull_oi - bear_oi) * 5))
+
+    # Weighted score: VIX 30%, SPIKE 30%, Tide 25%, OI 15%
+    market_score = round(
+        vix_score   * 0.30 +
+        spike_score * 0.30 +
+        tide_component * 0.25 +
+        oi_component   * 0.15, 1
+    )
+
+    # Go/no-go logic
+    if market_score >= 65:
         sell_premium = True
-        buy_leaps    = False  # when tide is bullish, options are more expensive
-        quality      = "🔥 EXCELLENT DAY — Strong bullish conditions for premium selling"
+        buy_leaps    = vix_regime in ("low","low_moderate")  # cheap options = LEAPS
+        quality      = "🔥 EXCELLENT CONDITIONS — High conviction day for premium selling"
     elif market_score >= 50:
         sell_premium = True
         buy_leaps    = True
-        quality      = "✅ GOOD DAY — Conditions support selective premium selling"
-    elif market_score >= 40:
+        quality      = "✅ GOOD CONDITIONS — Selective premium selling supported"
+    elif market_score >= 38:
         sell_premium = False
         buy_leaps    = True
-        quality      = "⚠️ CAUTIOUS DAY — Skip new CSPs, LEAPS/spreads only"
+        quality      = "⚠️ CAUTIOUS — Skip new CSPs today, LEAPS/spreads only"
     else:
         sell_premium = False
-        buy_leaps    = True  # market fear = cheap options = good LEAPS entry
-        quality      = "🔴 POOR DAY FOR PREMIUM SELLING — Consider LEAPS on quality names"
+        buy_leaps    = False
+        quality      = "🔴 POOR CONDITIONS — No new positions today. Watch and wait."
 
     return {
-        "sell_premium": sell_premium,
-        "buy_leaps":    buy_leaps,
-        "score":        market_score,
-        "tide_score":   tide_score,
-        "bull_oi_count":bull_oi,
-        "bear_oi_count":bear_oi,
-        "quality":      quality,
-        "tide_label":   tide.get("label",""),
+        "sell_premium":  sell_premium,
+        "buy_leaps":     buy_leaps,
+        "score":         market_score,
+        "tide_score":    tide_score,
+        "vix":           vix,
+        "spike":         spike,
+        "bull_oi_count": bull_oi,
+        "bear_oi_count": bear_oi,
+        "quality":       quality,
+        "vix_regime":    vix_regime,
+        "spike_regime":  spike_regime,
     }
 
 
@@ -1199,12 +1292,20 @@ def run_scanner():
     tide       = get_market_tide()
     print(f"   {tide['label']}")
 
+    print("   😱 Fetching VIX...")
+    vix_data   = get_vix()
+    print(f"   {vix_data['label']}")
+
+    print("   ⚡ Fetching SPIKE...")
+    spike_data = get_spike()
+    print(f"   {spike_data['label']}")
+
     print("   📈 Fetching OI Changes...")
     oi_signals = get_oi_change()
     print(f"   OI data for {len(oi_signals)} tickers")
 
     # ── GO / NO-GO DECISION ──────────────────────────────────
-    gng = market_go_nogo(tide, oi_signals)
+    gng = market_go_nogo(tide, oi_signals, vix_data, spike_data)
     print(f"\n{'='*50}")
     print(f"📡 MARKET QUALITY SCORE: {gng['score']}/100")
     print(f"   {gng['quality']}")
@@ -1213,16 +1314,47 @@ def run_scanner():
     print(f"   Buy LEAPS:    {'✅ YES' if gng['buy_leaps'] else '❌ NO'}")
     print(f"{'='*50}\n")
 
-    # Send morning market briefing to Telegram
-    morning_msg = (
-        f"📡 *Market Intelligence — {datetime.now().strftime('%b %d %H:%M')} ET*\n\n"
+    # ── MORNING MARKET BRIEFING ─────────────────────────────
+    # Structure: 1) Market situation  2) Summary verdict  3) Trades follow
+    vix   = gng["vix"]
+    spike = gng["spike"]
+
+    spike_line = (
+        f"*SPIKE: {spike:.1f}*\n{spike_data['label']}\n"
+        f"_SPIKE is like VIX but built from actual options order flow. "
+        f"More real-time than VIX. {spike_data.get('action','')}_"
+    ) if spike_data.get('available') else "*SPIKE: N/A*"
+
+    briefing = (
+        f"📡 *MARKET BRIEFING — {datetime.now().strftime('%b %d, %Y %H:%M')} ET*\n"
+        f"\n"
+        f"━━━ MARKET CONDITIONS ━━━\n"
+        f"\n"
+        f"*VIX: {vix}*\n"
+        f"{vix_data['label']}\n"
+        f"_VIX measures market fear. Above 25 = high volatility."
+        f" Higher VIX = fatter premiums = better CSP/CC income._\n"
+        f"\n"
+        f"{spike_line}\n"
+        f"\n"
+        f"*Market Tide: {gng['tide_score']:+.1f}*\n"
         f"{tide['label']}\n"
-        f"Market Score: {gng['score']}/100\n"
-        f"{gng['quality']}\n\n"
-        f"Sell Premium: {'✅ YES' if gng['sell_premium'] else '❌ SKIP TODAY'}\n"
-        f"Buy LEAPS: {'✅ YES' if gng['buy_leaps'] else '⏳ WAIT'}"
+        f"_Tide = net call minus put premium across the whole market."
+        f" Positive = money flowing into calls. Negative = put hedging (fear)._\n"
+        f"\n"
+        f"OI: {gng['bull_oi_count']} bullish signals | {gng['bear_oi_count']} bearish signals\n"
+        f"\n"
+        f"━━━ TODAY'S VERDICT ━━━\n"
+        f"\n"
+        f"*Overall Score: {gng['score']}/100*\n"
+        f"{gng['quality']}\n"
+        f"\n"
+        f"Sell Premium (CSP/CC): {'✅ YES' if gng['sell_premium'] else '❌ SKIP TODAY'}\n"
+        f"Buy LEAPS: {'✅ YES' if gng['buy_leaps'] else '⏳ WAIT FOR BETTER ENTRY'}\n"
+        f"\n"
+        f"{'_Trading opportunities follow below ↓_' if (gng['sell_premium'] or gng['buy_leaps']) else '_No new positions today. Preserving capital._'}"
     )
-    send_telegram(morning_msg)
+    send_telegram(briefing)
     time.sleep(2)
 
     # If market conditions are poor — skip premium selling, maybe skip entirely
@@ -1351,32 +1483,38 @@ def run_scanner():
     analysis = claude_analyze(top_csps,top_ccs,top_leaps,top_pmccs,top_bcss,discoveries)
     if analysis: print(f"\n{analysis}")
 
-    # ── Telegram ─────────────────────────────────────────
+    # ── Telegram — ORDER: Summary → Trades ───────────────
     print("\n📱 Sending...")
-    if top_csps:
-        send_telegram("📋 *TOP CSP OPPORTUNITIES*"); time.sleep(1)
-        for o in top_csps: send_telegram(fmt_csp(o)); time.sleep(2)
-    if top_ccs:
-        send_telegram("📋 *TOP COVERED CALL OPPORTUNITIES*"); time.sleep(1)
-        for o in top_ccs: send_telegram(fmt_cc(o)); time.sleep(2)
-    if top_leaps:
-        send_telegram("📋 *TOP LEAPS OPPORTUNITIES*"); time.sleep(1)
-        for o in top_leaps: send_telegram(fmt_leaps(o)); time.sleep(2)
-    if top_pmccs:
-        send_telegram("📋 *PMCC — SELL CALLS AGAINST YOUR LEAPS*"); time.sleep(1)
-        for o in top_pmccs: send_telegram(fmt_pmcc(o)); time.sleep(2)
-    if top_bcss:
-        send_telegram("📋 *TOP BULL CALL SPREADS*"); time.sleep(1)
-        for o in top_bcss: send_telegram(fmt_bcs(o)); time.sleep(2)
-    if discoveries:
+
+    # 1. Claude summary FIRST (before individual trades)
+    if analysis:
+        send_telegram(f"🧠 *CLAUDE SUMMARY*\n\n{analysis}")
         time.sleep(2)
+
+    # 2. Peter Lynch discoveries (context before trades)
+    if discoveries:
         msg = "🔬 *Peter Lynch Discoveries*\n_Not on watchlist — quality fundamentals + whale flow_\n\n"
         for d in discoveries:
             msg += f"*{d['ticker']}* — PEG {d['peg_ratio']} | EPS +{d['eps_growth']}% | Flow {d['whale_flow']}\n"
         send_telegram(msg)
-    if analysis:
         time.sleep(2)
-        send_telegram(f"🧠 *Claude Summary*\n\n{analysis}")
+
+    # 3. Individual trade alerts
+    if top_csps:
+        send_telegram("━━━ *CSP OPPORTUNITIES* ━━━"); time.sleep(1)
+        for o in top_csps: send_telegram(fmt_csp(o)); time.sleep(2)
+    if top_ccs:
+        send_telegram("━━━ *COVERED CALL OPPORTUNITIES* ━━━"); time.sleep(1)
+        for o in top_ccs: send_telegram(fmt_cc(o)); time.sleep(2)
+    if top_leaps:
+        send_telegram("━━━ *LEAPS OPPORTUNITIES* ━━━"); time.sleep(1)
+        for o in top_leaps: send_telegram(fmt_leaps(o)); time.sleep(2)
+    if top_pmccs:
+        send_telegram("━━━ *PMCC — SELL AGAINST YOUR LEAPS* ━━━"); time.sleep(1)
+        for o in top_pmccs: send_telegram(fmt_pmcc(o)); time.sleep(2)
+    if top_bcss:
+        send_telegram("━━━ *BULL CALL SPREADS* ━━━"); time.sleep(1)
+        for o in top_bcss: send_telegram(fmt_bcs(o)); time.sleep(2)
 
     print("\n✅ Done!")
 
