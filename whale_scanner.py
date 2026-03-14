@@ -873,6 +873,7 @@ def fmt_csp(opp) -> str:
         f"💰 *CSP — {opp['ticker']} @ ${opp['price']}*",
         f"_{t['signal']}_",
         f"  {fmt_quality(q)}",
+        f"  {opp['darkpool']['label']} | ${opp['darkpool']['total_notional']:,.0f} notional",
         f"  Tier: {s['tier']} | Max: {s['max_pct']}%",
         f"  Sell Put ${opp['csp']['strike']} | {opp['csp']['expiry']} | {opp['csp']['dte']} DTE",
         f"  Bid ${opp['csp']['bid']} / Ask ${opp['csp']['ask']}",
@@ -889,6 +890,7 @@ def fmt_cc(opp) -> str:
     return "\n".join([
         f"📈 *CC — {opp['ticker']} @ ${opp['price']}*",
         f"_{t['signal']}_",
+        f"  {opp['darkpool']['label']} | ${opp['darkpool']['total_notional']:,.0f} notional",
         f"  Hold {int(s['quantity'])} shares @ ${opp['cc']['avg_cost']} avg",
         f"  Sell Call ${opp['cc']['strike']} | {opp['cc']['expiry']} | {opp['cc']['dte']} DTE",
         f"  Bid ${opp['cc']['bid']} / Ask ${opp['cc']['ask']}",
@@ -905,6 +907,7 @@ def fmt_leaps(opp) -> str:
     return "\n".join([
         f"🚀 *LEAPS — {opp['ticker']} @ ${opp['price']}*",
         f"_{t['signal']}_",
+        f"  {opp['darkpool']['label']} | ${opp['darkpool']['total_notional']:,.0f} notional",
         f"  52w: ${opp['w52_low']} — ${opp['w52_high']} | {opp['pullback_pct']}% off high",
         f"  Buy Call ${l['strike']} | {l['expiry']} | {l['dte']} DTE",
         f"  Bid ${l['bid']} / Ask ${l['ask']} | Cost ${l['premium']}",
@@ -935,6 +938,7 @@ def fmt_bcs(opp) -> str:
     return "\n".join([
         f"📊 *Bull Call Spread — {opp['ticker']} @ ${opp['price']}*",
         f"_{t['signal']}_",
+        f"  {opp['darkpool']['label']} | ${opp['darkpool']['total_notional']:,.0f} notional",
         f"  {fmt_quality(q)}",
         f"  Buy ${b['long_strike']} Call / Sell ${b['short_strike']} Call",
         f"  Expiry: {b['expiry']} | {b['dte']} DTE",
@@ -993,18 +997,21 @@ def run_scanner():
 
         ivdata     = calculate_ivp(contracts)
         sizing     = position_check(ticker, ibkr)
+        dp         = score_darkpool(get_darkpool(ticker))
+        dp_boost   = 1.2 if dp["score"] > 55 else 0.9 if dp["score"] < 45 else 1.0
 
         base = {"ticker":ticker,"price":price,"pir":pir,
                 "w52_low":w52l,"w52_high":w52h,
                 "pullback_pct":round(pullback*100,1),
-                "ivp":ivdata["ivp"],"quality":quality,"sizing":sizing}
+                "ivp":ivdata["ivp"],"quality":quality,
+                "sizing":sizing,"darkpool":dp}
 
         # ── CSP ──────────────────────────────────────────
         if sizing["status"] != "OVERWEIGHT" and quality["checks"].get("earnings_ok",True):
             csp, _ = find_best_csp(ticker, price, contracts, ivdata, pir, quality)
             if csp:
                 csp_opps.append({**base,"csp":csp,
-                    "score":csp["timing"]["score"]*quality["quality_score"]*csp["annualized_return"]})
+                    "score":csp["timing"]["score"]*quality["quality_score"]*csp["annualized_return"]*dp_boost})
                 print(f"  {ticker}: 💰 CSP ${csp['strike']} {csp['annualized_return']}% ann δ{csp['delta']} IVP{ivdata['ivp']:.0f}%")
 
         # ── CC ───────────────────────────────────────────
@@ -1038,7 +1045,7 @@ def run_scanner():
             bcs, _ = find_bull_call_spread(ticker, price, contracts, ivdata, pir, quality)
             if bcs:
                 bcs_opps.append({**base,"bcs":bcs,
-                    "score":quality["quality_score"]*bcs["ror"]*pullback})
+                    "score":quality["quality_score"]*bcs["ror"]*pullback*dp_boost})
                 print(f"  {ticker}: 📊 BCS ROR {bcs['ror']}% | debit ${bcs['debit']}")
 
     # ── Sort & top 3 each ─────────────────────────────────
