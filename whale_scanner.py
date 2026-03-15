@@ -22,11 +22,18 @@ IBKR_FLEX_QUERY_ID     = os.environ.get("IBKR_FLEX_QUERY_ID", "")
 
 PORTFOLIO_SIZE = 7_000_000
 
-# ── Tiered position limits ──────────────────────────────────
+# ── Position limits by tier ─────────────────────────────────
+# Core: 8% | Growth: 5% | Cyclical: 4% | Opportunistic: 2.5%
 POSITION_TIERS = {
-    "AAPL": 0.08, "AMZN": 0.08, "GOOGL": 0.08, "NVDA": 0.08, "MSFT": 0.08,
-    "ASML": 0.06, "TSM":  0.06, "MELI":  0.06, "NVO":  0.06, "BRK-B": 0.06,
-    "IBKR": 0.04, "MU":   0.04,
+    # Core Compounders — 8%
+    "AAPL":0.08,"AMZN":0.08,"ASML":0.08,"BRK-B":0.08,"GOOGL":0.08,
+    "MSFT":0.08,"NVDA":0.08,"TSM":0.08,"IBKR":0.08,"MELI":0.08,
+    "CPRT":0.08,"VRTX":0.08,"NVO":0.08,
+    # Growth / Semi-Core — 5%
+    "NOW":0.05,"DDOG":0.05,"UBER":0.05,"NFLX":0.05,"PLTR":0.05,"META":0.05,
+    # Cyclical Compounders — 4%
+    "MU":0.04,"KNX":0.04,"POWL":0.04,
+    # Opportunistic — 2.5%
     "__DEFAULT__": 0.025
 }
 
@@ -34,25 +41,68 @@ POSITION_TIERS = {
 CSP_DTE_MIN           = 30;   CSP_DTE_MAX     = 45
 CC_DTE_MIN            = 30;   CC_DTE_MAX      = 45
 LEAPS_DTE_MIN         = 500   # 2+ years
-CSP_DELTA_MIN         = 0.20; CSP_DELTA_MAX   = 0.30   # standard
+# CSP: default delta 0.25-0.30, up to 0.35 only when IVP > 50
+CSP_DELTA_MIN         = 0.25; CSP_DELTA_MAX   = 0.30
+CSP_DELTA_MAX_HIGH_IV = 0.35  # allowed when IVP > 50
 CC_DELTA_MIN          = 0.15; CC_DELTA_MAX    = 0.25
 LEAPS_DELTA_MIN       = 0.80; LEAPS_DELTA_MAX = 0.90
-CSP_MIN_ANNUALIZED    = 20.0  # preferred minimum
-CC_MIN_ANNUALIZED     = 15.0
+CSP_MIN_ANNUALIZED    = 20.0  # preferred minimum (high vol stocks)
+CC_MIN_ANNUALIZED     = 8.0   # lowered — stable core names rarely give 15%
 MAX_ANNUALIZED        = 120.0 # cap bad data
-IVP_MIN_SELL          = 30    # min IVP to sell premium
+IVP_MIN_SELL          = 30    # floor — skip below 30
+IVP_ELEVATED          = 50    # "elevated" — allow wider delta, flag as excellent
 IVP_MAX_BUY           = 50    # max IVP to buy LEAPS
-EARNINGS_BLACKOUT     = 14    # skip CSP/CC if earnings within N days
-PULLBACK_MIN          = 0.15  # stock must be ≥15% below 52w high
-PULLBACK_MAX          = 0.65  # but not >65% (company may be broken)
+LEAPS_EXTRINSIC_MAX   = 25.0  # tightened from 30% — target <20%
+# Earnings filter: <14 days = hard stop, 14-21 = warning, >21 = normal
+EARNINGS_HARD_STOP    = 14    # hard stop
+EARNINGS_WARNING      = 21    # warning label
+# Price location: >15% below 52w high = preferred, 8-15% = caution, <8% = skip CSP
+NEAR_HIGH_SKIP        = 0.08  # skip CSP if within 8% of 52w high
+NEAR_HIGH_CAUTION     = 0.15  # caution if 8-15% below high
+PULLBACK_MIN          = 0.15  # preferred zone starts here
+PULLBACK_MAX          = 0.65  # not >65% (company may be broken)
+# MA filters
+MA50_EXTENDED         = 0.08  # skip CSP if >8% above 50-day MA
+# Gap risk filter
+GAP_RISK_PCT          = 0.08  # skip if stock moved >8% in single day
+# Liquidity requirements
+MIN_OPEN_INTEREST     = 1000
+MIN_DAILY_VOLUME      = 100
+MAX_BID_ASK_SPREAD    = 0.05  # 5%
+# Premium efficiency: minimum premium as % of strike
+MIN_PREMIUM_PCT_30_45 = 0.015 # 1.5% for 30-45 DTE
+MIN_PREMIUM_PCT_45_60 = 0.020 # 2.0% for 45-60 DTE
+# Sector exposure cap
+MAX_SECTOR_PCT        = 0.25  # 25% max per sector
 BCS_MIN_ROR           = 0.80  # Bull Call Spread min return on risk
 
 CORE_STOCKS = ["AAPL","AMZN","ASML","BRK-B","GOOGL","IBKR","MELI","MU","NVDA","NVO","TSM"]
 OPPORTUNISTIC_STOCKS = [
-    "BABA","CLS","CRDO","DDOG","FIX","KNX","LULU","NFLX","NOW","POWL",
-    "UBER","VRT","VRTX","CPRT","CRSP","GRAB","IBIT","NBIS","PATH","PLTR","TSLA"
+    # Quality opportunistic — scan all strategies
+    "CLS","CRDO","DDOG","FIX","KNX","NFLX","NOW","POWL",
+    "UBER","VRT","IBIT","TSLA",
+    # Watchlist only — scan but apply extra caution (wider strikes, tighter timing)
+    "BABA",    # China risk — LEAPS only, no CSP
+    "CPRT",    # Downtrend, wait for 200MA stabilization
+    "LULU",    # Growth slowdown, unclear if temporary
+    "PLTR",    # Extreme valuation, opportunistic only
+    "VRTX",    # Biotech, wide strikes required
 ]
-SPECULATIVE = {"VRTX","CRSP","NBIS","GRAB","PATH","IBIT","PLTR","BABA","CRDO"}
+# Removed entirely (scanner will skip):
+# GRAB  — decelerating growth, poor liquidity, geopolitical risk
+# NBIS  — no profits, too early stage for options income
+# CRSP  — binary biotech, dangerous for CSP (gap risk)
+# PATH  — declining growth, not quality compounder
+# NVO   — moved to CORE watchlist below (broken thesis, monitor for re-entry)
+
+# Speculative tickers — require wider OTM buffers, stricter timing
+SPECULATIVE = {"VRTX","IBIT","PLTR","BABA","CRDO","LULU"}
+
+# Watchlist only — scanner will suggest LEAPS only, never CSP/CC
+# until thesis recovers
+LEAPS_ONLY = {"BABA", "CPRT"}
+
+# NVO is now a Core holding with valuation awareness
 
 UW_BASE    = "https://api.unusualwhales.com"
 UW_HEADERS = {"Authorization": f"Bearer {UNUSUAL_WHALES_API_KEY}"}
@@ -78,16 +128,23 @@ def get_market_data(tickers: list) -> dict:
             closes = j.get("indicators",{}).get("quote",[{}])[0].get("close",[])
             closes = [c for c in closes if c]
 
-            ma200 = sum(closes[-200:]) / min(200, len(closes)) if closes else 0
-            price = float(meta.get("regularMarketPrice",0))
+            closes_clean = [c for c in closes if c is not None]
+            ma200 = sum(closes_clean[-200:]) / min(200, len(closes_clean)) if closes_clean else 0
+            ma50  = sum(closes_clean[-50:])  / min(50,  len(closes_clean)) if closes_clean else 0
+            price = float(meta.get("regularMarketPrice", 0))
+            prev_close = float(meta.get("chartPreviousClose", price) or price)
+            day_change_pct = abs(price - prev_close) / prev_close if prev_close > 0 else 0
 
             data[ticker] = {
-                "price":        round(price, 2),
-                "week52_high":  round(float(meta.get("fiftyTwoWeekHigh", price)), 2),
-                "week52_low":   round(float(meta.get("fiftyTwoWeekLow",  price)), 2),
-                "avg_volume":   int(meta.get("averageDailyVolume3Month", 0)),
-                "ma200":        round(ma200, 2),
-                "above_ma200":  price >= ma200 * 0.97,  # within 3% counts as near MA
+                "price":          round(price, 2),
+                "week52_high":    round(float(meta.get("fiftyTwoWeekHigh", price)), 2),
+                "week52_low":     round(float(meta.get("fiftyTwoWeekLow",  price)), 2),
+                "avg_volume":     int(meta.get("averageDailyVolume3Month", 0)),
+                "ma200":          round(ma200, 2),
+                "ma50":           round(ma50, 2),
+                "above_ma200":    price >= ma200 * 0.97,
+                "pct_above_ma50": (price - ma50) / ma50 if ma50 > 0 else 0,
+                "day_change_pct": round(day_change_pct, 4),
             }
         except Exception as e:
             data[ticker] = {"price":0,"week52_high":0,"week52_low":0,
@@ -464,7 +521,8 @@ def get_expiry_breakdown(ticker: str) -> dict:
 
 
 def market_go_nogo(tide: dict, oi_signals: dict,
-                   vix_data: dict, spike_data: dict) -> dict:
+                   vix_data: dict, spike_data: dict,
+                   spy_regime: dict = None) -> dict:
     """
     Master go/no-go decision using VIX + SPIKE + Market Tide + OI breadth.
     Framework: only trade when opportunity is really good.
@@ -504,6 +562,10 @@ def market_go_nogo(tide: dict, oi_signals: dict,
         tide_component * 0.25 +
         oi_component   * 0.15, 1
     )
+    # S&P below 200MA: warning regime — reduce score by 15 points
+    spy_warning = spy_regime and not spy_regime.get("above_ma200", True)
+    if spy_warning:
+        market_score = max(0, market_score - 15)
 
     # Go/no-go logic
     if market_score >= 65:
@@ -535,6 +597,7 @@ def market_go_nogo(tide: dict, oi_signals: dict,
         "quality":       quality,
         "vix_regime":    vix_regime,
         "spike_regime":  spike_regime,
+        "spy_warning":   spy_warning if "spy_warning" in dir() else False,
     }
 
 
@@ -592,20 +655,109 @@ def calculate_ivp(contracts: list) -> dict:
             "iv_high":round(s[-1],3),"ivp":ivp}
 
 
+# ── Stock Universe ──────────────────────────────────────────
+# Tier 1: Core Compounders — durable moats, long-term holds
+# Primary candidates for CSP, CC, PMCC, LEAPS
+# Max allocation: 8% ($560K) per position
+CORE_STOCKS = [
+    "AAPL",   # Ecosystem + buybacks
+    "AMZN",   # AWS + logistics moat
+    "ASML",   # EUV lithography monopoly
+    "BRK-B",  # Capital allocation machine
+    "GOOGL",  # Search dominance + AI
+    "MSFT",   # AI + enterprise platform (top PMCC/CSP stock)
+    "NVDA",   # AI compute backbone
+    "TSM",    # Semiconductor manufacturing monopoly
+    "IBKR",   # Structural brokerage winner
+    "MELI",   # LATAM ecommerce + fintech
+    "CPRT",   # Salvage auction network effects (valuation reset, not broken)
+    "VRTX",   # Profitable biotech, CF franchise $10B+ revenue, zero debt
+    "NVO",    # GLP-1 leadership — Core holding with valuation awareness
+]
+
+# Tier 2: Growth / Semi-Core — can compound but more valuation sensitive
+# Max allocation: 5% ($350K) per position
+GROWTH_STOCKS = [
+    "NOW",    # Elite SaaS platform
+    "DDOG",   # Observability infrastructure leader
+    "UBER",   # Mobility + logistics platform
+    "NFLX",   # Global media platform
+    "PLTR",   # AI-driven data infrastructure (extreme valuation — stricter delta)
+    "META",   # AI + global social graph (top options liquidity, PMCC candidate)
+]
+
+# Tier 3: Cyclical Compounders — good companies tied to cycles
+# Max allocation: 4% ($280K) per position
+CYCLICAL_STOCKS = [
+    "MU",     # Memory semiconductor cycle
+    "KNX",    # Trucking cycle
+    "POWL",   # Electrical equipment cycle
+]
+
+# Tier 4: Opportunistic / Tactical — best for LEAPS, CSP harvesting, rotation
+# Max allocation: 2.5% ($175K) per position
+OPPORTUNISTIC_STOCKS = [
+    "CLS",    # AI server demand cycle
+    "CRDO",   # Hyperscaler networking cycle
+    "FIX",    # Construction cycle
+    "VRT",    # Data center power infrastructure
+    "LULU",   # Retail cyclicality
+    "TSLA",   # High volatility, narrative driven (best options liquidity)
+    "BABA",   # Geopolitical risk — LEAPS/CSP only, no CC
+    "IBIT",   # Bitcoin proxy — directional/LEAPS only
+]
+
+# All tickers for scanning
+ALL_TICKERS = CORE_STOCKS + GROWTH_STOCKS + CYCLICAL_STOCKS + OPPORTUNISTIC_STOCKS
+
+# Speculative — wider OTM buffers required
+SPECULATIVE = {"IBIT", "BABA", "CRDO", "LULU"}
+
+# LEAPS/CSP only — no CC income generation
+LEAPS_ONLY = {"BABA", "IBIT"}
+
+# Stricter delta rules for specific stocks
+STRICT_DELTA = {
+    "PLTR": (0.20, 0.25),   # Extreme valuation, stricter
+    "TSLA": (0.20, 0.28),   # High volatility, be selective
+    "BABA": (0.15, 0.25),   # Geopolitical risk
+}
+
+# IVP minimums by strategy (overrides global defaults for specific stocks)
+STRICT_IVP = {
+    "PLTR": 40,    # Needs elevated IV to justify premium selling
+    "BABA": 35,
+}
+
+# Options income priority — these 6 have best liquidity/volatility structure
+# Scanner scores these higher automatically
+OPTIONS_INCOME_PRIORITY = {"NVDA", "MSFT", "AMZN", "TSLA", "META", "NFLX"}
+
 # Dark Pool notional thresholds by tier (notable, significant)
 DP_THRESHOLDS = {
+    # Mega cap
     "AAPL":  (50_000_000, 200_000_000),
     "NVDA":  (50_000_000, 200_000_000),
     "AMZN":  (50_000_000, 200_000_000),
     "GOOGL": (50_000_000, 200_000_000),
     "MSFT":  (50_000_000, 200_000_000),
+    "META":  (50_000_000, 200_000_000),
+    # Large cap core
     "ASML":  (25_000_000, 100_000_000),
     "MELI":  (25_000_000, 100_000_000),
     "TSM":   (25_000_000, 100_000_000),
     "BRK-B": (25_000_000, 100_000_000),
+    "CPRT":  (20_000_000,  80_000_000),
+    "VRTX":  (20_000_000,  80_000_000),
+    "NVO":   (20_000_000,  80_000_000),
+    "NFLX":  (20_000_000,  80_000_000),
+    # Standard
     "IBKR":  (15_000_000,  50_000_000),
-    "NVO":   (15_000_000,  50_000_000),
     "MU":    (15_000_000,  50_000_000),
+    "NOW":   (15_000_000,  50_000_000),
+    "DDOG":  (10_000_000,  40_000_000),
+    "UBER":  (10_000_000,  40_000_000),
+    "PLTR":  (10_000_000,  40_000_000),
     "__DEFAULT__": (10_000_000, 30_000_000),
 }
 DP_LEAPS_MIN = 50_000_000  # LEAPS needs much higher bar
@@ -693,20 +845,51 @@ def score_darkpool(trades: list, ticker: str = "", for_leaps: bool = False) -> d
 def get_max_alloc(ticker): return POSITION_TIERS.get(ticker, POSITION_TIERS["__DEFAULT__"])
 
 
+# Sector mapping for exposure cap
+SECTOR_MAP = {
+    "NVDA":"Technology","MSFT":"Technology","AAPL":"Technology",
+    "ASML":"Technology","TSM":"Technology","CRDO":"Technology","CLS":"Technology",
+    "AMZN":"Consumer","MELI":"Consumer","LULU":"Consumer","NFLX":"Consumer","UBER":"Consumer",
+    "GOOGL":"Communication","META":"Communication",
+    "IBKR":"Financials","BRK-B":"Financials","IBIT":"Financials",
+    "NVO":"Healthcare","VRTX":"Healthcare",
+    "MU":"Semiconductors","AMD":"Semiconductors",
+    "CPRT":"Industrials","KNX":"Industrials","POWL":"Industrials","FIX":"Industrials","VRT":"Industrials",
+    "NOW":"SaaS","DDOG":"SaaS",
+    "TSLA":"Automotive","BABA":"China","PLTR":"Defense/AI",
+}
+
+
+def get_sector_exposure(ibkr_positions: dict) -> dict:
+    """Calculate current sector exposure as % of portfolio."""
+    sector_vals = {}
+    for ticker, pos in ibkr_positions.items():
+        if pos.get("asset_class") != "STK": continue
+        sector = SECTOR_MAP.get(ticker, "Other")
+        sector_vals[sector] = sector_vals.get(sector, 0) + abs(pos.get("market_value", 0))
+    return {s: round(v / PORTFOLIO_SIZE * 100, 1) for s, v in sector_vals.items()}
+
+
 def position_check(ticker, ibkr):
-    pos  = ibkr.get(ticker,{})
-    val  = pos.get("market_value",0)
-    qty  = pos.get("quantity",0)
-    avg  = pos.get("avg_cost",0)
-    pct  = (val / PORTFOLIO_SIZE) * 100
-    max_a= get_max_alloc(ticker)
-    room = max(0, round(PORTFOLIO_SIZE * max_a - val, 0))
-    tier = ("Mega cap" if max_a >= 0.08 else "Quality core" if max_a >= 0.06
-            else "Standard core" if max_a >= 0.04 else "Opportunistic")
+    pos    = ibkr.get(ticker,{})
+    val    = pos.get("market_value",0)
+    qty    = pos.get("quantity",0)
+    avg    = pos.get("avg_cost",0)
+    pct    = (val / PORTFOLIO_SIZE) * 100
+    max_a  = get_max_alloc(ticker)
+    room   = max(0, round(PORTFOLIO_SIZE * max_a - val, 0))
+    sector = SECTOR_MAP.get(ticker, "Other")
+
+    # Determine tier label
+    if ticker in CORE_STOCKS:        tier = "Core"
+    elif ticker in GROWTH_STOCKS:    tier = "Growth"
+    elif ticker in CYCLICAL_STOCKS:  tier = "Cyclical"
+    else:                            tier = "Opportunistic"
+
     return {
-        "current_value":round(val,0), "quantity":qty, "avg_cost":avg,
-        "current_pct":round(pct,2), "max_pct":round(max_a*100,1),
-        "room_usd":room, "tier":tier,
+        "current_value": round(val,0), "quantity":qty, "avg_cost":avg,
+        "current_pct":   round(pct,2), "max_pct":round(max_a*100,1),
+        "room_usd":      room, "tier":tier, "sector":sector,
         "status":("OVERWEIGHT" if pct > max_a*100*1.2
                   else "FULL"  if pct > max_a*100*0.9
                   else "HAS ROOM" if val > 0 else "NEW POSITION")
@@ -720,50 +903,102 @@ def position_check(ticker, ibkr):
 
 def stock_quality_check(ticker, md, earnings_date) -> dict:
     """
-    Returns quality score and pass/fail for each criterion.
-    Bad traders: scan → highest premium → trade
-    Good traders: quality stock → pullback → check option yield
+    Full quality gate based on finalized rules document.
+    Quality stock → pullback → check option yield (never reverse this)
     """
-    price    = md["price"]
-    w52h     = md["week52_high"]
-    w52l     = md["week52_low"]
-    pullback = pullback_from_high(price, w52h)
-    vol      = md["avg_volume"]
-    above_ma = md["above_ma200"]
-    ma200    = md["ma200"]
+    price          = md["price"]
+    w52h           = md.get("week52_high", price)
+    w52l           = md.get("week52_low",  price)
+    pullback       = pullback_from_high(price, w52h)
+    vol            = md.get("avg_volume", 0)
+    ma200          = md.get("ma200", 0)
+    ma50           = md.get("ma50", 0)
+    above_ma200    = md.get("above_ma200", True)
+    pct_above_ma50 = md.get("pct_above_ma50", 0)
+    day_change_pct = md.get("day_change_pct", 0)
 
     checks = {}
+    warnings = []
 
+    # ── Hard filters ─────────────────────────────────────
     # Price > $20
-    checks["price_ok"]    = price >= 20
+    checks["price_ok"] = price >= 20
 
-    # Volume > 1M
-    checks["volume_ok"]   = vol >= 1_000_000
+    # Volume > 1M shares/day
+    checks["volume_ok"] = vol >= 1_000_000
 
-    # Pullback 15-65% from high (opportunity zone)
-    checks["pullback_ok"] = PULLBACK_MIN <= pullback <= PULLBACK_MAX
+    # Gap risk: skip if moved >8% today (distorted premiums)
+    checks["no_gap"] = day_change_pct <= GAP_RISK_PCT
+    if not checks["no_gap"]:
+        warnings.append(f"⚡ Gap risk: {day_change_pct*100:.1f}% move today — premiums distorted")
 
-    # Above 200MA or within 5% of it (near support)
-    checks["ma200_ok"]    = above_ma or (ma200 > 0 and price >= ma200 * 0.95)
+    # Price location: within 8% of 52w high = skip CSP (near highs, poor risk/reward)
+    near_high = pullback < NEAR_HIGH_SKIP
+    checks["not_near_high"] = not near_high
+    if near_high:
+        warnings.append(f"📍 Near 52w high ({pullback*100:.1f}% below) — skip CSP")
+    elif pullback < NEAR_HIGH_CAUTION:
+        warnings.append(f"⚠️ Caution zone ({pullback*100:.1f}% below high)")
 
-    # Not in earnings blackout
+    # MA50: skip CSP if >8% above 50-day MA (extended short-term)
+    ma50_extended = pct_above_ma50 > MA50_EXTENDED
+    checks["ma50_ok"] = not ma50_extended
+    if ma50_extended:
+        warnings.append(f"📈 Extended {pct_above_ma50*100:.1f}% above 50MA — wait for pullback")
+
+    # ── Earnings filter ──────────────────────────────────
     days_to_earnings = None
+    earnings_status = "ok"
     if earnings_date:
         days_to_earnings = (earnings_date - datetime.now()).days
-        checks["earnings_ok"] = days_to_earnings > EARNINGS_BLACKOUT or days_to_earnings < 0
+        if 0 < days_to_earnings < EARNINGS_HARD_STOP:
+            checks["earnings_ok"] = False
+            earnings_status = "hard_stop"
+            warnings.append(f"🚨 Earnings in {days_to_earnings}d — HARD STOP")
+        elif 0 < days_to_earnings < EARNINGS_WARNING:
+            checks["earnings_ok"] = True   # allowed but flagged
+            earnings_status = "warning"
+            warnings.append(f"⚠️ Earnings in {days_to_earnings}d — proceed with caution")
+        else:
+            checks["earnings_ok"] = True
+            earnings_status = "ok"
     else:
         checks["earnings_ok"] = True
 
-    # Quality score: sum of passes (0-5)
+    # ── Soft checks (affect score but not hard filter) ──
+    # Above 200MA (trend health)
+    checks["ma200_ok"] = above_ma200 or (ma200 > 0 and price >= ma200 * 0.95)
+    if not checks["ma200_ok"]:
+        warnings.append("⚠️ Below 200MA — downtrend warning")
+
+    # Pullback in preferred zone
+    checks["pullback_ok"] = PULLBACK_MIN <= pullback <= PULLBACK_MAX
+    if not checks["pullback_ok"] and pullback >= PULLBACK_MIN:
+        pass  # already caught by near_high check above
+
+    # Hard stop conditions
+    hard_stop = (not checks["price_ok"] or
+                 not checks["volume_ok"] or
+                 not checks["no_gap"] or
+                 not checks["not_near_high"] or
+                 not checks["ma50_ok"] or
+                 earnings_status == "hard_stop")
+
     quality_score = sum(checks.values())
 
     return {
-        "checks": checks,
-        "quality_score": quality_score,
-        "pullback": pullback,
-        "pullback_pct": round(pullback * 100, 1),
-        "days_to_earnings": days_to_earnings,
-        "passes": quality_score >= 3,  # need at least 3/5 to proceed
+        "checks":          checks,
+        "quality_score":   quality_score,
+        "pullback":        pullback,
+        "pullback_pct":    round(pullback * 100, 1),
+        "days_to_earnings":days_to_earnings,
+        "earnings_status": earnings_status,
+        "pct_above_ma50":  round(pct_above_ma50 * 100, 1),
+        "ma50_extended":   ma50_extended,
+        "near_high":       near_high,
+        "warnings":        warnings,
+        "hard_stop":       hard_stop,
+        "passes":          not hard_stop and quality_score >= 3,
     }
 
 
@@ -771,7 +1006,12 @@ def stock_quality_check(ticker, md, earnings_date) -> dict:
 # TIMING INTELLIGENCE (IVP + price position)
 # ════════════════════════════════════════════════════════════
 
-def timing_score(strategy, pir, ivp, is_spec=False) -> dict:
+def timing_score(strategy, pir, ivp, is_spec=False, ivp_override=None) -> dict:
+    # Allow per-stock IVP floor override (e.g. PLTR needs IVP > 40)
+    effective_ivp_min = ivp_override if ivp_override else IVP_MIN_SELL
+    if strategy in ("CSP","CC") and ivp < effective_ivp_min:
+        return {"score": 10, "recommend": False,
+                "signal": f"❌ SKIP — IVP {ivp:.0f}% below minimum ({effective_ivp_min})"}
     high_ivp  = ivp >= IVP_MIN_SELL
     low_ivp   = ivp <= IVP_MAX_BUY
     near_low  = pir < 0.30
@@ -860,7 +1100,10 @@ def timing_score(strategy, pir, ivp, is_spec=False) -> dict:
 # ════════════════════════════════════════════════════════════
 
 def find_best_csp(ticker, price, contracts, ivdata, pir, quality):
-    timing = timing_score("CSP", pir, ivdata["ivp"], ticker in SPECULATIVE)
+    # Per-stock IVP minimum (stricter for PLTR/BABA)
+    ivp_min = STRICT_IVP.get(ticker, IVP_MIN_SELL)
+    timing = timing_score("CSP", pir, ivdata["ivp"], ticker in SPECULATIVE,
+                          ivp_override=ivp_min)
     if not timing["recommend"]: return None, timing
     if not contracts or price <= 0: return None, timing
 
@@ -886,12 +1129,30 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality):
         mid = (bid + ask) / 2
         if mid < 1.0: continue
         if mid > strike * 0.25: continue
+        # Liquidity filter: OI > 1000, volume > 100, spread < 5%
+        oi_val  = int(c.get("open_interest", 0) or 0)
+        vol_val = int(c.get("volume", 0) or 0)
+        spread  = (ask - bid) / ask if ask > 0 else 1
+        if oi_val < MIN_OPEN_INTEREST: continue
+        if vol_val < MIN_DAILY_VOLUME: continue
+        if spread > MAX_BID_ASK_SPREAD: continue
+        # Premium efficiency: must be ≥1.5% of strike for 30-45 DTE
+        prem_pct = mid / strike
+        min_prem_pct = MIN_PREMIUM_PCT_30_45 if dte <= 45 else MIN_PREMIUM_PCT_45_60
+        if prem_pct < min_prem_pct: continue
         delta = estimate_delta(price, strike, dte, atm_iv, "P")
-        if delta is None or not (CSP_DELTA_MIN <= delta <= CSP_DELTA_MAX): continue
+        # Use stricter delta for specific stocks (PLTR, TSLA, BABA)
+        d_min, d_max = STRICT_DELTA.get(ticker, (CSP_DELTA_MIN, CSP_DELTA_MAX))
+        # Allow up to 0.35 delta when IVP is elevated (>50)
+        if ivdata["ivp"] >= IVP_ELEVATED:
+            d_max = min(CSP_DELTA_MAX_HIGH_IV, d_max + 0.05)
+        if delta is None or not (d_min <= delta <= d_max): continue
         annualized = (mid / strike) * (365 / dte) * 100
         if not (CSP_MIN_ANNUALIZED <= annualized <= MAX_ANNUALIZED): continue
         max_contracts = max(1, int((PORTFOLIO_SIZE * get_max_alloc(ticker)) / (strike * 100)))
-        score = (timing["score"]/100) * (quality["quality_score"]/5) * mid * (1 + atm_iv) * (1 - abs(dte-37)/37)
+        # Options income priority stocks score 20% higher (better liquidity/fills)
+        priority_boost = 1.2 if ticker in OPTIONS_INCOME_PRIORITY else 1.0
+        score = (timing["score"]/100) * (quality["quality_score"]/5) * mid * (1 + atm_iv) * (1 - abs(dte-37)/37) * priority_boost
         if score > best_score:
             best_score = score
             best = {"strike":strike,"expiry":expiry.strftime("%Y-%m-%d"),"dte":dte,
@@ -929,6 +1190,13 @@ def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir):
         ask = float(c.get("nbbo_ask",0) or 0)
         mid = (bid + ask) / 2
         if mid < 1.0: continue
+        # Liquidity filter
+        oi_val  = int(c.get("open_interest", 0) or 0)
+        vol_val = int(c.get("volume", 0) or 0)
+        spread  = (ask - bid) / ask if ask > 0 else 1
+        if oi_val < MIN_OPEN_INTEREST: continue
+        if vol_val < MIN_DAILY_VOLUME: continue
+        if spread > MAX_BID_ASK_SPREAD: continue
         delta = estimate_delta(price, strike, dte, atm_iv, "C")
         if delta is None or not (CC_DELTA_MIN <= delta <= CC_DELTA_MAX): continue
         annualized = (mid / price) * (365 / dte) * 100
@@ -975,7 +1243,7 @@ def find_best_leaps(ticker, price, contracts, ivdata, pir):
         intrinsic     = max(0, price - strike)
         extrinsic     = max(0, mid - intrinsic)
         extrinsic_pct = (extrinsic / mid * 100) if mid > 0 else 100
-        if extrinsic_pct > 30: continue  # hard reject — usually too expensive
+        if extrinsic_pct > LEAPS_EXTRINSIC_MAX: continue  # reject >25% extrinsic
 
         # Extrinsic quality label (from framework)
         if extrinsic_pct < 10:
@@ -1247,14 +1515,37 @@ def send_telegram(msg: str):
 
 
 def fmt_quality(q) -> str:
-    c = q["checks"]
-    flags = []
-    if not c.get("pullback_ok"):  flags.append(f"⚠️ Pullback {q['pullback_pct']}% (need 15-65%)")
-    if not c.get("ma200_ok"):     flags.append("⚠️ Below 200MA")
-    if not c.get("volume_ok"):    flags.append("⚠️ Low volume")
-    if q.get("days_to_earnings") and 0 < q["days_to_earnings"] <= EARNINGS_BLACKOUT:
-        flags.append(f"🚨 Earnings in {q['days_to_earnings']} days!")
-    return (" | ".join(flags)) if flags else f"✅ Quality score {q['quality_score']}/5 | {q['pullback_pct']}% off highs"
+    """Format quality summary for Telegram alerts."""
+    warnings = q.get("warnings", [])
+    score    = q.get("quality_score", 0)
+    pullback = q.get("pullback_pct", 0)
+    earn     = q.get("days_to_earnings")
+    earn_status = q.get("earnings_status","ok")
+
+    lines = []
+    # Earnings
+    if earn_status == "hard_stop":
+        lines.append(f"🚨 Earnings in {earn}d — HARD STOP")
+    elif earn_status == "warning":
+        lines.append(f"⚠️ Earnings in {earn}d — caution")
+    elif earn and earn > 0:
+        lines.append(f"✅ Earnings in {earn}d — safe")
+
+    # MA50 extension
+    if q.get("ma50_extended"):
+        lines.append(f"📈 Extended {q.get('pct_above_ma50',0):.1f}% above 50MA")
+
+    # MA200
+    if not q.get("checks",{}).get("ma200_ok", True):
+        lines.append("⚠️ Below 200MA")
+
+    # Price location
+    if q.get("near_high"):
+        lines.append(f"📍 Near 52w high — CSP skipped")
+    else:
+        lines.append(f"✅ {pullback:.1f}% off highs | Quality {score}/6")
+
+    return " | ".join(lines) if lines else f"✅ Quality {score}/6 | {pullback:.1f}% off highs"
 
 
 def fmt_csp(opp) -> str:
@@ -1266,11 +1557,11 @@ def fmt_csp(opp) -> str:
         f"  {fmt_quality(q)}",
         *([f"  {opp['darkpool']['label']}"]
            if opp.get('darkpool',{}).get('show') else []),
-        f"  Tier: {s['tier']} | Max: {s['max_pct']}%",
+        f"  [{opp['tier']}] {s['tier']} tier | Max: {s['max_pct']}% (${PORTFOLIO_SIZE*s['max_pct']/100:,.0f})",
         f"  Sell Put ${opp['csp']['strike']} | {opp['csp']['expiry']} | {opp['csp']['dte']} DTE",
         f"  Bid ${opp['csp']['bid']} / Ask ${opp['csp']['ask']}",
         f"  {opp['csp']['otm_pct']}% OTM | IV {opp['csp']['iv']}% | IVP {opp['csp']['ivp']:.0f}%{d}",
-        f"  Annualized: {opp['csp']['annualized_return']}% | {opp['csp']['max_contracts']} contracts",
+        f"  Annualized: {opp['csp']['annualized_return']}% | ${opp['csp']['premium']/opp['csp']['dte']:.2f}/day | {opp['csp']['max_contracts']} contracts",
         f"  Collateral: ${opp['csp']['collateral']:,.0f} | Room: ${s['room_usd']:,.0f}",
         *([f"  ⚠️ OI Signal: {opp['oi_signal']['signal']} (calls {opp['oi_signal']['call_oi_change']:+,} / puts {opp['oi_signal']['put_oi_change']:+,})"]
            if opp.get("oi_signal") else []),
@@ -1292,7 +1583,7 @@ def fmt_cc(opp) -> str:
         f"  Sell Call ${opp['cc']['strike']} | {opp['cc']['expiry']} | {opp['cc']['dte']} DTE",
         f"  Bid ${opp['cc']['bid']} / Ask ${opp['cc']['ask']}",
         f"  {opp['cc']['otm_pct']}% OTM | IV {opp['cc']['iv']}% | IVP {opp['cc']['ivp']:.0f}%{d}",
-        f"  Annualized: {opp['cc']['annualized_return']}% | {opp['cc']['max_contracts']} contracts",
+        f"  Annualized: {opp['cc']['annualized_return']}% | ${opp['cc']['premium']/opp['cc']['dte']:.2f}/day | {opp['cc']['max_contracts']} contracts",
         f"_Scanned {datetime.now().strftime('%b %d %H:%M')} ET_"
     ])
 
@@ -1377,7 +1668,7 @@ def run_scanner():
     ibkr     = get_ibkr_positions()
     stk_hold = {k:v for k,v in ibkr.items() if v.get("asset_class")=="STK"}
 
-    all_tickers = CORE_STOCKS + OPPORTUNISTIC_STOCKS
+    all_tickers = ALL_TICKERS
     print(f"💹 Market data ({len(all_tickers)} stocks)...")
     mkt = get_market_data(all_tickers)
     ok  = sum(1 for v in mkt.values() if v["price"]>0)
@@ -1389,6 +1680,21 @@ def run_scanner():
     print("   📊 Fetching Market Tide...")
     tide       = get_market_tide()
     print(f"   {tide['label']}")
+
+    print("   📈 Fetching S&P 500 regime...")
+    spy_md     = get_market_data(["SPY"]).get("SPY", {})
+    spy_price  = spy_md.get("price", 0)
+    spy_ma200  = spy_md.get("ma200", 0)
+    spy_above  = spy_price >= spy_ma200 if spy_ma200 > 0 else True
+    spy_regime = {
+        "above_ma200": spy_above,
+        "spy":         spy_price,
+        "ma200":       round(spy_ma200, 2),
+        "label": (f"✅ S&P 500 above 200MA (${spy_ma200:.0f}) — Normal environment"
+                  if spy_above else
+                  f"⚠️ S&P 500 BELOW 200MA (${spy_ma200:.0f}) — Risk regime: reduce size, lower delta")
+    }
+    print(f"   {spy_regime['label']}")
 
     print("   😱 Fetching VIX...")
     vix_data   = get_vix()
@@ -1403,7 +1709,7 @@ def run_scanner():
     print(f"   OI data for {len(oi_signals)} tickers")
 
     # ── GO / NO-GO DECISION ──────────────────────────────────
-    gng = market_go_nogo(tide, oi_signals, vix_data, spike_data)
+    gng = market_go_nogo(tide, oi_signals, vix_data, spike_data, spy_regime)
     print(f"\n{'='*50}")
     print(f"📡 MARKET QUALITY SCORE: {gng['score']}/100")
     print(f"   {gng['quality']}")
@@ -1442,6 +1748,10 @@ def run_scanner():
         f"\n"
         f"OI: {gng['bull_oi_count']} bullish signals | {gng['bear_oi_count']} bearish signals\n"
         f"\n"
+        f"*S&P 500 Regime:*\n"
+        f"{spy_regime['label']}\n"
+        f"_S&P below 200MA = risk regime: smaller sizes, lower delta._\n"
+        f"\n"
         f"━━━ TODAY'S VERDICT ━━━\n"
         f"\n"
         f"*Overall Score: {gng['score']}/100*\n"
@@ -1466,6 +1776,12 @@ def run_scanner():
 
     print(f"\n🔍 Scanning {len(all_tickers)} stocks...")
     for ticker in all_tickers:
+        # Determine tier
+        if ticker in CORE_STOCKS:        tier = "Core"
+        elif ticker in GROWTH_STOCKS:    tier = "Growth"
+        elif ticker in CYCLICAL_STOCKS:  tier = "Cyclical"
+        else:                            tier = "Opportunistic"
+        is_core = (tier == "Core")
         md    = mkt.get(ticker,{})
         price = md.get("price",0)
         if price <= 0: continue
@@ -1499,6 +1815,7 @@ def run_scanner():
         exp_bdown  = get_expiry_breakdown(ticker)
 
         base = {"ticker":ticker,"price":price,"pir":pir,
+                "tier":tier,
                 "w52_low":w52l,"w52_high":w52h,
                 "pullback_pct":round(pullback*100,1),
                 "ivp":ivdata["ivp"],"quality":quality,
@@ -1509,20 +1826,26 @@ def run_scanner():
         # ── CSP ──────────────────────────────────────────
         if (gng["sell_premium"]
                 and sizing["status"] != "OVERWEIGHT"
-                and quality["checks"].get("earnings_ok",True)
-                and not oi_warning):  # skip if heavy new put OI
-            csp, _ = find_best_csp(ticker, price, contracts, ivdata, pir, quality)
+                and not quality["hard_stop"]
+                and not oi_warning
+                and ticker not in LEAPS_ONLY):
+            # Apply risk regime adjustments when S&P below 200MA
+            q_adjusted = dict(quality)
+            if gng.get("spy_warning"):
+                q_adjusted["quality_score"] = max(0, quality["quality_score"] - 1)
+            csp, _ = find_best_csp(ticker, price, contracts, ivdata, pir, q_adjusted)
             if csp:
                 csp_opps.append({**base,"csp":csp,
                     "score":csp["timing"]["score"]*quality["quality_score"]*csp["annualized_return"]*dp_boost})
-                print(f"  {ticker}: 💰 CSP ${csp['strike']} {csp['annualized_return']}% ann δ{csp['delta']} IVP{ivdata['ivp']:.0f}%")
+                print(f"  [{tier}] {ticker}: 💰 CSP ${csp['strike']} {csp['annualized_return']}% ann δ{csp['delta']} IVP{ivdata['ivp']:.0f}%")
 
         # ── CC ───────────────────────────────────────────
         holding = stk_hold.get(ticker,{})
         qty = holding.get("quantity",0); avg = holding.get("avg_cost",0)
         if (gng["sell_premium"]
                 and qty >= 100
-                and quality["checks"].get("earnings_ok",True)):
+                and not quality["hard_stop"]
+                and ticker not in LEAPS_ONLY):
             cc, _ = find_best_cc(ticker, price, qty, avg, contracts, ivdata, pir)
             if cc:
                 cc_opps.append({**base,"cc":cc,
@@ -1570,7 +1893,7 @@ def run_scanner():
 
     # ── Peter Lynch ───────────────────────────────────────
     print("🔬 Peter Lynch screen...")
-    discoveries = peter_lynch_screen(set(all_tickers), flow)
+    discoveries = peter_lynch_screen(set(ALL_TICKERS), flow)
     if discoveries:
         print(f"   Found: {[d['ticker'] for d in discoveries]}")
 
