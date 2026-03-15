@@ -592,23 +592,102 @@ def calculate_ivp(contracts: list) -> dict:
             "iv_high":round(s[-1],3),"ivp":ivp}
 
 
-def score_darkpool(trades: list) -> dict:
+# Dark Pool notional thresholds by tier (notable, significant)
+DP_THRESHOLDS = {
+    "AAPL":  (50_000_000, 200_000_000),
+    "NVDA":  (50_000_000, 200_000_000),
+    "AMZN":  (50_000_000, 200_000_000),
+    "GOOGL": (50_000_000, 200_000_000),
+    "MSFT":  (50_000_000, 200_000_000),
+    "ASML":  (25_000_000, 100_000_000),
+    "MELI":  (25_000_000, 100_000_000),
+    "TSM":   (25_000_000, 100_000_000),
+    "BRK-B": (25_000_000, 100_000_000),
+    "IBKR":  (15_000_000,  50_000_000),
+    "NVO":   (15_000_000,  50_000_000),
+    "MU":    (15_000_000,  50_000_000),
+    "__DEFAULT__": (10_000_000, 30_000_000),
+}
+DP_LEAPS_MIN = 50_000_000  # LEAPS needs much higher bar
+
+
+def score_darkpool(trades: list, ticker: str = "", for_leaps: bool = False) -> dict:
+    """
+    Tiered dark pool analysis. Only surfaces signal when genuinely meaningful.
+    Rules:
+    1. Only show if notional exceeds tier threshold — below = noise, ignored
+    2. Notable  = single large block above threshold
+    3. Significant = multiple blocks (3+) + above VWAP = real accumulation
+    4. Score boost only on Significant — not Notable
+    5. LEAPS bar = $50M+ minimum (single $8.5M print is noise for LEAPS)
+    """
+    empty = {"score":50,"total_notional":0,"label":None,
+             "significant":False,"notable":False,"show":False}
     if not trades:
-        return {"score":50,"total_notional":0,"label":"No dark pool data"}
-    total = bullish = 0
-    for t in trades[:20]:
-        n = float(t.get("size",0)) * float(t.get("price",0))
+        return empty
+
+    total = bullish = ask_side = 0
+    block_count = 0
+    for t in trades[:30]:
+        size  = float(t.get("size",  0) or 0)
+        price = float(t.get("price", 0) or 0)
+        vwap  = float(t.get("vwap",  price) or price)
+        n     = size * price
         total += n
-        if float(t.get("price",0)) >= float(t.get("vwap", t.get("price",0))):
-            bullish += n
-    score = (bullish/total*100) if total > 0 else 50
+        if n > 1_000_000:
+            block_count += 1
+        if price >= vwap:
+            bullish  += n
+            ask_side += n
+
+    if total == 0:
+        return empty
+
+    score        = round(bullish / total * 100, 1)
+    ask_side_pct = round(ask_side / total * 100, 1)
+    is_bullish   = score > 55
+    is_bearish   = score < 45
+
+    thresh       = DP_THRESHOLDS.get(ticker, DP_THRESHOLDS["__DEFAULT__"])
+    notable_min  = thresh[0]
+    sig_min      = thresh[1]
+    if for_leaps:
+        notable_min = max(notable_min, DP_LEAPS_MIN)
+        sig_min     = max(sig_min, DP_LEAPS_MIN * 2)
+
+    significant  = (total >= sig_min and block_count >= 3 and is_bullish)
+    notable      = (total >= notable_min and not significant)
+    show         = significant or notable
+
+    if not show:
+        return {**empty, "score":score, "total_notional":round(total,0)}
+
+    notional_str = f"${total/1e6:.0f}M" if total >= 1_000_000 else f"${total/1e3:.0f}K"
+
+    if significant and is_bullish:
+        label = (f"🟢 *Dark Pool: Significant accumulation* — "
+                 f"{notional_str} | {block_count} blocks | {ask_side_pct:.0f}% ask-side")
+    elif significant and is_bearish:
+        label = f"🔴 *Dark Pool: Significant distribution* — {notional_str} | {block_count} blocks"
+    elif notable and is_bullish:
+        label = f"🟡 *Dark Pool: Notable buying* — {notional_str}"
+    elif notable and is_bearish:
+        label = f"🟡 *Dark Pool: Notable selling* — {notional_str}"
+    else:
+        label = f"⚪ Dark Pool: Mixed — {notional_str}"
+
     return {
-        "score": round(score,1),
-        "total_notional": round(total,0),
-        "label": ("🟢 Institutions accumulating" if score > 55
-                  else "🔴 Institutions distributing" if score < 45
-                  else "⚪ Mixed")
+        "score":          score,
+        "total_notional": round(total, 0),
+        "block_count":    block_count,
+        "ask_side_pct":   ask_side_pct,
+        "significant":    significant,
+        "notable":        notable,
+        "show":           show,
+        "is_bullish":     is_bullish,
+        "label":          label,
     }
+
 
 
 def get_max_alloc(ticker): return POSITION_TIERS.get(ticker, POSITION_TIERS["__DEFAULT__"])
@@ -1185,7 +1264,8 @@ def fmt_csp(opp) -> str:
         f"💰 *CSP — {opp['ticker']} @ ${opp['price']}*",
         f"_{t['signal']}_",
         f"  {fmt_quality(q)}",
-        f"  {opp['darkpool']['label']} | ${opp['darkpool']['total_notional']:,.0f} notional",
+        *([f"  {opp['darkpool']['label']}"]
+           if opp.get('darkpool',{}).get('show') else []),
         f"  Tier: {s['tier']} | Max: {s['max_pct']}%",
         f"  Sell Put ${opp['csp']['strike']} | {opp['csp']['expiry']} | {opp['csp']['dte']} DTE",
         f"  Bid ${opp['csp']['bid']} / Ask ${opp['csp']['ask']}",
@@ -1206,7 +1286,8 @@ def fmt_cc(opp) -> str:
     return "\n".join([
         f"📈 *CC — {opp['ticker']} @ ${opp['price']}*",
         f"_{t['signal']}_",
-        f"  {opp['darkpool']['label']} | ${opp['darkpool']['total_notional']:,.0f} notional",
+        *([f"  {opp['darkpool']['label']}"]
+           if opp.get('darkpool',{}).get('show') else []),
         f"  Hold {int(s['quantity'])} shares @ ${opp['cc']['avg_cost']} avg",
         f"  Sell Call ${opp['cc']['strike']} | {opp['cc']['expiry']} | {opp['cc']['dte']} DTE",
         f"  Bid ${opp['cc']['bid']} / Ask ${opp['cc']['ask']}",
@@ -1220,10 +1301,26 @@ def fmt_leaps(opp) -> str:
     t = opp["leaps"]["timing"]; s = opp["sizing"]; l = opp["leaps"]
     d = f" | δ{l['delta']}" if l.get('delta') else ""
     itm = f"{l['itm_pct']}% ITM" if l['itm_pct'] > 0 else f"{abs(l['itm_pct'])}% OTM"
+
+    # Downgrade timing signal if extrinsic doesn't match the label
+    # "Exceptional" requires extrinsic <10%, "Good" requires <20%
+    signal = t["signal"]
+    ext_pct = l.get("extrinsic_pct", 100)
+    if "EXCEPTIONAL" in signal and ext_pct >= 10:
+        if ext_pct < 20:
+            signal = signal.replace("🔥 EXCEPTIONAL", "✅ GOOD")
+        elif ext_pct < 30:
+            signal = signal.replace("🔥 EXCEPTIONAL", "⚠️ ACCEPTABLE")
+        else:
+            signal = signal.replace("🔥 EXCEPTIONAL", "⚠️ POOR EXTRINSIC")
+    elif "GOOD" in signal and ext_pct >= 20:
+        signal = signal.replace("✅ GOOD", "⚠️ ACCEPTABLE")
+
     return "\n".join([
         f"🚀 *LEAPS — {opp['ticker']} @ ${opp['price']}*",
-        f"_{t['signal']}_",
-        f"  {opp['darkpool']['label']} | ${opp['darkpool']['total_notional']:,.0f} notional",
+        f"_{signal}_",
+        *([f"  {opp['darkpool_leaps']['label']}"]
+           if opp.get('darkpool_leaps',{}).get('show') else []),
         f"  52w: ${opp['w52_low']} — ${opp['w52_high']} | {opp['pullback_pct']}% off high",
         f"  Buy Call ${l['strike']} | {l['expiry']} | {l['dte']} DTE",
         f"  Bid ${l['bid']} / Ask ${l['ask']} | Cost ${l['premium']}",
@@ -1254,7 +1351,8 @@ def fmt_bcs(opp) -> str:
     return "\n".join([
         f"📊 *Bull Call Spread — {opp['ticker']} @ ${opp['price']}*",
         f"_{t['signal']}_",
-        f"  {opp['darkpool']['label']} | ${opp['darkpool']['total_notional']:,.0f} notional",
+        *([f"  {opp['darkpool']['label']}"]
+           if opp.get('darkpool',{}).get('show') else []),
         f"  {fmt_quality(q)}",
         f"  Buy ${b['long_strike']} Call / Sell ${b['short_strike']} Call",
         f"  Expiry: {b['expiry']} | {b['dte']} DTE",
@@ -1388,8 +1486,10 @@ def run_scanner():
 
         ivdata     = calculate_ivp(contracts)
         sizing     = position_check(ticker, ibkr)
-        dp         = score_darkpool(get_darkpool(ticker))
-        dp_boost   = 1.2 if dp["score"] > 55 else 0.9 if dp["score"] < 45 else 1.0
+        dp_stock   = score_darkpool(get_darkpool(ticker), ticker=ticker)
+        dp_leaps   = score_darkpool(get_darkpool(ticker), ticker=ticker, for_leaps=True)
+        dp         = dp_stock  # default used for CSP/CC
+        dp_boost   = 1.2 if dp.get("significant") else 1.0  # only boost on significant dark pool
 
         # OI signal for this ticker — warns if puts are being targeted
         oi_sig     = oi_signals.get(ticker, {})
@@ -1402,7 +1502,7 @@ def run_scanner():
                 "w52_low":w52l,"w52_high":w52h,
                 "pullback_pct":round(pullback*100,1),
                 "ivp":ivdata["ivp"],"quality":quality,
-                "sizing":sizing,"darkpool":dp,
+                "sizing":sizing,"darkpool":dp_stock,"darkpool_leaps":dp_leaps,
                 "oi_signal":oi_sig,"expiry_breakdown":exp_bdown,
                 "oi_warning":oi_warning}
 
