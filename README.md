@@ -1,2 +1,2 @@
 # whale-intelligence
-# Whale Intelligence Trading Scanner
+# Whale Intelligence Trading Scan
