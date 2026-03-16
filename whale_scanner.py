@@ -7,12 +7,21 @@ v5 — Full framework implementation:
 """
 
 import os, json, re, math, time
+from datetime import timezone as tz
+from zoneinfo import ZoneInfo
 import requests
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from typing import Optional
 
 # ── API Keys ────────────────────────────────────────────────
+# Pacific Time helper (your local timezone)
+PT = ZoneInfo("America/Los_Angeles")
+
+def now_et():
+    """Current time in Pacific Time (handles DST automatically)."""
+    return datetime.now(tz.utc).astimezone(PT)
+
 UNUSUAL_WHALES_API_KEY = os.environ.get("UW_API_KEY", "")
 TELEGRAM_BOT_TOKEN     = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID       = os.environ.get("TELEGRAM_CHAT_ID", "")
@@ -1467,16 +1476,20 @@ PMCCs: {json.dumps(pmccs,indent=2)}
 Bull Call Spreads: {json.dumps(bcss,indent=2)}
 Peter Lynch Discoveries: {json.dumps(discoveries,indent=2) if discoveries else 'None'}
 
+CRITICAL FORMAT RULE: Always use EXACT expiry dates in YYYY-MM-DD format.
+Never write "Apr-26" or "April expiry" — always write the full date like "2026-04-17".
+There are multiple weekly expirations in any month — the exact date is essential.
+
 Give:
-1. Best CSP — exact trade, checklist pass/fail, execution price
-2. Best CC (if any)
-3. Best LEAPS or PMCC (if any)
-4. Best Bull Call Spread (if any, ROR focus)
+1. Best CSP — ticker, exact strike, EXACT expiry date (YYYY-MM-DD), DTE, bid/ask, delta, annualized return
+2. Best CC — same format (if any)
+3. Best LEAPS or PMCC — same format (if any)
+4. Best Bull Call Spread — long strike / short strike, EXACT expiry (YYYY-MM-DD), debit, max profit, ROR%
 5. Any Peter Lynch discovery worth investigating
 6. One-line IVP environment summary
 7. Hard pass on anything that fails quality check
 
-Direct, specific, no fluff."""
+Direct, specific, no fluff. Every trade must include the full YYYY-MM-DD expiry date."""
 
     try:
         r = requests.post(
@@ -1567,7 +1580,7 @@ def fmt_csp(opp) -> str:
            if opp.get("oi_signal") else []),
         *([f"  📍 Max Pain: ${opp['expiry_breakdown']['max_pain_strike']} | P/C ratio: {opp['expiry_breakdown']['put_call_ratio']}"]
            if opp.get("expiry_breakdown") and opp["expiry_breakdown"].get("max_pain_strike") else []),
-        f"_Scanned {datetime.now().strftime('%b %d %H:%M')} ET_"
+        f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
     ])
 
 
@@ -1584,7 +1597,7 @@ def fmt_cc(opp) -> str:
         f"  Bid ${opp['cc']['bid']} / Ask ${opp['cc']['ask']}",
         f"  {opp['cc']['otm_pct']}% OTM | IV {opp['cc']['iv']}% | IVP {opp['cc']['ivp']:.0f}%{d}",
         f"  Annualized: {opp['cc']['annualized_return']}% | ${opp['cc']['premium']/opp['cc']['dte']:.2f}/day | {opp['cc']['max_contracts']} contracts",
-        f"_Scanned {datetime.now().strftime('%b %d %H:%M')} ET_"
+        f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
     ])
 
 
@@ -1618,7 +1631,7 @@ def fmt_leaps(opp) -> str:
         f"  {itm} | IVP {l['ivp']:.0f}%{d}",
         f"  Intrinsic: ${l['intrinsic']} | Extrinsic: ${l['extrinsic']} — {l.get('ext_label', str(l['extrinsic_pct'])+'%')}",
         f"  Leverage: {l['leverage']}x | Tier: {s['tier']} | Room: ${s['room_usd']:,.0f}",
-        f"_Scanned {datetime.now().strftime('%b %d %H:%M')} ET_"
+        f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
     ])
 
 
@@ -1633,7 +1646,7 @@ def fmt_pmcc(opp) -> str:
         f"  Bid ${p['bid']} / Ask ${p['ask']}",
         f"  {p['otm_pct']}% OTM | IVP {p['ivp']:.0f}%{d}",
         f"  Annualized: {p['annualized_return']}% | Months to recover LEAPS: {p['months_to_recover']}",
-        f"_Scanned {datetime.now().strftime('%b %d %H:%M')} ET_"
+        f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
     ])
 
 
@@ -1650,7 +1663,7 @@ def fmt_bcs(opp) -> str:
         f"  Debit: ${b['debit']} | Max Profit: ${b['max_profit']}",
         f"  Return on Risk: {b['ror']}% | Breakeven: ${b['breakeven']}",
         f"  IVP: {b['ivp']:.0f}%",
-        f"_Scanned {datetime.now().strftime('%b %d %H:%M')} ET_"
+        f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
     ])
 
 
@@ -1660,7 +1673,7 @@ def fmt_bcs(opp) -> str:
 
 def run_scanner():
     print(f"\n{'='*60}")
-    print(f"🐋 WHALE INTELLIGENCE v5 — {datetime.now().strftime('%Y-%m-%d %H:%M')} ET")
+    print(f"🐋 WHALE INTELLIGENCE v5 — {now_et().strftime('%Y-%m-%d %H:%M')} ET")
     print(f"   Framework: Quality → Pullback → Option Yield")
     print(f"{'='*60}\n")
 
@@ -1730,7 +1743,7 @@ def run_scanner():
     ) if spike_data.get('available') else "*SPIKE: N/A*"
 
     briefing = (
-        f"📡 *MARKET BRIEFING — {datetime.now().strftime('%b %d, %Y %H:%M')} ET*\n"
+        f"📡 *MARKET BRIEFING — {now_et().strftime('%b %d, %Y %H:%M')} ET*\n"
         f"\n"
         f"━━━ MARKET CONDITIONS ━━━\n"
         f"\n"
