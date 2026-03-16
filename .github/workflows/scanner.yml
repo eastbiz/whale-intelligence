@@ -2,12 +2,13 @@ name: Whale Intelligence Scanner
 
 on:
   schedule:
-    # 9:45 AM ET (14:45 UTC) — after open chaos settles
-    - cron: '45 14 * * 1-5'
-    # 12:00 PM ET (17:00 UTC) — midday institutional flow
-    - cron: '0 17 * * 1-5'
-    # 3:00 PM ET (20:00 UTC) — 1hr before close, time to act
-    - cron: '0 20 * * 1-5'
+    # All times in UTC. Currently DST = ET is UTC-4, PT is UTC-7
+    # 9:45 AM ET = 13:45 UTC (DST) — after open settles
+    - cron: '45 13 * * 1-5'
+    # 12:30 PM ET = 16:30 UTC (DST) — midday flow
+    - cron: '30 16 * * 1-5'
+    # 2:45 PM ET = 18:45 UTC (DST) — 75 min before close, time to act
+    - cron: '45 18 * * 1-5'
   workflow_dispatch:
 
 jobs:
