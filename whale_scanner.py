@@ -1256,13 +1256,13 @@ def find_best_leaps(ticker, price, contracts, ivdata, pir):
 
         # Extrinsic quality label (from framework)
         if extrinsic_pct < 10:
-            ext_label = "🔥 Excellent (<10%)"
+            ext_label = f"🔥 Excellent ({extrinsic_pct:.1f}%)"
         elif extrinsic_pct < 20:
-            ext_label = "✅ Good (10-20%)"
+            ext_label = f"✅ Good ({extrinsic_pct:.1f}%)"
         elif extrinsic_pct < 30:
-            ext_label = "⚠️ Acceptable (20-30%)"
+            ext_label = f"⚠️ Acceptable ({extrinsic_pct:.1f}%)"
         else:
-            ext_label = "❌ Too expensive (>30%)"
+            ext_label = f"❌ Too expensive ({extrinsic_pct:.1f}%)"
 
         # Score heavily penalizes high extrinsic — prefers <20% target
         # <10%: full score, 10-20%: slight penalty, 20-30%: significant penalty
