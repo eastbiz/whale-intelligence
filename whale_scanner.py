@@ -339,22 +339,13 @@ def get_market_tide() -> dict:
             return {"score": 0, "label": "Tide: no data from API", "available": False}
 
         latest = items[-1] if isinstance(items, list) else items
-        print(f"   Tide item keys: {list(latest.keys()) if isinstance(latest,dict) else type(latest)}")
-        # Try multiple field name variations
-        call_prem = float(latest.get("call_premium",
-                    latest.get("calls_premium",
-                    latest.get("calls",
-                    latest.get("bullish_premium", 0)))) or 0)
-        put_prem  = float(latest.get("put_premium",
-                    latest.get("puts_premium",
-                    latest.get("puts",
-                    latest.get("bearish_premium", 0)))) or 0)
-        net       = float(latest.get("net",
-                    latest.get("net_premium",
-                    call_prem - put_prem)) or 0)
-        print(f"   Tide: calls=${call_prem/1e6:.1f}M puts=${put_prem/1e6:.1f}M net=${net/1e6:.1f}M")
-        total     = call_prem + put_prem
 
+        # Correct field names from UW API
+        call_prem = float(latest.get("net_call_premium", 0) or 0)
+        put_prem  = abs(float(latest.get("net_put_premium", 0) or 0))  # stored as negative
+        net       = call_prem - put_prem
+        total     = call_prem + put_prem
+        print(f"   Tide: calls=${call_prem/1e6:.1f}M puts=${put_prem/1e6:.1f}M net=${net/1e6:.1f}M")
         # Normalize to -100/+100
         score = round((net / total * 100), 1) if total > 0 else 0
 
@@ -427,16 +418,16 @@ def get_spike() -> dict:
         data  = r.json()
         items = data.get("data", data.get("results", []))
         if not items:
-            return {"spike": 0, "label": "SPIKE unavailable", "available": False}
+            # SPIKE endpoint exists but returns empty on this plan
+            # Fall back to VIX-based fear gauge only
+            print("   SPIKE: no data (not available on current UW plan)")
+            return {"spike": 0, "label": None, "available": False}
 
         latest = items[-1] if isinstance(items, list) else items
-        print(f"   SPIKE item keys: {list(latest.keys()) if isinstance(latest,dict) else type(latest)}")
-        print(f"   SPIKE sample: {str(latest)[:150]}")
         spike  = float(latest.get("spike",
                   latest.get("value",
                   latest.get("index",
                   latest.get("score", 0)))) or 0)
-        print(f"   SPIKE value: {spike}")
 
         if spike < 20:
             label  = f"😴 SPIKE {spike:.1f} — Low fear (options flow calm). Avoid selling premium."
@@ -479,32 +470,33 @@ def get_oi_change() -> dict:
         if not items:
             return {}
 
-        # Debug first item to understand structure
-        if items:
-            first = items[0] if isinstance(items, list) else items
-            print(f"   OI item keys: {list(first.keys()) if isinstance(first,dict) else type(first)}")
-            print(f"   OI sample: {str(first)[:200]}")
+
         oi_signals = {}
         for item in items[:50]:  # top 50 by OI change
             ticker = item.get("ticker","")
             if not ticker: continue
             # Try multiple field variations
-            call_oi = float(item.get("call_oi_change",
-                       item.get("calls_oi_change",
-                       item.get("call_open_interest_change",
-                       item.get("net_call_premium", 0)))) or 0)
-            put_oi  = float(item.get("put_oi_change",
-                       item.get("puts_oi_change",
-                       item.get("put_open_interest_change",
-                       item.get("net_put_premium", 0)))) or 0)
+            # UW OI change: use prev premium volume as proxy for directional bias
+            # ask_volume > bid_volume = bought = bullish
+            ask_vol = float(item.get("prev_ask_volume", 0) or 0)
+            bid_vol = float(item.get("prev_bid_volume", 0) or 0)
+            sym     = item.get("option_symbol", "")
+            is_call = "C" in sym
+            is_put  = "P" in sym
+            premium = float(item.get("prev_total_premium", 0) or 0)
+            # Net: positive = call buying, negative = put buying
+            direction = (ask_vol - bid_vol)
+            call_oi = premium if (is_call and direction > 0) else 0
+            put_oi  = premium if (is_put  and direction > 0) else 0
             if abs(call_oi) < 100 and abs(put_oi) < 100: continue
-            net = call_oi - put_oi
+            net_flow = call_oi - put_oi
+            existing = oi_signals.get(ticker, {"call_flow":0,"put_flow":0})
             oi_signals[ticker] = {
-                "call_oi_change": int(call_oi),
-                "put_oi_change":  int(put_oi),
-                "net": int(net),
-                "signal": ("🟢 Bullish OI" if net > 500
-                           else "🔴 Bearish OI" if net < -500
+                "call_flow":  existing["call_flow"] + call_oi,
+                "put_flow":   existing["put_flow"]  + put_oi,
+                "net":        existing["call_flow"] + call_oi - existing["put_flow"] - put_oi,
+                "signal": ("🟢 Bullish OI" if net_flow > 100_000
+                           else "🔴 Bearish OI" if net_flow < -100_000
                            else "⚪ Neutral OI")
             }
         return oi_signals
@@ -1936,6 +1928,18 @@ def run_scanner():
     total = sum(len(x) for x in [top_csps,top_ccs,top_leaps,top_pmccs,top_bcss])
     print(f"\n🏆 {len(top_csps)} CSPs | {len(top_ccs)} CCs | {len(top_leaps)} LEAPS | "
           f"{len(top_pmccs)} PMCCs | {len(top_bcss)} Spreads")
+
+    # If LEAPS recommended but none found — explain why
+    if gng["buy_leaps"] and len(top_leaps) == 0:
+        leaps_msg = (
+            "🚀 *LEAPS — No qualifying trades today*\n\n"
+            "System recommended buying LEAPS but none passed all filters.\n\n"
+            "Most likely reason: IVP is above 50% on most stocks, making options "
+            "too expensive to buy. LEAPS are best when IVP < 40%.\n\n"
+            "_Wait for a volatility spike followed by a quick reversal — "
+            "that's when LEAPS become cheapest on quality stocks._"
+        )
+        send_telegram(leaps_msg)
 
     # ── Peter Lynch ───────────────────────────────────────
     print("🔬 Peter Lynch screen...")
