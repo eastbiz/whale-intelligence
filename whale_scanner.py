@@ -117,6 +117,223 @@ UW_BASE    = "https://api.unusualwhales.com"
 UW_HEADERS = {"Authorization": f"Bearer {UNUSUAL_WHALES_API_KEY}"}
 
 
+# ── Schwab API ───────────────────────────────────────────
+SCHWAB_APP_KEY       = os.environ.get("SCHWAB_APP_KEY", "")
+SCHWAB_APP_SECRET    = os.environ.get("SCHWAB_APP_SECRET", "")
+SCHWAB_REFRESH_TOKEN = os.environ.get("SCHWAB_REFRESH_TOKEN", "")
+SCHWAB_ACCESS_TOKEN  = os.environ.get("SCHWAB_ACCESS_TOKEN", "")
+SCHWAB_BASE          = "https://api.schwabapi.com"
+SCHWAB_MARKET_BASE   = f"{SCHWAB_BASE}/marketdata/v1"
+SCHWAB_TRADER_BASE   = f"{SCHWAB_BASE}/trader/v1"
+
+_schwab_cache = {"access_token": "", "expires_at": 0}
+
+
+def schwab_get_token() -> str:
+    """Auto-refresh Schwab access token using refresh token."""
+    import time as _time, base64
+    c = _schwab_cache
+    # Use cached token if still valid
+    if c["access_token"] and _time.time() < c["expires_at"] - 60:
+        return c["access_token"]
+    # Try to refresh
+    if not SCHWAB_REFRESH_TOKEN:
+        return SCHWAB_ACCESS_TOKEN  # fall back to stored
+    try:
+        creds = base64.b64encode(f"{SCHWAB_APP_KEY}:{SCHWAB_APP_SECRET}".encode()).decode()
+        r = requests.post(
+            f"{SCHWAB_BASE}/v1/oauth/token",
+            headers={"Authorization": f"Basic {creds}",
+                     "Content-Type": "application/x-www-form-urlencoded"},
+            data={"grant_type": "refresh_token", "refresh_token": SCHWAB_REFRESH_TOKEN},
+            timeout=10
+        )
+        if r.status_code == 200:
+            data = r.json()
+            c["access_token"] = data["access_token"]
+            c["expires_at"]   = _time.time() + data.get("expires_in", 1800)
+            print("   ✅ Schwab token refreshed")
+            return c["access_token"]
+        else:
+            print(f"   ⚠️ Schwab token refresh failed ({r.status_code}) — using stored token")
+            return SCHWAB_ACCESS_TOKEN
+    except Exception as e:
+        print(f"   ⚠️ Schwab token error: {e}")
+        return SCHWAB_ACCESS_TOKEN
+
+
+def schwab_headers() -> dict:
+    token = schwab_get_token()
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+
+def schwab_get_quotes(tickers: list) -> dict:
+    """Real-time quotes: price, 52w range, volume, prev close."""
+    if not SCHWAB_APP_KEY:
+        return {}
+    try:
+        r = requests.get(
+            f"{SCHWAB_MARKET_BASE}/quotes",
+            headers=schwab_headers(),
+            params={"symbols": ",".join(tickers), "fields": "quote,fundamental"},
+            timeout=15
+        )
+        if r.status_code != 200:
+            print(f"   Schwab quotes error: {r.status_code}")
+            return {}
+        result = {}
+        for ticker, info in r.json().items():
+            q = info.get("quote", {})
+            f = info.get("fundamental", {})
+            result[ticker] = {
+                "price":       float(q.get("lastPrice",  q.get("mark", 0)) or 0),
+                "week52_high": float(q.get("52WeekHigh", 0) or 0),
+                "week52_low":  float(q.get("52WeekLow",  0) or 0),
+                "avg_volume":  int(q.get("totalVolume",  0) or 0),
+                "prev_close":  float(q.get("closePrice", 0) or 0),
+                "pe_ratio":    float(f.get("peRatio",    0) or 0),
+            }
+        print(f"   Schwab quotes: {len(result)}/{len(tickers)} ✓")
+        return result
+    except Exception as e:
+        print(f"   Schwab quotes exception: {e}")
+        return {}
+
+
+def schwab_get_option_chain(ticker: str, from_date: str, to_date: str) -> list:
+    """
+    Real option chain with TRUE delta, IV, OI, theta from Schwab.
+    Replaces Yahoo Finance + Black-Scholes approximation entirely.
+    """
+    if not SCHWAB_APP_KEY:
+        return []
+    try:
+        r = requests.get(
+            f"{SCHWAB_MARKET_BASE}/chains",
+            headers=schwab_headers(),
+            params={
+                "symbol":       ticker,
+                "contractType": "ALL",
+                "strikeCount":  20,
+                "includeUnderlyingQuote": True,
+                "fromDate":     from_date,
+                "toDate":       to_date,
+                "optionType":   "S",
+            },
+            timeout=15
+        )
+        if r.status_code != 200:
+            print(f"   Schwab chain {ticker}: {r.status_code}")
+            return []
+        data      = r.json()
+        contracts = []
+        price     = float(data.get("underlyingPrice", 0) or 0)
+        for opt_type, map_key in [("P","putExpDateMap"),("C","callExpDateMap")]:
+            for exp_str, strikes in data.get(map_key, {}).items():
+                exp_date = exp_str.split(":")[0]
+                for strike_str, opts in strikes.items():
+                    for opt in opts:
+                        contracts.append({
+                            "option_symbol":   opt.get("symbol",""),
+                            "strike":          float(strike_str),
+                            "expiry":          exp_date,
+                            "option_type":     opt_type,
+                            "nbbo_bid":        float(opt.get("bid",           0) or 0),
+                            "nbbo_ask":        float(opt.get("ask",           0) or 0),
+                            "iv":              float(opt.get("volatility",     0) or 0) / 100,
+                            "delta":           float(opt.get("delta",         0) or 0),
+                            "theta":           float(opt.get("theta",         0) or 0),
+                            "gamma":           float(opt.get("gamma",         0) or 0),
+                            "open_interest":   int(opt.get("openInterest",    0) or 0),
+                            "volume":          int(opt.get("totalVolume",     0) or 0),
+                            "underlying_price": price,
+                        })
+        print(f"   Schwab chain {ticker}: {len(contracts)} contracts ✓")
+        return contracts
+    except Exception as e:
+        print(f"   Schwab chain {ticker} error: {e}")
+        return []
+
+
+def schwab_get_ivp(ticker: str) -> float:
+    """
+    Calculate real IV Percentile from 1-year Schwab price history.
+    Much more accurate than our current ATM contract proxy.
+    """
+    if not SCHWAB_APP_KEY:
+        return 0
+    try:
+        from datetime import timedelta
+        end   = datetime.now()
+        start = end - timedelta(days=365)
+        r = requests.get(
+            f"{SCHWAB_MARKET_BASE}/pricehistory",
+            headers=schwab_headers(),
+            params={
+                "symbol":        ticker,
+                "periodType":    "year",
+                "period":        1,
+                "frequencyType": "daily",
+                "frequency":     1,
+                "startDate":     int(start.timestamp() * 1000),
+                "endDate":       int(end.timestamp()   * 1000),
+            },
+            timeout=15
+        )
+        if r.status_code != 200:
+            return 0
+        candles = r.json().get("candles", [])
+        if len(candles) < 30:
+            return 0
+        closes  = [c["close"] for c in candles if c.get("close")]
+        returns = [(closes[i]-closes[i-1])/closes[i-1] for i in range(1,len(closes))]
+        vols    = []
+        for i in range(20, len(returns)):
+            w    = returns[i-20:i]
+            mean = sum(w)/20
+            var  = sum((x-mean)**2 for x in w)/20
+            vols.append((var**0.5)*(252**0.5))
+        if not vols:
+            return 0
+        curr = vols[-1]
+        return round(sum(1 for v in vols if v < curr)/len(vols)*100, 1)
+    except:
+        return 0
+
+
+def schwab_get_accounts() -> list:
+    """Fetch all Schwab accounts with balances and positions."""
+    if not SCHWAB_APP_KEY:
+        return []
+    try:
+        r = requests.get(
+            f"{SCHWAB_TRADER_BASE}/accounts",
+            headers=schwab_headers(),
+            params={"fields": "positions"},
+            timeout=15
+        )
+        if r.status_code != 200:
+            print(f"   Schwab accounts: {r.status_code}")
+            return []
+        result = []
+        for acc in r.json():
+            sec = acc.get("securitiesAccount", {})
+            bal = sec.get("currentBalances", {})
+            result.append({
+                "account_id":      sec.get("accountNumber",""),
+                "account_type":    sec.get("type",""),
+                "buying_power":    float(bal.get("buyingPower",       0) or 0),
+                "cash":            float(bal.get("cashBalance",        0) or 0),
+                "net_liquidation": float(bal.get("liquidationValue",   0) or 0),
+                "positions":       sec.get("positions", []),
+            })
+        print(f"   Schwab accounts: {len(result)} ✓")
+        return result
+    except Exception as e:
+        print(f"   Schwab accounts error: {e}")
+        return []
+
+
 # ════════════════════════════════════════════════════════════
 # MARKET DATA
 # ════════════════════════════════════════════════════════════
@@ -1669,7 +1886,27 @@ def run_scanner():
 
     all_tickers = ALL_TICKERS
     print(f"💹 Market data ({len(all_tickers)} stocks)...")
+    # Use Schwab for real-time quotes if available, else Yahoo Finance
+    schwab_quotes = schwab_get_quotes(all_tickers) if SCHWAB_APP_KEY else {}
     mkt = get_market_data(all_tickers)
+    # Merge Schwab data over Yahoo — Schwab is more accurate
+    for ticker, sq in schwab_quotes.items():
+        if ticker in mkt and sq.get("price", 0) > 0:
+            mkt[ticker]["price"]       = sq["price"]
+            mkt[ticker]["week52_high"] = sq["week52_high"] or mkt[ticker]["week52_high"]
+            mkt[ticker]["week52_low"]  = sq["week52_low"]  or mkt[ticker]["week52_low"]
+            mkt[ticker]["avg_volume"]  = sq["avg_volume"]  or mkt[ticker]["avg_volume"]
+            if sq.get("prev_close", 0) > 0:
+                mkt[ticker]["day_change_pct"] = abs(
+                    sq["price"] - sq["prev_close"]
+                ) / sq["prev_close"]
+    print(f"   Schwab: {len(schwab_quotes)} real-time | Yahoo fallback: {len(mkt)-len(schwab_quotes)}")
+
+    # Fetch Schwab accounts for position awareness
+    schwab_accounts = schwab_get_accounts() if SCHWAB_APP_KEY else []
+    schwab_total_value = sum(a["net_liquidation"] for a in schwab_accounts)
+    if schwab_accounts:
+        print(f"   Schwab accounts: {len(schwab_accounts)} | Total: ${schwab_total_value:,.0f}")
     ok  = sum(1 for v in mkt.values() if v["price"]>0)
     print(f"   {ok}/{len(all_tickers)} prices ✓")
 
@@ -1735,6 +1972,9 @@ def run_scanner():
         f" Positive = money flowing into calls. Negative = put hedging (fear)._\n"
         f"\n"
         f"*S&P 500:* {spy_regime['label']}\n"
+        + (f"\n*Schwab Accounts:* {len(schwab_accounts)} accounts | Total: ${schwab_total_value:,.0f}\n"
+           if schwab_accounts else "")
+        +
         f"_S&P below 200MA = reduce size, lower delta._\n"
         f"\n"
         f"━━━ TODAY'S CONTEXT ━━━\n"
@@ -1775,10 +2015,21 @@ def run_scanner():
         # Stock quality gate — framework step 1
         quality    = stock_quality_check(ticker, md, earn_date)
 
-        contracts  = get_option_contracts(ticker)
+        # Use Schwab option chain if available (real Greeks/IV), else UW
+        if SCHWAB_APP_KEY:
+            from datetime import timedelta
+            from_d = datetime.now().strftime("%Y-%m-%d")
+            to_d   = (datetime.now() + timedelta(days=75)).strftime("%Y-%m-%d")
+            contracts = schwab_get_option_chain(ticker, from_d, to_d)
+        if not SCHWAB_APP_KEY or not contracts:
+            contracts = get_option_contracts(ticker)
         if not contracts: continue
 
+        # Use Schwab real IVP if available
+        schwab_ivp = schwab_get_ivp(ticker) if SCHWAB_APP_KEY else 0
         ivdata     = calculate_ivp(contracts)
+        if schwab_ivp > 0:
+            ivdata["ivp"] = schwab_ivp  # replace proxy with real IVP
         sizing     = position_check(ticker, ibkr)
         dp_stock   = score_darkpool(get_darkpool(ticker), ticker=ticker)
         dp_leaps   = score_darkpool(get_darkpool(ticker), ticker=ticker, for_leaps=True)
