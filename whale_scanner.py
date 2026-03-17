@@ -1703,11 +1703,10 @@ def run_scanner():
     # ── GO / NO-GO DECISION ──────────────────────────────────
     gng = market_go_nogo(tide, vix_data, spy_regime)
     print(f"\n{'='*50}")
-    print(f"📡 MARKET QUALITY SCORE: {gng['score']}/100")
+    print(f"📡 MARKET CONTEXT")
     print(f"   {gng['quality']}")
-    print(f"   Tide: {gng['tide_score']:+.1f} | Bull OI: {gng['bull_oi_count']} | Bear OI: {gng['bear_oi_count']}")
-    print(f"   Sell Premium: {'✅ YES' if gng['sell_premium'] else '❌ NO'}")
-    print(f"   Buy LEAPS:    {'✅ YES' if gng['buy_leaps'] else '❌ NO'}")
+    print(f"   VIX: {gng['vix']} | Tide: {gng['tide_score']:+.1f}")
+    print(f"   Scanner always runs — IVP filters per stock")
     print(f"{'='*50}\n")
 
     # ── MORNING MARKET BRIEFING ─────────────────────────────
