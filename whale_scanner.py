@@ -551,84 +551,45 @@ def get_expiry_breakdown(ticker: str) -> dict:
         return {}
 
 
-def market_go_nogo(tide: dict, oi_signals: dict,
-                   vix_data: dict, spike_data: dict,
+def market_go_nogo(tide: dict, vix_data: dict,
                    spy_regime: dict = None) -> dict:
     """
-    Master go/no-go decision using VIX + SPIKE + Market Tide + OI breadth.
-    Framework: only trade when opportunity is really good.
+    Simplified go/no-go — VIX and Market Tide are for BRIEFING ONLY.
+    Individual trades are filtered by per-stock IVP.
+    This function always returns sell_premium=True and buy_leaps=True
+    so the scanner always runs — IVP handles the actual filtering.
+    The briefing informs the user; it does not block trades.
     """
-    tide_score  = tide.get("score", 0)
-    vix         = vix_data.get("vix", 20)
-    spike       = spike_data.get("spike", 25)
-    vix_regime  = vix_data.get("regime", "moderate")
-    spike_regime= spike_data.get("regime", "moderate")
-
-    all_tickers = set(CORE_STOCKS + OPPORTUNISTIC_STOCKS)
-    bull_oi = sum(1 for t,v in oi_signals.items()
-                  if t in all_tickers and v["net"] > 500)
-    bear_oi = sum(1 for t,v in oi_signals.items()
-                  if t in all_tickers and v["net"] < -500)
-
-    # Component scores (0-100 each)
-    # VIX: higher = better for premium selling
-    vix_score = (0 if vix < 12 else 20 if vix < 15 else
-                 35 if vix < 20 else 60 if vix < 25 else
-                 80 if vix < 35 else 95)
-
-    # SPIKE: higher = better for premium selling
-    spike_score = (0 if spike < 15 else 20 if spike < 20 else
-                   45 if spike < 30 else 75 if spike < 40 else 95)
-
-    # Tide: positive = good for selling
-    tide_component = min(100, max(0, tide_score + 50))
-
-    # OI breadth
-    oi_component = min(100, max(0, 50 + (bull_oi - bear_oi) * 5))
-
-    # Weighted score: VIX 30%, SPIKE 30%, Tide 25%, OI 15%
-    market_score = round(
-        vix_score   * 0.30 +
-        spike_score * 0.30 +
-        tide_component * 0.25 +
-        oi_component   * 0.15, 1
-    )
-    # S&P below 200MA: warning regime — reduce score by 15 points
+    vix        = vix_data.get("vix", 20)
+    vix_regime = vix_data.get("regime", "moderate")
+    tide_score = tide.get("score", 0)
     spy_warning = spy_regime and not spy_regime.get("above_ma200", True)
-    if spy_warning:
-        market_score = max(0, market_score - 15)
 
-    # Go/no-go logic
-    if market_score >= 65:
-        sell_premium = True
-        buy_leaps    = vix_regime in ("low","low_moderate")  # cheap options = LEAPS
-        quality      = "🔥 EXCELLENT CONDITIONS — High conviction day for premium selling"
-    elif market_score >= 50:
-        sell_premium = True
-        buy_leaps    = True
-        quality      = "✅ GOOD CONDITIONS — Selective premium selling supported"
-    elif market_score >= 38:
-        sell_premium = False
-        buy_leaps    = True
-        quality      = "⚠️ CAUTIOUS — Skip new CSPs today, LEAPS/spreads only"
+    # Context labels for briefing only
+    if vix >= 25 and tide_score > 0:
+        quality = "🔥 EXCELLENT — High VIX + bullish tide. Strong premium selling environment."
+    elif vix >= 20 and tide_score > -20:
+        quality = "✅ GOOD — Reasonable conditions. IVP filters individual trades."
+    elif tide_score < -30:
+        quality = "⚠️ BEARISH TIDE — Put premium dominating. Be selective, check IVP per stock."
+    elif vix < 15:
+        quality = "😴 LOW VOLATILITY — Premiums are thin. Only trade highest IVP setups."
     else:
-        sell_premium = False
-        buy_leaps    = False
-        quality      = "🔴 POOR CONDITIONS — No new positions today. Watch and wait."
+        quality = "✅ NEUTRAL — Scanner running. IVP determines trade quality per stock."
+
+    if spy_warning:
+        quality += " | ⚠️ S&P below 200MA — reduce size."
 
     return {
-        "sell_premium":  sell_premium,
-        "buy_leaps":     buy_leaps,
-        "score":         market_score,
-        "tide_score":    tide_score,
-        "vix":           vix,
-        "spike":         spike,
-        "bull_oi_count": bull_oi,
-        "bear_oi_count": bear_oi,
-        "quality":       quality,
-        "vix_regime":    vix_regime,
-        "spike_regime":  spike_regime,
-        "spy_warning":   spy_warning if "spy_warning" in dir() else False,
+        "sell_premium": True,   # always scan — IVP filters per stock
+        "buy_leaps":    True,   # always scan — timing filters per stock
+        "vix":          vix,
+        "tide_score":   tide_score,
+        "vix_regime":   vix_regime,
+        "quality":      quality,
+        "spy_warning":  spy_warning if spy_warning else False,
+        "bull_oi_count": 0,
+        "bear_oi_count": 0,
     }
 
 
@@ -1735,16 +1696,12 @@ def run_scanner():
     vix_data   = get_vix()
     print(f"   {vix_data['label']}")
 
-    print("   ⚡ Fetching SPIKE...")
-    spike_data = get_spike()
-    print(f"   {spike_data['label']}")
+    spike_data = {"available": False}  # Not available on current UW plan
 
-    print("   📈 Fetching OI Changes...")
-    oi_signals = get_oi_change()
-    print(f"   OI data for {len(oi_signals)} tickers")
+    oi_signals = {}  # OI removed — IVP handles individual trade filtering
 
     # ── GO / NO-GO DECISION ──────────────────────────────────
-    gng = market_go_nogo(tide, oi_signals, vix_data, spike_data, spy_regime)
+    gng = market_go_nogo(tide, vix_data, spy_regime)
     print(f"\n{'='*50}")
     print(f"📡 MARKET QUALITY SCORE: {gng['score']}/100")
     print(f"   {gng['quality']}")
@@ -1756,13 +1713,8 @@ def run_scanner():
     # ── MORNING MARKET BRIEFING ─────────────────────────────
     # Structure: 1) Market situation  2) Summary verdict  3) Trades follow
     vix   = gng["vix"]
-    spike = gng["spike"]
 
-    spike_line = (
-        f"*SPIKE: {spike:.1f}*\n{spike_data['label']}\n"
-        f"_SPIKE is like VIX but built from actual options order flow. "
-        f"More real-time than VIX. {spike_data.get('action','')}_"
-    ) if spike_data.get('available') else "*SPIKE: N/A*"
+
 
     briefing = (
         f"📡 *MARKET BRIEFING — {now_et().strftime('%b %d, %Y %H:%M')} ET*\n"
@@ -1774,37 +1726,26 @@ def run_scanner():
         f"_VIX measures market fear. Above 25 = high volatility."
         f" Higher VIX = fatter premiums = better CSP/CC income._\n"
         f"\n"
-        f"{spike_line}\n"
-        f"\n"
+
         f"*Market Tide: {gng['tide_score']:+.1f}*\n"
         f"{tide['label']}\n"
         f"_Tide = net call minus put premium across the whole market."
         f" Positive = money flowing into calls. Negative = put hedging (fear)._\n"
         f"\n"
-        f"OI: {gng['bull_oi_count']} bullish signals | {gng['bear_oi_count']} bearish signals\n"
+        f"*S&P 500:* {spy_regime['label']}\n"
+        f"_S&P below 200MA = reduce size, lower delta._\n"
         f"\n"
-        f"*S&P 500 Regime:*\n"
-        f"{spy_regime['label']}\n"
-        f"_S&P below 200MA = risk regime: smaller sizes, lower delta._\n"
+        f"━━━ TODAY'S CONTEXT ━━━\n"
         f"\n"
-        f"━━━ TODAY'S VERDICT ━━━\n"
-        f"\n"
-        f"*Overall Score: {gng['score']}/100*\n"
         f"{gng['quality']}\n"
         f"\n"
-        f"Sell Premium (CSP/CC): {'✅ YES' if gng['sell_premium'] else '❌ SKIP TODAY'}\n"
-        f"Buy LEAPS: {'✅ YES' if gng['buy_leaps'] else '⏳ WAIT FOR BETTER ENTRY'}\n"
-        f"\n"
-        f"{'_Trading opportunities follow below ↓_' if (gng['sell_premium'] or gng['buy_leaps']) else '_No new positions today. Preserving capital._'}"
+        f"_Individual trades filtered by per-stock IV Percentile (IVP ≥ 30)._\n"
+        f"_Trading opportunities follow below ↓_"
     )
     send_telegram(briefing)
     time.sleep(2)
 
-    # If market conditions are poor — skip premium selling, maybe skip entirely
-    if not gng["sell_premium"] and not gng["buy_leaps"]:
-        print("🚫 Market conditions too poor. No scan today.")
-        send_telegram("🚫 *No trades today* — Market conditions don't meet quality threshold.")
-        return
+    # Scanner always runs — IVP filters individual trades
 
     csp_opps = []; cc_opps  = []; leaps_opps = []
     pmcc_opps= []; bcs_opps = []
