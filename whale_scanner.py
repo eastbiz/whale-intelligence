@@ -331,16 +331,28 @@ def get_market_tide() -> dict:
         if r.status_code != 200:
             return {"score": 0, "label": "Unknown", "raw": {}, "available": False}
         data = r.json()
-        # UW returns array of {timestamp, call_premium, put_premium, net}
+        # Debug: print raw structure to identify correct field names
         items = data.get("data", data.get("results", []))
         if not items:
-            return {"score": 0, "label": "Unknown", "raw": {}, "available": False}
+            print(f"   Tide raw keys: {list(data.keys()) if isinstance(data,dict) else 'list'}")
+            print(f"   Tide raw sample: {str(data)[:200]}")
+            return {"score": 0, "label": "Tide: no data from API", "available": False}
 
-        # Use most recent entry
         latest = items[-1] if isinstance(items, list) else items
-        call_prem = float(latest.get("call_premium", latest.get("calls", 0)) or 0)
-        put_prem  = float(latest.get("put_premium",  latest.get("puts",  0)) or 0)
-        net       = float(latest.get("net", call_prem - put_prem) or 0)
+        print(f"   Tide item keys: {list(latest.keys()) if isinstance(latest,dict) else type(latest)}")
+        # Try multiple field name variations
+        call_prem = float(latest.get("call_premium",
+                    latest.get("calls_premium",
+                    latest.get("calls",
+                    latest.get("bullish_premium", 0)))) or 0)
+        put_prem  = float(latest.get("put_premium",
+                    latest.get("puts_premium",
+                    latest.get("puts",
+                    latest.get("bearish_premium", 0)))) or 0)
+        net       = float(latest.get("net",
+                    latest.get("net_premium",
+                    call_prem - put_prem)) or 0)
+        print(f"   Tide: calls=${call_prem/1e6:.1f}M puts=${put_prem/1e6:.1f}M net=${net/1e6:.1f}M")
         total     = call_prem + put_prem
 
         # Normalize to -100/+100
@@ -418,7 +430,13 @@ def get_spike() -> dict:
             return {"spike": 0, "label": "SPIKE unavailable", "available": False}
 
         latest = items[-1] if isinstance(items, list) else items
-        spike  = float(latest.get("spike", latest.get("value", 0)) or 0)
+        print(f"   SPIKE item keys: {list(latest.keys()) if isinstance(latest,dict) else type(latest)}")
+        print(f"   SPIKE sample: {str(latest)[:150]}")
+        spike  = float(latest.get("spike",
+                  latest.get("value",
+                  latest.get("index",
+                  latest.get("score", 0)))) or 0)
+        print(f"   SPIKE value: {spike}")
 
         if spike < 20:
             label  = f"😴 SPIKE {spike:.1f} — Low fear (options flow calm). Avoid selling premium."
@@ -461,12 +479,24 @@ def get_oi_change() -> dict:
         if not items:
             return {}
 
+        # Debug first item to understand structure
+        if items:
+            first = items[0] if isinstance(items, list) else items
+            print(f"   OI item keys: {list(first.keys()) if isinstance(first,dict) else type(first)}")
+            print(f"   OI sample: {str(first)[:200]}")
         oi_signals = {}
         for item in items[:50]:  # top 50 by OI change
             ticker = item.get("ticker","")
             if not ticker: continue
-            call_oi = float(item.get("call_oi_change", item.get("calls_oi_change", 0)) or 0)
-            put_oi  = float(item.get("put_oi_change",  item.get("puts_oi_change",  0)) or 0)
+            # Try multiple field variations
+            call_oi = float(item.get("call_oi_change",
+                       item.get("calls_oi_change",
+                       item.get("call_open_interest_change",
+                       item.get("net_call_premium", 0)))) or 0)
+            put_oi  = float(item.get("put_oi_change",
+                       item.get("puts_oi_change",
+                       item.get("put_open_interest_change",
+                       item.get("net_put_premium", 0)))) or 0)
             if abs(call_oi) < 100 and abs(put_oi) < 100: continue
             net = call_oi - put_oi
             oi_signals[ticker] = {
@@ -1867,9 +1897,12 @@ def run_scanner():
 
         # ── LEAPS ────────────────────────────────────────
         if gng["buy_leaps"]:
-         leaps, _ = find_best_leaps(ticker, price, contracts, ivdata, pir)
+            leaps, leaps_timing = find_best_leaps(ticker, price, contracts, ivdata, pir)
+            if leaps is None and ivdata["ivp"] > 0:
+                print(f"  [{tier}] {ticker}: LEAPS rejected — IVP {ivdata['ivp']:.0f}% timing: {leaps_timing.get('signal','')[:50]}")
         else:
-         leaps = None
+            leaps = None
+            leaps_timing = {}
         if leaps:
             leaps_opps.append({**base,"leaps":leaps,
                 "score":leaps["timing"]["score"]*(1/max(0.01,leaps["extrinsic_pct"]))*leaps["delta"]})
