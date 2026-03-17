@@ -141,8 +141,11 @@ def get_market_data(tickers: list) -> dict:
             ma200 = sum(closes_clean[-200:]) / min(200, len(closes_clean)) if closes_clean else 0
             ma50  = sum(closes_clean[-50:])  / min(50,  len(closes_clean)) if closes_clean else 0
             price = float(meta.get("regularMarketPrice", 0))
-            prev_close = float(meta.get("chartPreviousClose", price) or price)
+            prev_close = float(meta.get("regularMarketPreviousClose",
+                              meta.get("previousClose",
+                              meta.get("chartPreviousClose", price))) or price)
             day_change_pct = abs(price - prev_close) / prev_close if prev_close > 0 else 0
+            print(f"   {ticker}: price=${price} prev=${prev_close} change={day_change_pct*100:.1f}%")
 
             data[ticker] = {
                 "price":          round(price, 2),
