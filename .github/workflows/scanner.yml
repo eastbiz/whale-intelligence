@@ -27,10 +27,14 @@ jobs:
 
       - name: Run scanner
         env:
-          UW_API_KEY:          ${{ secrets.UW_API_KEY }}
-          TELEGRAM_BOT_TOKEN:  ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID:    ${{ secrets.TELEGRAM_CHAT_ID }}
-          ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}
-          IBKR_FLEX_TOKEN:     ${{ secrets.IBKR_FLEX_TOKEN }}
-          IBKR_FLEX_QUERY_ID:  ${{ secrets.IBKR_FLEX_QUERY_ID }}
+          UW_API_KEY:            ${{ secrets.UW_API_KEY }}
+          TELEGRAM_BOT_TOKEN:    ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:      ${{ secrets.TELEGRAM_CHAT_ID }}
+          ANTHROPIC_API_KEY:     ${{ secrets.ANTHROPIC_API_KEY }}
+          IBKR_FLEX_TOKEN:       ${{ secrets.IBKR_FLEX_TOKEN }}
+          IBKR_FLEX_QUERY_ID:    ${{ secrets.IBKR_FLEX_QUERY_ID }}
+          SCHWAB_APP_KEY:        ${{ secrets.SCHWAB_APP_KEY }}
+          SCHWAB_APP_SECRET:     ${{ secrets.SCHWAB_APP_SECRET }}
+          SCHWAB_REFRESH_TOKEN:  ${{ secrets.SCHWAB_REFRESH_TOKEN }}
+          SCHWAB_ACCESS_TOKEN:   ${{ secrets.SCHWAB_ACCESS_TOKEN }}
         run: python whale_scanner.py
