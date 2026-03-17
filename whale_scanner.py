@@ -72,8 +72,31 @@ PULLBACK_MIN          = 0.15  # preferred zone starts here
 PULLBACK_MAX          = 0.65  # not >65% (company may be broken)
 # MA filters
 MA50_EXTENDED         = 0.08  # skip CSP if >8% above 50-day MA
-# Gap risk filter
-GAP_RISK_PCT          = 0.08  # skip if stock moved >8% in single day
+# ── Gap / spike / drop thresholds ───────────────────────
+GAP_RISK_PCT          = 0.08  # Income mode: skip if moved >8% today
+
+# Mode 2: Post-Spike CC — triggered BY upward gaps
+OPP_SPIKE_MIN         = 0.08  # minimum upward spike to trigger
+OPP_SPIKE_DAYS        = 3
+OPP_CC_DTE_MIN        = 14
+OPP_CC_DTE_MAX        = 30
+OPP_CC_DELTA_MIN      = 0.20
+OPP_CC_DELTA_MAX      = 0.35
+OPP_IVP_MIN           = 40
+OPP_EARNINGS_MIN      = 7
+
+# Mode 3: Post-Drop CSP — triggered BY downward drops
+DROP_TRIGGER_MIN      = 0.08  # minimum drop to trigger (8-12%+)
+DROP_CSP_DTE_MIN      = 25    # DTE range
+DROP_CSP_DTE_MAX      = 45
+DROP_CSP_DELTA_MIN    = 0.20  # more conservative than income scanner
+DROP_CSP_DELTA_MAX    = 0.25
+DROP_IVP_MIN          = 40    # preferred >50
+DROP_EARNINGS_MIN     = 7     # hard stop
+DROP_SIZE_FACTOR      = 0.60  # 50-70% of normal position size
+
+# Quality tiers allowed for post-drop CSP
+DROP_CSP_ALLOWED_TIERS = {"Core", "Growth"}
 # Liquidity requirements
 MIN_OPEN_INTEREST     = 1000
 MIN_DAILY_VOLUME      = 100
@@ -88,28 +111,27 @@ BCS_MIN_ROR           = 0.80  # Bull Call Spread min return on risk
 CORE_STOCKS = ["AAPL","AMZN","ASML","BRK-B","GOOGL","IBKR","MELI","MU","NVDA","NVO","TSM"]
 OPPORTUNISTIC_STOCKS = [
     # Quality opportunistic — scan all strategies
-    "CLS","CRDO","DDOG","FIX","KNX","NFLX","NOW","POWL",
+    "CLS","CRDO","FIX","KNX","NFLX","NOW","POWL",
     "UBER","VRT","IBIT","TSLA",
-    # Watchlist only — scan but apply extra caution (wider strikes, tighter timing)
+    # Watchlist only — scan but apply extra caution
     "BABA",    # China risk — LEAPS only, no CSP
     "CPRT",    # Downtrend, wait for 200MA stabilization
     "LULU",    # Growth slowdown, unclear if temporary
     "PLTR",    # Extreme valuation, opportunistic only
     "VRTX",    # Biotech, wide strikes required
+    # Volatility opportunity — held shares, sell CC on spikes
+    "NBIS",    # AI infrastructure, volatile, CC on spikes only
 ]
-# Removed entirely (scanner will skip):
-# GRAB  — decelerating growth, poor liquidity, geopolitical risk
-# NBIS  — no profits, too early stage for options income
-# CRSP  — binary biotech, dangerous for CSP (gap risk)
-# PATH  — declining growth, not quality compounder
-# NVO   — moved to CORE watchlist below (broken thesis, monitor for re-entry)
 
 # Speculative tickers — require wider OTM buffers, stricter timing
-SPECULATIVE = {"VRTX","IBIT","PLTR","BABA","CRDO","LULU"}
+SPECULATIVE = {"VRTX","IBIT","PLTR","BABA","CRDO","LULU","NBIS"}
 
-# Watchlist only — scanner will suggest LEAPS only, never CSP/CC
-# until thesis recovers
+# LEAPS/CSP only — no systematic CC income
 LEAPS_ONLY = {"BABA", "CPRT"}
+
+# Volatility spike CC candidates — only flag CC when stock spikes 8%+ upward
+# These are stocks where you hold shares and want to sell calls on spikes
+SPIKE_CC_CANDIDATES = {"NBIS", "IBIT", "PLTR"}
 
 # NVO is now a Core holding with valuation awareness
 
@@ -299,6 +321,40 @@ def schwab_get_ivp(ticker: str) -> float:
         return round(sum(1 for v in vols if v < curr)/len(vols)*100, 1)
     except:
         return 0
+
+
+def schwab_parse_positions(accounts: list) -> dict:
+    """
+    Parse Schwab accounts into a flat dict of stock holdings.
+    Returns {ticker: {quantity, avg_cost, market_value, account_type}}
+    Aggregates across ALL accounts so cross-account exposure is visible.
+    """
+    holdings = {}
+    for acc in accounts:
+        acc_type = acc.get("account_type", "")
+        for pos in acc.get("positions", []):
+            inst = pos.get("instrument", {})
+            if inst.get("assetType") != "EQUITY":
+                continue
+            ticker = inst.get("symbol", "").replace("/", "-")
+            qty    = float(pos.get("longQuantity",  0) or 0)
+            if qty <= 0:
+                continue
+            avg    = float(pos.get("averagePrice",   0) or 0)
+            mval   = float(pos.get("marketValue",    0) or 0)
+            if ticker in holdings:
+                # Aggregate across accounts
+                holdings[ticker]["quantity"]     += qty
+                holdings[ticker]["market_value"] += mval
+            else:
+                holdings[ticker] = {
+                    "quantity":     qty,
+                    "avg_cost":     avg,
+                    "market_value": mval,
+                    "account_type": acc_type,
+                    "asset_class":  "STK",
+                }
+    return holdings
 
 
 def schwab_get_accounts() -> list:
@@ -917,13 +973,14 @@ OPPORTUNISTIC_STOCKS = [
     "TSLA",   # High volatility, narrative driven (best options liquidity)
     "BABA",   # Geopolitical risk — LEAPS/CSP only, no CC
     "IBIT",   # Bitcoin proxy — directional/LEAPS only
+    "NBIS",   # AI infrastructure — opportunistic CC/volatility spike mode
 ]
 
 # All tickers for scanning
 ALL_TICKERS = CORE_STOCKS + GROWTH_STOCKS + CYCLICAL_STOCKS + OPPORTUNISTIC_STOCKS
 
 # Speculative — wider OTM buffers required
-SPECULATIVE = {"IBIT", "BABA", "CRDO", "LULU"}
+SPECULATIVE = {"IBIT", "BABA", "CRDO", "LULU", "NBIS"}
 
 # LEAPS/CSP only — no CC income generation
 LEAPS_ONLY = {"BABA", "IBIT"}
@@ -1378,6 +1435,233 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality):
     return best, timing
 
 
+def detect_price_drop(ticker: str, md: dict) -> dict:
+    """
+    Detect if a stock has dropped 8%+ recently — triggers Post-Drop CSP mode.
+    Opposite of spike detection.
+    Checks today's move AND position relative to MA50 (extended below = recent drop).
+    """
+    price          = md.get("price", 0)
+    prev_close     = md.get("prev_close", price)
+    day_change     = (price - prev_close) / prev_close if prev_close > 0 else 0
+    ma50           = md.get("ma50", 0)
+    ma200          = md.get("ma200", 0)
+    pct_above_ma50 = md.get("pct_above_ma50", 0)
+    above_ma200    = md.get("above_ma200", True)
+
+    today_drop     = day_change <= -DROP_TRIGGER_MIN        # fell 8%+ today
+    recent_drop    = pct_above_ma50 <= -DROP_TRIGGER_MIN    # below 50MA significantly
+
+    return {
+        "is_drop":        today_drop or recent_drop,
+        "today_change":   round(day_change * 100, 1),
+        "pct_below_ma50": round(pct_above_ma50 * 100, 1),
+        "above_ma200":    above_ma200,
+        "trigger":        "today" if today_drop else "recent" if recent_drop else "none",
+    }
+
+
+def find_drop_csp(ticker, price, contracts, ivdata, pir, quality,
+                  drop_info, tier, sizing) -> tuple:
+    """
+    Post-Drop CSP — sell fear after sharp downside move.
+
+    Key differences from Income CSP:
+    - Gap filter DISABLED (drop is the trigger)
+    - Near-high restriction DISABLED
+    - More conservative delta (0.20-0.25)
+    - Reduced position size (60% of normal)
+    - Must be above 200MA (no broken stocks)
+    - Only Core and Growth tier stocks
+    - IVP > 40 required (elevated fear = elevated premium)
+    - Strike below real support (MA50 or swing low)
+    """
+    # Quality gates
+    if not drop_info["above_ma200"]:
+        return None, {"signal": "❌ Below 200MA — skip (structurally broken)"}
+    if tier not in DROP_CSP_ALLOWED_TIERS:
+        return None, {"signal": f"❌ {tier} tier not allowed for post-drop CSP"}
+    if ivdata["ivp"] < DROP_IVP_MIN:
+        return None, {"signal": f"❌ IVP {ivdata['ivp']:.0f}% below {DROP_IVP_MIN}% minimum"}
+    if (quality.get("days_to_earnings") is not None
+            and 0 < quality["days_to_earnings"] <= DROP_EARNINGS_MIN):
+        return None, {"signal": f"❌ Earnings in {quality['days_to_earnings']}d — hard stop"}
+
+    atm_iv     = ivdata.get("atm_iv", 0.3)
+    ma50       = 0  # will use strike selection logic
+    candidates = []
+
+    for c in contracts:
+        if c.get("option_type") != "P":
+            continue
+        try:
+            expiry = datetime.strptime(c["expiry"], "%Y-%m-%d")
+            dte    = (expiry - datetime.now()).days
+            if not (DROP_CSP_DTE_MIN <= dte <= DROP_CSP_DTE_MAX):
+                continue
+
+            strike = float(c["strike"])
+            if strike >= price: continue  # must be OTM
+
+            bid    = float(c.get("nbbo_bid", 0) or 0)
+            ask    = float(c.get("nbbo_ask", 0) or 0)
+            mid    = (bid + ask) / 2
+            if mid < 1.0: continue
+
+            # Use real delta from Schwab if available
+            delta  = float(c.get("delta", 0) or 0)
+            if abs(delta) == 0:
+                delta = estimate_delta(price, strike, dte, atm_iv, "P")
+            if delta is None: continue
+            delta = abs(delta)
+            if not (DROP_CSP_DELTA_MIN <= delta <= DROP_CSP_DELTA_MAX):
+                continue
+
+            # Liquidity
+            oi     = int(c.get("open_interest", 0) or 0)
+            vol    = int(c.get("volume", 0) or 0)
+            spread = (ask - bid) / ask if ask > 0 else 1
+            if oi < MIN_OPEN_INTEREST: continue
+            if vol < MIN_DAILY_VOLUME: continue
+            if spread > MAX_BID_ASK_SPREAD: continue
+
+            # Premium efficiency
+            prem_pct = mid / strike
+            if prem_pct < MIN_PREMIUM_PCT_30_45: continue
+
+            annualized  = (mid / strike) * (365 / dte) * 100
+
+            # Reduced position size — 60% of normal
+            normal_size = PORTFOLIO_SIZE * get_max_alloc(ticker)
+            reduced_size = normal_size * DROP_SIZE_FACTOR
+            max_contracts = max(1, int(reduced_size / (strike * 100)))
+
+            # Extrinsic quality label
+            intrinsic   = max(0, strike - price)
+            extrinsic   = max(0, mid - intrinsic)
+            ext_pct     = (extrinsic / mid * 100) if mid > 0 else 0
+
+            score = (ivdata["ivp"] / 100) * delta * mid * (1 - abs(dte-35)/35)
+            candidates.append({
+                "strike":          strike,
+                "expiry":          expiry.strftime("%Y-%m-%d"),
+                "dte":             dte,
+                "bid":             round(bid, 2),
+                "ask":             round(ask, 2),
+                "premium":         round(mid, 2),
+                "delta":           round(delta, 2),
+                "annualized_return": round(annualized, 1),
+                "prem_pct":        round(prem_pct * 100, 2),
+                "max_contracts":   max_contracts,
+                "collateral":      round(strike * 100 * max_contracts, 0),
+                "score":           score,
+            })
+        except:
+            continue
+
+    if not candidates:
+        return None, {}
+
+    best = max(candidates, key=lambda x: x["score"])
+    return best, {"signal": f"✅ Post-Drop CSP | {drop_info['today_change']:+.1f}% | IVP {ivdata['ivp']:.0f}%"}
+
+
+def detect_price_spike(ticker: str, md: dict) -> dict:
+    """
+    Detect if a stock has spiked 8%+ upward recently.
+    Opportunistic mode is TRIGGERED by spikes (opposite of income mode which skips them).
+    """
+    price          = md.get("price", 0)
+    prev_close     = md.get("prev_close", price)
+    day_change     = (price - prev_close) / prev_close if prev_close > 0 else 0
+    pct_above_ma50 = md.get("pct_above_ma50", 0)
+
+    today_spike   = day_change >= OPP_SPIKE_MIN        # big move today
+    extended_run  = pct_above_ma50 >= OPP_SPIKE_MIN    # stock has run up recently
+
+    return {
+        "is_spike":       today_spike or extended_run,
+        "today_change":   round(day_change * 100, 1),
+        "pct_above_ma50": round(pct_above_ma50 * 100, 1),
+        "trigger":        "today" if today_spike else "extended" if extended_run else "none",
+    }
+
+
+def find_spike_cc(ticker, price, qty, avg_cost, contracts, ivdata, spike_info) -> tuple:
+    """
+    Opportunistic CC after volatility spike.
+    Rules from framework doc:
+    - DTE: 14-30 (shorter — capture fast vol contraction)
+    - Delta: 0.20-0.35 (strikes above spike high)
+    - IVP > 40 required
+    - Earnings hard stop: 7 days
+    - Must hold shares (qty >= 100)
+    """
+    if qty < 100:
+        return None, {}
+    if ivdata["ivp"] < OPP_IVP_MIN:
+        return None, {"signal": f"IVP {ivdata['ivp']:.0f}% < {OPP_IVP_MIN}% minimum for spike CC"}
+
+    atm_iv     = ivdata.get("atm_iv", 0.3)
+    candidates = []
+
+    for c in contracts:
+        if c.get("option_type") != "C":
+            continue
+        try:
+            expiry = datetime.strptime(c["expiry"], "%Y-%m-%d")
+            dte    = (expiry - datetime.now()).days
+            if not (OPP_CC_DTE_MIN <= dte <= OPP_CC_DTE_MAX):
+                continue
+            strike = float(c["strike"])
+            if strike <= price: continue  # must be OTM
+            bid    = float(c.get("nbbo_bid", 0) or 0)
+            ask    = float(c.get("nbbo_ask", 0) or 0)
+            mid    = (bid + ask) / 2
+            if mid < 0.50: continue
+
+            delta = float(c.get("delta", 0) or 0)
+            if delta == 0:
+                delta = estimate_delta(price, strike, dte, atm_iv, "C")
+            if delta is None or not (OPP_CC_DELTA_MIN <= abs(delta) <= OPP_CC_DELTA_MAX):
+                continue
+
+            oi     = int(c.get("open_interest", 0) or 0)
+            vol    = int(c.get("volume", 0) or 0)
+            spread = (ask - bid) / ask if ask > 0 else 1
+            if oi < MIN_OPEN_INTEREST: continue
+            if vol < MIN_DAILY_VOLUME: continue
+            if spread > MAX_BID_ASK_SPREAD: continue
+
+            annualized     = (mid / price) * (365 / dte) * 100
+            protection_pct = round((mid / price) * 100, 1)
+            max_contracts  = max(1, int(qty / 100))
+            score          = (ivdata["ivp"] / 100) * abs(delta) * mid
+
+            candidates.append({
+                "strike":            strike,
+                "expiry":            expiry.strftime("%Y-%m-%d"),
+                "dte":               dte,
+                "bid":               round(bid, 2),
+                "ask":               round(ask, 2),
+                "premium":           round(mid, 2),
+                "delta":             round(abs(delta), 2),
+                "annualized_return": round(annualized, 1),
+                "max_contracts":     max_contracts,
+                "avg_cost":          avg_cost,
+                "protection_pct":    protection_pct,
+                "score":             score,
+            })
+        except:
+            continue
+
+    if not candidates:
+        return None, {}
+
+    best = max(candidates, key=lambda x: x["score"])
+    return best, {"signal": f"✅ Spike CC | {spike_info['today_change']:+.1f}% move | IVP {ivdata['ivp']:.0f}%"}
+
+
 def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir):
     timing = timing_score("CC", pir, ivdata["ivp"])
     if not timing["recommend"]: return None, timing
@@ -1616,6 +1900,129 @@ def find_bull_call_spread(ticker, price, contracts, ivdata, pir, quality):
 
 
 # ════════════════════════════════════════════════════════════
+# OPPORTUNISTIC VOLATILITY SCANNER
+# ════════════════════════════════════════════════════════════
+
+def check_volatility_spike(ticker: str, md: dict) -> dict:
+    """
+    Detect if a stock has spiked ≥8% recently (1-3 days).
+    Uses price vs recent closes from Yahoo Finance.
+    Returns spike details if triggered, else None.
+    """
+    try:
+        r = requests.get(
+            f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}",
+            headers={"User-Agent": "Mozilla/5.0"},
+            params={"interval": "1d", "range": "5d"},
+            timeout=8
+        )
+        data    = r.json()["chart"]["result"][0]
+        closes  = data["indicators"]["quote"][0].get("close", [])
+        closes  = [c for c in closes if c is not None]
+        if len(closes) < 2:
+            return None
+        current = closes[-1]
+        # Check 1-day and 3-day spike
+        spike_1d = (current - closes[-2]) / closes[-2] if len(closes) >= 2 else 0
+        spike_3d = (current - closes[-4]) / closes[-4] if len(closes) >= 4 else 0
+        best_spike = max(spike_1d, spike_3d)
+        if best_spike >= OPP_SPIKE_MIN:
+            return {
+                "spike_pct":  round(best_spike * 100, 1),
+                "spike_days": 1 if spike_1d >= OPP_SPIKE_MIN else 3,
+                "current":    round(current, 2),
+                "triggered":  True,
+            }
+        return None
+    except:
+        return None
+
+
+def find_opp_cc(ticker: str, price: float, qty: float, avg_cost: float,
+                contracts: list, ivdata: dict) -> dict:
+    """
+    Find best covered call for opportunistic volatility mode.
+    Rules: 14-30 DTE, delta 0.20-0.35, IVP > 40, strike above spike high.
+    Only valid if holding ≥100 shares.
+    """
+    if qty < 100:
+        return None
+    best = None
+    best_score = 0
+    for c in contracts:
+        if c.get("option_type") != "C":
+            continue
+        strike = float(c.get("strike", 0))
+        if strike <= price:
+            continue  # must be OTM
+        expiry = c.get("expiry", "")
+        try:
+            exp_dt = datetime.strptime(expiry, "%Y-%m-%d")
+        except:
+            continue
+        dte = (exp_dt - datetime.now()).days
+        if not (OPP_CC_DTE_MIN <= dte <= OPP_CC_DTE_MAX):
+            continue
+        bid = float(c.get("nbbo_bid", 0) or 0)
+        ask = float(c.get("nbbo_ask", 0) or 0)
+        mid = (bid + ask) / 2
+        if mid < 0.50:
+            continue
+        # Liquidity
+        oi  = int(c.get("open_interest", 0) or 0)
+        vol = int(c.get("volume", 0) or 0)
+        spd = (ask - bid) / ask if ask > 0 else 1
+        if oi < MIN_OPEN_INTEREST or vol < MIN_DAILY_VOLUME or spd > MAX_BID_ASK_SPREAD:
+            continue
+        # Use real delta from Schwab if available, else estimate
+        delta = abs(float(c.get("delta", 0) or 0))
+        if delta == 0:
+            atm_iv = ivdata.get("atm_iv", 0.30)
+            delta = abs(estimate_delta(price, strike, dte, atm_iv, "C") or 0)
+        if not (OPP_CC_DELTA_MIN <= delta <= OPP_CC_DELTA_MAX):
+            continue
+        annualized = (mid / price) * (365 / dte) * 100
+        max_contracts = int(qty // 100)
+        score = (delta * 40) + (annualized * 0.5) + (oi / 10000)
+        if score > best_score:
+            best_score = score
+            best = {
+                "strike":           round(strike, 2),
+                "expiry":           expiry,
+                "dte":              dte,
+                "bid":              round(bid, 2),
+                "ask":              round(ask, 2),
+                "premium":          round(mid, 2),
+                "delta":            round(delta, 2),
+                "annualized_return": round(annualized, 1),
+                "max_contracts":    max_contracts,
+                "avg_cost":         round(avg_cost, 2),
+                "protection_pct":   round(mid / price * 100, 2),
+            }
+    return best
+
+
+def fmt_opp_cc(opp: dict) -> str:
+    """Format opportunistic CC alert for Telegram."""
+    cc  = opp["cc"]
+    spk = opp["spike"]
+    s   = opp["sizing"]
+    lines = [
+        f"⚡ *VOLATILITY SPIKE — {opp['ticker']} @ ${opp['price']}*",
+        f"_+{spk['spike_pct']}% spike in {spk['spike_days']}d — IV elevated — sell calls now_",
+        "",
+        f"  [{opp['tier']}] | Hold {int(s['quantity'])} shares @ ${cc['avg_cost']} avg",
+        f"  Sell Call ${cc['strike']} | {cc['expiry']} | {cc['dte']} DTE",
+        f"  Bid ${cc['bid']} / Ask ${cc['ask']} | Premium ${cc['premium']}",
+        f"  δ{cc['delta']} | Annualized: {cc['annualized_return']}% | {cc['max_contracts']} contracts",
+        f"  Protection: {cc['protection_pct']}% downside buffer",
+        f"  IVP: {opp['ivp']:.0f}% | Exit at 50-70% profit",
+        f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
+    ]
+    return "\n".join(lines)
+
+
+# ════════════════════════════════════════════════════════════
 # PETER LYNCH DISCOVERY
 # ════════════════════════════════════════════════════════════
 
@@ -1651,7 +2058,7 @@ def peter_lynch_screen(known_tickers, flow_data) -> list:
 # CLAUDE ANALYSIS
 # ════════════════════════════════════════════════════════════
 
-def claude_analyze(csps, ccs, leaps_list, pmccs, bcss, discoveries) -> str:
+def claude_analyze(csps, ccs, leaps_list, pmccs, bcss, discoveries, spikes=None, drops=None) -> str:
     if not ANTHROPIC_API_KEY: return ""
     all_opps = csps + ccs + leaps_list + pmccs + bcss
     if not all_opps: return ""
@@ -1672,11 +2079,13 @@ Deal quality checklist:
 4. Is chain liquid?
 5. Is strike near real support?
 
-CSPs: {json.dumps(csps,indent=2)}
-CCs: {json.dumps(ccs,indent=2)}
+CSPs (Income Mode): {json.dumps(csps,indent=2)}
+CCs (Income Mode): {json.dumps(ccs,indent=2)}
 LEAPS: {json.dumps(leaps_list,indent=2)}
 PMCCs: {json.dumps(pmccs,indent=2)}
 Bull Call Spreads: {json.dumps(bcss,indent=2)}
+Post-Drop CSPs (Sell Fear Mode): {json.dumps(drops,indent=2) if drops else 'None'}
+Post-Spike CCs (Sell Strength Mode): {json.dumps(spikes,indent=2) if spikes else 'None'}
 Peter Lynch Discoveries: {json.dumps(discoveries,indent=2) if discoveries else 'None'}
 
 CRITICAL FORMAT RULE: Always use EXACT expiry dates in YYYY-MM-DD format.
@@ -1853,6 +2262,70 @@ def fmt_pmcc(opp) -> str:
     ])
 
 
+def fmt_drop_csp(opp) -> str:
+    """Format post-drop CSP alert for Telegram."""
+    s  = opp["sizing"]
+    d  = opp["drop_csp"]
+    di = opp["drop_info"]
+    dp = opp.get("darkpool", {})
+
+    trigger = (f"🔻 Dropped {di['today_change']:+.1f}% today"
+               if di["trigger"] == "today"
+               else f"🔻 Dropped {di['pct_below_ma50']:+.1f}% below 50MA recently")
+
+    lines = [
+        f"🔻 *POST-DROP CSP — {opp['ticker']} @ ${opp['price']}*",
+        f"_{trigger} — Selling fear, not chasing a falling knife_",
+        f"_⚠️ ELEVATED RISK — Reduced position size ({int(DROP_SIZE_FACTOR*100)}% of normal)_",
+        "",
+        *([f"  {dp['label']}"] if dp.get("show") else []),
+        f"  IVP: {opp['ivp']:.0f}% | 200MA: ✅ Above",
+        f"  1d change: {di['today_change']:+.1f}% | Pullback: {opp['pullback_pct']}% off highs",
+        f"  Sell Put ${d['strike']} | {d['expiry']} | {d['dte']} DTE",
+        f"  Bid ${d['bid']} / Ask ${d['ask']} | Mid ${d['premium']}",
+        f"  δ{d['delta']} | Premium: {d['prem_pct']}% of strike",
+        f"  Annualized: {d['annualized_return']}% | ${d['premium']/d['dte']:.2f}/day",
+        f"  Collateral: ${d['collateral']:,.0f} | {d['max_contracts']} contracts (reduced size)",
+        f"  [{opp['tier']}] {s['tier']} tier | Room: ${s['room_usd']:,.0f}",
+        "",
+        f"  ✅ _Favorable if: market selloff, sector rotation, profit taking_",
+        f"  ❌ _Avoid if: earnings miss, guidance cut, broken trend_",
+        f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
+    ]
+    return "\n".join([l for l in lines if l is not None])
+
+
+def fmt_spike_cc(opp) -> str:
+    """Format opportunistic spike CC alert for Telegram."""
+    s  = opp["sizing"]
+    sc = opp["spike_cc"]
+    si = opp["spike_info"]
+    dp = opp.get("darkpool", {})
+
+    trigger = (f"📈 Up {si['today_change']:+.1f}% today"
+               if si["trigger"] == "today"
+               else f"📈 Extended {si['pct_above_ma50']:+.1f}% above 50MA")
+
+    lines = [
+        f"⚡ *SPIKE CC — {opp['ticker']} @ ${opp['price']}*",
+        f"_{trigger} — IV spiked, sell calls before vol contracts_",
+        "",
+        *([f"  {dp['label']}"] if dp.get("show") else []),
+        f"  IVP: {opp['ivp']:.0f}% | {opp['pullback_pct']}% off highs",
+        f"  Sell Call ${sc['strike']} | {sc['expiry']} | {sc['dte']} DTE",
+        f"  Bid ${sc['bid']} / Ask ${sc['ask']} | Mid ${sc['premium']}",
+        f"  δ{sc['delta']} | Annualized: {sc['annualized_return']}% | ${sc['premium']/sc['dte']:.2f}/day",
+        f"  Protection: {sc['protection_pct']}% downside buffer",
+        f"  Hold {int(s['quantity'])} shares @ ${sc['avg_cost']} avg",
+        f"  Max {sc['max_contracts']} contracts",
+        "",
+        f"  ⚠️ _Exit when 50-70% of premium captured_",
+        f"  ⚠️ _Close early if stock reverses sharply_",
+        f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
+    ]
+    return "\n".join([l for l in lines if l is not None])
+
+
 def fmt_bcs(opp) -> str:
     t = opp["bcs"]["timing"]; b = opp["bcs"]; q = opp["quality"]
     return "\n".join([
@@ -1903,10 +2376,14 @@ def run_scanner():
     print(f"   Schwab: {len(schwab_quotes)} real-time | Yahoo fallback: {len(mkt)-len(schwab_quotes)}")
 
     # Fetch Schwab accounts for position awareness
-    schwab_accounts = schwab_get_accounts() if SCHWAB_APP_KEY else []
-    schwab_total_value = sum(a["net_liquidation"] for a in schwab_accounts)
-    if schwab_accounts:
-        print(f"   Schwab accounts: {len(schwab_accounts)} | Total: ${schwab_total_value:,.0f}")
+    schwab_accounts  = schwab_get_accounts() if SCHWAB_APP_KEY else []
+    schwab_positions = schwab_parse_positions(schwab_accounts) if schwab_accounts else {}
+    if schwab_positions:
+        print(f"   Schwab positions: {len(schwab_positions)} holdings parsed")
+    # Merge Schwab positions into IBKR dict (Schwab takes priority if both have ticker)
+    for ticker, pos in schwab_positions.items():
+        if ticker not in ibkr or ibkr[ticker].get("market_value", 0) == 0:
+            ibkr[ticker] = pos
     ok  = sum(1 for v in mkt.values() if v["price"]>0)
     print(f"   {ok}/{len(all_tickers)} prices ✓")
 
@@ -1987,7 +2464,7 @@ def run_scanner():
     # Scanner always runs — IVP filters individual trades
 
     csp_opps = []; cc_opps  = []; leaps_opps = []
-    pmcc_opps= []; bcs_opps = []
+    pmcc_opps= []; bcs_opps = []; spike_opps = []; drop_opps = []
 
     print(f"\n🔍 Scanning {len(all_tickers)} stocks...")
     for ticker in all_tickers:
@@ -2065,6 +2542,42 @@ def run_scanner():
                     "score":csp["timing"]["score"]*quality["quality_score"]*csp["annualized_return"]*dp_boost})
                 print(f"  [{tier}] {ticker}: 💰 CSP ${csp['strike']} {csp['annualized_return']}% ann δ{csp['delta']} IVP{ivdata['ivp']:.0f}%")
 
+        # ── Post-Drop CSP (Mode 3) ───────────────────────────
+        drop_info = detect_price_drop(ticker, md)
+        if (drop_info["is_drop"]
+                and tier in DROP_CSP_ALLOWED_TIERS
+                and sizing["status"] != "OVERWEIGHT"):
+            drop_csp, drop_timing = find_drop_csp(
+                ticker, price, contracts, ivdata, pir,
+                quality, drop_info, tier, sizing)
+            if drop_csp:
+                drop_opps.append({**base, "drop_csp": drop_csp,
+                    "drop_info": drop_info,
+                    "score": drop_csp["annualized_return"] * (ivdata["ivp"]/100)})
+                print(f"  [{tier}] {ticker}: 🔻 DROP CSP ${drop_csp['strike']} "
+                      f"{drop_csp['annualized_return']}% ann | "
+                      f"{drop_info['today_change']:+.1f}% drop | "
+                      f"IVP {ivdata['ivp']:.0f}%")
+
+        # ── Opportunistic Spike CC ────────────────────────
+        # Triggered BY gap moves — opposite of income mode which skips them
+        # Only for SPIKE_CC_CANDIDATES where you hold shares
+        spike_info = detect_price_spike(ticker, md)
+        if (ticker in SPIKE_CC_CANDIDATES
+                and spike_info["is_spike"]
+                and qty >= 100
+                and (quality.get("days_to_earnings") is None
+                     or quality["days_to_earnings"] > OPP_EARNINGS_MIN)):
+            spike_cc, _ = find_spike_cc(
+                ticker, price, qty, avg, contracts, ivdata, spike_info)
+            if spike_cc:
+                spike_opps.append({**base, "spike_cc": spike_cc,
+                    "spike_info": spike_info,
+                    "score": spike_cc["annualized_return"] * (ivdata["ivp"] / 100)})
+                print(f"  [{tier}] {ticker}: ⚡ SPIKE CC ${spike_cc['strike']} "
+                      f"{spike_cc['annualized_return']}% ann | "
+                      f"{spike_info['today_change']:+.1f}% move")
+
         # ── CC ───────────────────────────────────────────
         holding = stk_hold.get(ticker,{})
         qty = holding.get("quantity",0); avg = holding.get("avg_cost",0)
@@ -2115,8 +2628,10 @@ def run_scanner():
     top_csps  = csp_opps[:3];  top_ccs   = cc_opps[:3]
     top_leaps = leaps_opps[:3];top_pmccs = pmcc_opps[:3]
     top_bcss  = bcs_opps[:3]
+    top_spikes = spike_opps[:3]
+    top_drops  = drop_opps[:3]
 
-    total = sum(len(x) for x in [top_csps,top_ccs,top_leaps,top_pmccs,top_bcss])
+    total = sum(len(x) for x in [top_csps,top_ccs,top_leaps,top_pmccs,top_bcss,top_spikes,top_drops])
     print(f"\n🏆 {len(top_csps)} CSPs | {len(top_ccs)} CCs | {len(top_leaps)} LEAPS | "
           f"{len(top_pmccs)} PMCCs | {len(top_bcss)} Spreads")
 
@@ -2142,9 +2657,74 @@ def run_scanner():
         print("✅ No qualifying opportunities today.")
         return
 
+    # ── Opportunistic Volatility Scan ────────────────────
+    print("\n⚡ Opportunistic volatility scan...")
+    opp_opps = []
+    # Scan ALL tickers including ones not normally scanned for spikes
+    opp_tickers = ALL_TICKERS + ["NBIS", "PLTR", "IBIT"]
+    opp_tickers = list(set(opp_tickers))  # deduplicate
+    for ticker in opp_tickers:
+        try:
+            md_t  = mkt.get(ticker, {})
+            price = md_t.get("price", 0)
+            if price <= 0:
+                continue
+            # Check for volatility spike
+            spike = check_volatility_spike(ticker, md_t)
+            if not spike:
+                continue
+            # Check earnings blackout
+            earn_date = get_earnings_date(ticker)
+            if earn_date:
+                days_earn = (earn_date - datetime.now()).days
+                if 0 < days_earn < OPP_EARNINGS_MIN:
+                    print(f"  {ticker}: spike {spike['spike_pct']}% but earnings in {days_earn}d — skip")
+                    continue
+            # Check IVP
+            ivdata_t = calculate_ivp(get_option_contracts(ticker))
+            if ivdata_t.get("ivp", 0) < OPP_IVP_MIN:
+                print(f"  {ticker}: spike {spike['spike_pct']}% but IVP {ivdata_t['ivp']:.0f}% too low")
+                continue
+            # Check if holding shares (from IBKR or Schwab)
+            pos   = ibkr.get(ticker, {})
+            qty   = float(pos.get("quantity", 0))
+            avg   = float(pos.get("avg_cost", 0))
+            if qty < 100:
+                print(f"  {ticker}: spike {spike['spike_pct']}% but <100 shares held")
+                continue
+            # Get contracts and find best CC
+            contracts_t = get_option_contracts(ticker)
+            if SCHWAB_APP_KEY:
+                from datetime import timedelta
+                from_d = datetime.now().strftime("%Y-%m-%d")
+                to_d   = (datetime.now() + timedelta(days=35)).strftime("%Y-%m-%d")
+                sc = schwab_get_option_chain(ticker, from_d, to_d)
+                if sc:
+                    contracts_t = sc
+            tier_t = ("Core" if ticker in CORE_STOCKS else
+                      "Growth" if ticker in GROWTH_STOCKS else
+                      "Cyclical" if ticker in CYCLICAL_STOCKS else "Opportunistic")
+            sizing_t = position_check(ticker, ibkr)
+            cc_opp = find_opp_cc(ticker, price, qty, avg, contracts_t, ivdata_t)
+            if cc_opp:
+                opp_opps.append({
+                    "ticker": ticker, "price": price,
+                    "tier": tier_t, "spike": spike,
+                    "cc": cc_opp, "sizing": sizing_t,
+                    "ivp": ivdata_t.get("ivp", 0),
+                })
+                print(f"  {ticker}: ⚡ SPIKE {spike['spike_pct']}% | CC ${cc_opp['strike']} {cc_opp['annualized_return']}% ann")
+        except Exception as e:
+            print(f"  {ticker} opp error: {e}")
+
+    if opp_opps:
+        print(f"\n⚡ {len(opp_opps)} volatility spike opportunities found")
+    else:
+        print("   No volatility spike setups today")
+
     # ── Claude analysis ───────────────────────────────────
-    print("🧠 Claude analysis...")
-    analysis = claude_analyze(top_csps,top_ccs,top_leaps,top_pmccs,top_bcss,discoveries)
+    print("\n🧠 Claude analysis...")
+    analysis = claude_analyze(top_csps,top_ccs,top_leaps,top_pmccs,top_bcss,discoveries,top_spikes,top_drops)
     if analysis: print(f"\n{analysis}")
 
     # ── Telegram — ORDER: Summary → Trades ───────────────
@@ -2163,7 +2743,25 @@ def run_scanner():
         send_telegram(msg)
         time.sleep(2)
 
+    # 2b. Opportunistic volatility spike alerts (before regular trades)
+    if opp_opps:
+        send_telegram("━━━ *⚡ VOLATILITY SPIKE OPPORTUNITIES* ━━━")
+        send_telegram(
+            "_These triggered because of recent sharp price spikes.\n"
+            "IV is elevated — good time to sell calls if you hold shares._"
+        )
+        time.sleep(1)
+        for o in opp_opps:
+            send_telegram(fmt_opp_cc(o))
+            time.sleep(2)
+
     # 3. Individual trade alerts
+    if top_drops:
+        send_telegram("━━━ *🔻 POST-DROP CSP OPPORTUNITIES* ━━━"); time.sleep(1)
+        for o in top_drops: send_telegram(fmt_drop_csp(o)); time.sleep(2)
+    if top_spikes:
+        send_telegram("━━━ *⚡ VOLATILITY SPIKE CC OPPORTUNITIES* ━━━"); time.sleep(1)
+        for o in top_spikes: send_telegram(fmt_spike_cc(o)); time.sleep(2)
     if top_csps:
         send_telegram("━━━ *CSP OPPORTUNITIES* ━━━"); time.sleep(1)
         for o in top_csps: send_telegram(fmt_csp(o)); time.sleep(2)
