@@ -1972,9 +1972,6 @@ def run_scanner():
         f" Positive = money flowing into calls. Negative = put hedging (fear)._\n"
         f"\n"
         f"*S&P 500:* {spy_regime['label']}\n"
-        + (f"\n*Schwab Accounts:* {len(schwab_accounts)} accounts | Total: ${schwab_total_value:,.0f}\n"
-           if schwab_accounts else "")
-        +
         f"_S&P below 200MA = reduce size, lower delta._\n"
         f"\n"
         f"━━━ TODAY'S CONTEXT ━━━\n"
