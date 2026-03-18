@@ -1479,8 +1479,11 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality):
         if ivdata["ivp"] >= IVP_ELEVATED:
             d_max = min(CSP_DELTA_MAX_HIGH_IV, d_max + 0.05)
         if delta is None or not (d_min <= delta <= d_max): continue
+        # Correct formula: premium / (strike×100 collateral) × (365/dte)
+        # Matches spreadsheet: $385 / $28,000 × (365/29) = 17%
         annualized = (mid / strike) * (365 / dte) * 100
-        if not (CSP_MIN_ANNUALIZED <= annualized <= MAX_ANNUALIZED): continue
+        below_min  = annualized < CSP_MIN_ANNUALIZED
+        if annualized > MAX_ANNUALIZED: continue  # filter bad data only
         max_contracts = max(1, int((PORTFOLIO_SIZE * get_max_alloc(ticker)) / (strike * 100)))
         # Options income priority stocks score 20% higher (better liquidity/fills)
         priority_boost = 1.2 if ticker in OPTIONS_INCOME_PRIORITY else 1.0
@@ -1492,6 +1495,7 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality):
                     "otm_pct":round(otm_pct,1),"iv":round(atm_iv*100,1),
                     "ivp":ivdata["ivp"],"delta":delta,
                     "annualized_return":round(annualized,1),
+                "below_min":       below_min,
                     "max_contracts":max_contracts,
                     "collateral":round(strike*100*max_contracts,0),
                     "timing":timing}
@@ -1826,7 +1830,8 @@ def find_spike_cc(ticker, price, qty, avg_cost, contracts, ivdata, spike_info) -
             if vol < MIN_DAILY_VOLUME: continue
             if spread > MAX_BID_ASK_SPREAD: continue
 
-            annualized     = (mid / price) * (365 / dte) * 100
+            # CC: use strike as collateral basis (matches CSP formula)
+            annualized     = (mid / strike) * (365 / dte) * 100
             protection_pct = round((mid / price) * 100, 1)
             max_contracts  = max(1, int(qty / 100))
             score          = (ivdata["ivp"] / 100) * abs(delta) * mid
@@ -2381,6 +2386,8 @@ def fmt_csp(opp) -> str:
         f"  Bid ${opp['csp']['bid']} / Ask ${opp['csp']['ask']}",
         f"  {opp['csp']['otm_pct']}% OTM | IV {opp['csp']['iv']}% | IVP {opp['csp']['ivp']:.0f}%{d}",
         f"  Annualized: {opp['csp']['annualized_return']}% | ${opp['csp']['premium']/opp['csp']['dte']:.2f}/day | {opp['csp']['max_contracts']} contracts",
+        *([f"  ⚠️ Below 20% minimum — consider skipping or check wider strike"]
+           if opp['csp'].get('below_min') else []),
         f"  Collateral: ${opp['csp']['collateral']:,.0f} | Room: ${s['room_usd']:,.0f}",
         *([f"  ⚠️ OI Signal: {opp['oi_signal']['signal']} (calls {opp['oi_signal']['call_oi_change']:+,} / puts {opp['oi_signal']['put_oi_change']:+,})"]
            if opp.get("oi_signal") else []),
@@ -2770,8 +2777,10 @@ def run_scanner():
                 q_adjusted["quality_score"] = max(0, quality["quality_score"] - 1)
             csp, _ = find_best_csp(ticker, price, contracts, ivdata, pir, q_adjusted)
             if csp:
+                # below_min trades still shown but scored lower
+                score_mult = 0.5 if csp.get("below_min") else 1.0
                 csp_opps.append({**base,"csp":csp,
-                    "score":csp["timing"]["score"]*quality["quality_score"]*csp["annualized_return"]*dp_boost})
+                    "score":csp["timing"]["score"]*quality["quality_score"]*csp["annualized_return"]*dp_boost*score_mult})
                 print(f"  [{tier}] {ticker}: 💰 CSP ${csp['strike']} {csp['annualized_return']}% ann δ{csp['delta']} IVP{ivdata['ivp']:.0f}%")
 
         # ── Position Income Optimization (Mode 4) ──────────────
