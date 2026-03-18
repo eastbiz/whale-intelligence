@@ -1280,6 +1280,8 @@ def stock_quality_check(ticker, md, earnings_date) -> dict:
         pass  # already caught by near_high check above
 
     # Hard stop conditions
+    # Note: 200MA check is NOT a hard stop for LEAPS on Core holdings
+    # For LEAPS, we're making a 2-year business bet, not a 30-day trend trade
     hard_stop = (not checks["price_ok"] or
                  not checks["volume_ok"] or
                  not checks["no_gap"] or
@@ -1287,21 +1289,27 @@ def stock_quality_check(ticker, md, earnings_date) -> dict:
                  not checks["ma50_ok"] or
                  earnings_status == "hard_stop")
 
+    # Separate LEAPS hard stop — more lenient on 200MA
+    leaps_hard_stop = (not checks["price_ok"] or
+                       not checks["volume_ok"] or
+                       earnings_status == "hard_stop")  # gap/near_high/ma50 not blocking LEAPS
+
     quality_score = sum(checks.values())
 
     return {
-        "checks":          checks,
-        "quality_score":   quality_score,
-        "pullback":        pullback,
-        "pullback_pct":    round(pullback * 100, 1),
-        "days_to_earnings":days_to_earnings,
-        "earnings_status": earnings_status,
-        "pct_above_ma50":  round(pct_above_ma50 * 100, 1),
-        "ma50_extended":   ma50_extended,
-        "near_high":       near_high,
-        "warnings":        warnings,
-        "hard_stop":       hard_stop,
-        "passes":          not hard_stop and quality_score >= 3,
+        "checks":           checks,
+        "quality_score":    quality_score,
+        "pullback":         pullback,
+        "pullback_pct":     round(pullback * 100, 1),
+        "days_to_earnings": days_to_earnings,
+        "earnings_status":  earnings_status,
+        "pct_above_ma50":   round(pct_above_ma50 * 100, 1),
+        "ma50_extended":    ma50_extended,
+        "near_high":        near_high,
+        "warnings":         warnings,
+        "hard_stop":        hard_stop,
+        "leaps_hard_stop":  leaps_hard_stop,
+        "passes":           not hard_stop and quality_score >= 3,
     }
 
 
@@ -1488,6 +1496,136 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality):
                     "collateral":round(strike*100*max_contracts,0),
                     "timing":timing}
     return best, timing
+
+
+def get_position_status(current_pct: float) -> str:
+    """
+    Determine position status based on current exposure %.
+    Drives delta selection for Position Income Optimization.
+    """
+    if current_pct < 4:
+        return "light"        # aggressive income — 0.30-0.40 delta
+    elif current_pct < 8:
+        return "normal"       # normal — 0.20-0.25 delta
+    elif current_pct < 12:
+        return "heavy"        # conservative — 0.10-0.15 delta
+    else:
+        return "overweight"   # reduce — sell closer calls, willing to assign
+
+
+def get_pnl_status(avg_cost: float, current_price: float) -> str:
+    """Determine P&L status for delta selection."""
+    if avg_cost <= 0:
+        return "unknown"
+    pnl_pct = (current_price - avg_cost) / avg_cost
+    if pnl_pct > 0.10:
+        return "profit"       # delta 0.30-0.40
+    elif pnl_pct > -0.05:
+        return "breakeven"    # delta 0.20-0.25
+    else:
+        return "loss"         # delta 0.10-0.15
+
+
+def find_position_income_cc(ticker, price, qty, avg_cost, contracts,
+                             ivdata, position_status, pnl_status) -> tuple:
+    """
+    Position Income Optimization — Mode 4.
+    Sell calls on existing holdings to generate income.
+    Rules from framework:
+    - Sell calls ABOVE break-even (cost basis - premiums collected)
+    - Delta based on P&L status:
+      profit    → 0.30-0.40 (more aggressive, happy to reduce)
+      breakeven → 0.20-0.25 (protect position)
+      loss      → 0.10-0.15 (very conservative, protect recovery)
+    - Ignores: 200MA rule, pullback requirements
+    - Focus: income vs risk, not trade perfection
+    - Only for stocks where you hold ≥100 shares
+    """
+    if qty < 100:
+        return None, {}
+
+    # Delta range based on P&L status
+    if pnl_status == "profit":
+        d_min, d_max = 0.30, 0.40
+        status_label = "📈 Profit position"
+    elif pnl_status == "loss":
+        d_min, d_max = 0.10, 0.15
+        status_label = "📉 Loss position — conservative"
+    else:
+        d_min, d_max = 0.20, 0.25
+        status_label = "➡️ Near break-even"
+
+    atm_iv     = ivdata.get("atm_iv", 0.3)
+    breakeven  = avg_cost  # simplified — would subtract collected premiums
+    candidates = []
+
+    for c in contracts:
+        if c.get("option_type") != "C":
+            continue
+        try:
+            expiry = datetime.strptime(c["expiry"], "%Y-%m-%d")
+            dte    = (expiry - datetime.now()).days
+            if not (30 <= dte <= 45):
+                continue
+
+            strike = float(c["strike"])
+            # Must be above break-even
+            if strike <= breakeven:
+                continue
+            if strike <= price:
+                continue  # must be OTM
+
+            bid    = float(c.get("nbbo_bid", 0) or 0)
+            ask    = float(c.get("nbbo_ask", 0) or 0)
+            mid    = (bid + ask) / 2
+            if mid < 0.50: continue
+
+            delta  = float(c.get("delta", 0) or 0)
+            if abs(delta) == 0:
+                delta = estimate_delta(price, strike, dte, atm_iv, "C")
+            if delta is None: continue
+            delta = abs(delta)
+            if not (d_min <= delta <= d_max):
+                continue
+
+            # Liquidity
+            oi     = int(c.get("open_interest", 0) or 0)
+            vol    = int(c.get("volume", 0) or 0)
+            spread = (ask - bid) / ask if ask > 0 else 1
+            if oi < MIN_OPEN_INTEREST: continue
+            if vol < MIN_DAILY_VOLUME: continue
+            if spread > MAX_BID_ASK_SPREAD: continue
+
+            annualized    = (mid / price) * (365 / dte) * 100
+            max_contracts = max(1, int(qty / 100))
+            prem_pct      = round(mid / strike * 100, 2)
+
+            score = delta * mid * (ivdata["ivp"] / 50)
+            candidates.append({
+                "strike":            strike,
+                "expiry":            expiry.strftime("%Y-%m-%d"),
+                "dte":               dte,
+                "bid":               round(bid, 2),
+                "ask":               round(ask, 2),
+                "premium":           round(mid, 2),
+                "delta":             round(delta, 2),
+                "annualized_return": round(annualized, 1),
+                "prem_pct":          prem_pct,
+                "max_contracts":     max_contracts,
+                "avg_cost":          avg_cost,
+                "breakeven":         round(breakeven, 2),
+                "status_label":      status_label,
+                "pnl_status":        pnl_status,
+                "score":             score,
+            })
+        except:
+            continue
+
+    if not candidates:
+        return None, {}
+
+    best = max(candidates, key=lambda x: x["score"])
+    return best, {"signal": f"✅ Position Income | {status_label}"}
 
 
 def detect_price_drop(ticker: str, md: dict) -> dict:
@@ -2113,7 +2251,7 @@ def peter_lynch_screen(known_tickers, flow_data) -> list:
 # CLAUDE ANALYSIS
 # ════════════════════════════════════════════════════════════
 
-def claude_analyze(csps, ccs, leaps_list, pmccs, bcss, discoveries, spikes=None, drops=None) -> str:
+def claude_analyze(csps, ccs, leaps_list, pmccs, bcss, discoveries, spikes=None, drops=None, pio=None) -> str:
     if not ANTHROPIC_API_KEY: return ""
     all_opps = csps + ccs + leaps_list + pmccs + bcss
     if not all_opps: return ""
@@ -2141,6 +2279,7 @@ PMCCs: {json.dumps(pmccs,indent=2)}
 Bull Call Spreads: {json.dumps(bcss,indent=2)}
 Post-Drop CSPs (Sell Fear Mode): {json.dumps(drops,indent=2) if drops else 'None'}
 Post-Spike CCs (Sell Strength Mode): {json.dumps(spikes,indent=2) if spikes else 'None'}
+Position Income CCs (Existing Holdings): {json.dumps(pio,indent=2) if pio else 'None'}
 Peter Lynch Discoveries: {json.dumps(discoveries,indent=2) if discoveries else 'None'}
 
 CRITICAL FORMAT RULE: Always use EXACT expiry dates in YYYY-MM-DD format.
@@ -2315,6 +2454,44 @@ def fmt_pmcc(opp) -> str:
         f"  Annualized: {p['annualized_return']}% | Months to recover LEAPS: {p['months_to_recover']}",
         f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
     ])
+
+
+def fmt_pio_cc(opp) -> str:
+    """Format Position Income Optimization CC alert."""
+    s  = opp["sizing"]
+    p  = opp["pio_cc"]
+    dp = opp.get("darkpool", {})
+    pnl_map = {
+        "profit":    "📈 In profit — aggressive income",
+        "loss":      "📉 In loss — conservative recovery income",
+        "breakeven": "➡️ Near break-even — protect position",
+        "unknown":   "❓ Position status unknown"
+    }
+    pnl_label = pnl_map.get(opp["pnl_status"], "")
+    pos_map = {
+        "light":      "🟢 Light position (<4%) — aggressive",
+        "normal":     "🟡 Normal position (4-8%)",
+        "heavy":      "🟠 Heavy position (8-12%) — conservative",
+        "overweight": "🔴 Overweight (>12%) — reduce exposure"
+    }
+    pos_label = pos_map.get(opp["pos_status"], "")
+
+    lines = [
+        f"💼 *POSITION INCOME — {opp['ticker']} @ ${opp['price']}*",
+        f"_{pnl_label}_",
+        f"_{pos_label}_",
+        "",
+        *([f"  {dp['label']}"] if dp.get("show") else []),
+        f"  Hold {int(s['quantity'])} shares @ ${p['avg_cost']} avg cost",
+        f"  Break-even: ${p['breakeven']} | Strike above break-even ✅",
+        f"  Sell Call ${p['strike']} | {p['expiry']} | {p['dte']} DTE",
+        f"  Bid ${p['bid']} / Ask ${p['ask']} | Mid ${p['premium']}",
+        f"  δ{p['delta']} | Premium: {p['prem_pct']}% of strike",
+        f"  Annualized: {p['annualized_return']}% | ${p['premium']/p['dte']:.2f}/day",
+        f"  Max {p['max_contracts']} contracts",
+        f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
+    ]
+    return "\n".join([l for l in lines if l is not None])
 
 
 def fmt_drop_csp(opp) -> str:
@@ -2519,7 +2696,7 @@ def run_scanner():
     # Scanner always runs — IVP filters individual trades
 
     csp_opps = []; cc_opps  = []; leaps_opps = []
-    pmcc_opps= []; bcs_opps = []; spike_opps = []; drop_opps = []
+    pmcc_opps= []; bcs_opps = []; spike_opps = []; drop_opps = []; pio_opps = []
 
     print(f"\n🔍 Scanning {len(all_tickers)} stocks...")
     for ticker in all_tickers:
@@ -2597,6 +2774,22 @@ def run_scanner():
                     "score":csp["timing"]["score"]*quality["quality_score"]*csp["annualized_return"]*dp_boost})
                 print(f"  [{tier}] {ticker}: 💰 CSP ${csp['strike']} {csp['annualized_return']}% ann δ{csp['delta']} IVP{ivdata['ivp']:.0f}%")
 
+        # ── Position Income Optimization (Mode 4) ──────────────
+        # Generate income from existing holdings regardless of market conditions
+        # Ignores 200MA, pullback, gap rules — pure income focus
+        if qty >= 100 and avg > 0:
+            pos_status = get_position_status(sizing["current_pct"])
+            pnl_status = get_pnl_status(avg, price)
+            # Only run if not already flagged for standard CC
+            pio_cc, _ = find_position_income_cc(
+                ticker, price, qty, avg, contracts, ivdata, pos_status, pnl_status)
+            if pio_cc:
+                pio_opps.append({**base, "pio_cc": pio_cc,
+                    "pos_status": pos_status, "pnl_status": pnl_status,
+                    "score": pio_cc["annualized_return"] * pio_cc["delta"]})
+                print(f"  [{tier}] {ticker}: 💼 PIO CC ${pio_cc['strike']} "
+                      f"{pio_cc['annualized_return']}% ann | {pnl_status} | δ{pio_cc['delta']}")
+
         # ── Post-Drop CSP (Mode 3) ───────────────────────────
         drop_info = detect_price_drop(ticker, md)
         if (drop_info["is_drop"]
@@ -2647,13 +2840,17 @@ def run_scanner():
                 print(f"  {ticker}: 📈 CC  ${cc['strike']} {cc['annualized_return']}% ann δ{cc['delta']}")
 
         # ── LEAPS ────────────────────────────────────────
-        if gng["buy_leaps"]:
+        # LEAPS use leaps_hard_stop (more lenient) — 200MA not blocking for Core
+        leaps_blocked = quality.get("leaps_hard_stop", quality["hard_stop"])
+        if gng["buy_leaps"] and not leaps_blocked:
             leaps, leaps_timing = find_best_leaps(ticker, price, contracts, ivdata, pir)
             if leaps is None and ivdata["ivp"] > 0:
                 print(f"  [{tier}] {ticker}: LEAPS rejected — IVP {ivdata['ivp']:.0f}% timing: {leaps_timing.get('signal','')[:50]}")
         else:
             leaps = None
             leaps_timing = {}
+            if leaps_blocked and tier in ("Core","Growth"):
+                print(f"  [{tier}] {ticker}: LEAPS hard stop (earnings/price)")
         if leaps:
             leaps_opps.append({**base,"leaps":leaps,
                 "score":leaps["timing"]["score"]*(1/max(0.01,leaps["extrinsic_pct"]))*leaps["delta"]})
@@ -2685,8 +2882,9 @@ def run_scanner():
     top_bcss  = bcs_opps[:3]
     top_spikes = spike_opps[:3]
     top_drops  = drop_opps[:3]
+    top_pio    = pio_opps[:5]  # show up to 5 position income trades
 
-    total = sum(len(x) for x in [top_csps,top_ccs,top_leaps,top_pmccs,top_bcss,top_spikes,top_drops])
+    total = sum(len(x) for x in [top_csps,top_ccs,top_leaps,top_pmccs,top_bcss,top_spikes,top_drops,top_pio])
     print(f"\n🏆 {len(top_csps)} CSPs | {len(top_ccs)} CCs | {len(top_leaps)} LEAPS | "
           f"{len(top_pmccs)} PMCCs | {len(top_bcss)} Spreads")
 
@@ -2779,7 +2977,7 @@ def run_scanner():
 
     # ── Claude analysis ───────────────────────────────────
     print("\n🧠 Claude analysis...")
-    analysis = claude_analyze(top_csps,top_ccs,top_leaps,top_pmccs,top_bcss,discoveries,top_spikes,top_drops)
+    analysis = claude_analyze(top_csps,top_ccs,top_leaps,top_pmccs,top_bcss,discoveries,top_spikes,top_drops,top_pio)
     if analysis: print(f"\n{analysis}")
 
     # ── Telegram — ORDER: Summary → Trades ───────────────
@@ -2811,6 +3009,9 @@ def run_scanner():
             time.sleep(2)
 
     # 3. Individual trade alerts
+    if top_pio:
+        send_telegram("━━━ *💼 POSITION INCOME OPPORTUNITIES* ━━━"); time.sleep(1)
+        for o in top_pio: send_telegram(fmt_pio_cc(o)); time.sleep(2)
     if top_drops:
         send_telegram("━━━ *🔻 POST-DROP CSP OPPORTUNITIES* ━━━"); time.sleep(1)
         for o in top_drops: send_telegram(fmt_drop_csp(o)); time.sleep(2)
