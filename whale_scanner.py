@@ -144,9 +144,34 @@ SCHWAB_APP_KEY       = os.environ.get("SCHWAB_APP_KEY", "")
 SCHWAB_APP_SECRET    = os.environ.get("SCHWAB_APP_SECRET", "")
 SCHWAB_REFRESH_TOKEN = os.environ.get("SCHWAB_REFRESH_TOKEN", "")
 SCHWAB_ACCESS_TOKEN  = os.environ.get("SCHWAB_ACCESS_TOKEN", "")
+SCHWAB_TOKEN_PATH    = os.environ.get("SCHWAB_TOKEN_PATH", "schwab_token.json")
 SCHWAB_BASE          = "https://api.schwabapi.com"
 SCHWAB_MARKET_BASE   = f"{SCHWAB_BASE}/marketdata/v1"
 SCHWAB_TRADER_BASE   = f"{SCHWAB_BASE}/trader/v1"
+
+# Use schwab-py for token management when token file exists (Windows local mode)
+_schwab_py_client = None
+def get_schwab_py_client():
+    """Get schwab-py client if token file exists — handles refresh automatically."""
+    global _schwab_py_client
+    if _schwab_py_client:
+        return _schwab_py_client
+    if not os.path.exists(SCHWAB_TOKEN_PATH):
+        return None
+    try:
+        import schwab
+        _schwab_py_client = schwab.auth.easy_client(
+            api_key=SCHWAB_APP_KEY,
+            app_secret=SCHWAB_APP_SECRET,
+            callback_url="https://127.0.0.1:8182",
+            token_path=SCHWAB_TOKEN_PATH,
+            interactive=False
+        )
+        print("   ✅ schwab-py client loaded from token file")
+        return _schwab_py_client
+    except Exception as e:
+        print(f"   ⚠️ schwab-py client error: {e}")
+        return None
 
 _schwab_cache = {"access_token": "", "expires_at": 0}
 
@@ -185,6 +210,15 @@ def schwab_get_token() -> str:
 
 
 def schwab_headers() -> dict:
+    """Get auth headers — uses schwab-py client if available, else manual refresh."""
+    py_client = get_schwab_py_client()
+    if py_client:
+        # schwab-py manages token internally — extract the token
+        try:
+            token = py_client.session.token["access_token"]
+            return {"Authorization": f"Bearer {token}"}
+        except:
+            pass
     token = schwab_get_token()
     return {"Authorization": f"Bearer {token}"} if token else {}
 
@@ -1319,21 +1353,42 @@ def timing_score(strategy, pir, ivp, is_spec=False, ivp_override=None) -> dict:
                     "signal":f"⚠️ WEAK — IVP {ivp:.0f}% too low for CC"}
 
     elif strategy == "LEAPS":
+        # LEAPS logic: want LOW IVP (cheap options) + good price entry
+        # IVP < 30  = cheap options = ideal to buy
+        # IVP 30-50 = moderate = acceptable
+        # IVP > 50  = expensive = avoid
+        # Price location: near 52w low = best entry, mid-range = ok, near high = avoid
+        very_cheap = ivp < 30
+        cheap      = ivp <= 50   # same as low_ivp
+        expensive  = ivp > 50
+
         if is_spec and near_high:
             return {"score":5,"recommend":False,
                     "signal":"❌ AVOID — Speculative + near highs, wait for bigger drawdown"}
-        elif low_ivp and near_low:
-            return {"score":95,"recommend":True,
-                    "signal":f"🔥 EXCEPTIONAL — IVP {ivp:.0f}% (cheap) + near 52w low"}
-        elif low_ivp and not near_high:
-            return {"score":78,"recommend":True,
-                    "signal":f"✅ GOOD — Low IVP {ivp:.0f}% = reasonably priced LEAPS"}
-        elif not low_ivp and near_low:
-            return {"score":52,"recommend":True,
-                    "signal":f"⚠️ MIXED — Good price but IVP {ivp:.0f}% makes options pricey"}
+        elif expensive and near_high:
+            return {"score":5,"recommend":False,
+                    "signal":f"❌ POOR — IVP {ivp:.0f}% expensive + near highs"}
+        elif expensive and not near_low:
+            return {"score":20,"recommend":False,
+                    "signal":f"❌ SKIP — IVP {ivp:.0f}% too expensive to buy LEAPS (want <50%)"}
+        elif very_cheap and near_low:
+            return {"score":98,"recommend":True,
+                    "signal":f"🔥 EXCEPTIONAL — IVP {ivp:.0f}% (very cheap) + near 52w low"}
+        elif very_cheap and not near_high:
+            return {"score":85,"recommend":True,
+                    "signal":f"🔥 EXCELLENT — IVP {ivp:.0f}% very cheap LEAPS"}
+        elif cheap and near_low:
+            return {"score":82,"recommend":True,
+                    "signal":f"✅ GOOD — IVP {ivp:.0f}% + near 52w low = solid LEAPS entry"}
+        elif cheap and not near_high:
+            return {"score":68,"recommend":True,
+                    "signal":f"✅ ACCEPTABLE — IVP {ivp:.0f}%, reasonable LEAPS entry"}
+        elif expensive and near_low:
+            return {"score":45,"recommend":True,
+                    "signal":f"⚠️ MIXED — Near 52w low but IVP {ivp:.0f}% makes options pricey"}
         else:
-            return {"score":15,"recommend":False,
-                    "signal":f"❌ POOR — IVP {ivp:.0f}% too high to buy LEAPS"}
+            return {"score":25,"recommend":False,
+                    "signal":f"⚠️ WEAK — IVP {ivp:.0f}% elevated + not near lows"}
 
     elif strategy == "PMCC":
         # PMCC short call — same as CC but we own LEAPS not stock
