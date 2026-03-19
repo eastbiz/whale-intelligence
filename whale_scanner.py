@@ -1570,6 +1570,8 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality) -> tuple:
             continue
 
     if not candidates:
+        if price > 10:  # only log for real stocks
+            pass  # uncomment to debug: print(f"   CSP {ticker}: no candidates — type={_rej_type} dte={_rej_dte} otm={_rej_otm} prem={_rej_prem} delta={_rej_delta} liq={_rej_liq} ann={_rej_ann} timing={_rej_timing} total_P={sum(1 for c in contracts if c.get('option_type')=='P')}")
         return None, {}
 
     best = max(candidates, key=lambda x: x["score"])
@@ -2898,6 +2900,100 @@ def run_scanner():
             "risk_note":         None,
         }
 
+    def find_best_csp_relaxed(ticker, price, contracts):
+        """Relaxed CSP finder for dashboard — wider filters, no IVP minimum."""
+        if not contracts or price <= 0: return None
+        best = None; best_score = 0
+        for c in contracts:
+            try:
+                if c.get("option_type") != "P": continue
+                expiry = datetime.strptime(c["expiry"], "%Y-%m-%d")
+                dte = (expiry - datetime.now()).days
+                if not (20 <= dte <= 60): continue  # wider DTE range
+                strike = float(c["strike"])
+                if strike <= 0 or strike >= price: continue
+                bid = float(c.get("nbbo_bid", 0) or 0)
+                ask = float(c.get("nbbo_ask", 0) or 0)
+                mid = (bid + ask) / 2
+                if mid < 0.05: continue
+                # Wider delta range for dashboard
+                delta = float(c.get("delta", 0) or 0)
+                if abs(delta) == 0:
+                    delta = estimate_delta(price, strike, dte, 0.30, "P")
+                if delta is None: continue
+                delta = abs(delta)
+                if not (0.10 <= delta <= 0.40): continue  # wider: 0.10-0.40
+                # Liquidity — relaxed
+                oi = int(c.get("open_interest", 0) or 0)
+                if oi < 100: continue  # much lower than 1000
+                annualized = (mid / strike) * (365 / dte) * 100
+                if annualized < 5 or annualized > 200: continue
+                otm_pct = round((price - strike) / price * 100, 1)
+                iv = round(float(c.get("iv", 0) or 0) * 100, 1)
+                score = annualized * delta
+                if score > best_score:
+                    best_score = score
+                    best = {
+                        "strike": strike, "expiry": expiry.strftime("%Y-%m-%d"),
+                        "dte": dte, "bid": round(bid,2), "ask": round(ask,2),
+                        "premium": round(mid,2), "delta": round(delta,2),
+                        "iv": iv, "otm_pct": otm_pct,
+                        "annualized_return": round(annualized,1),
+                        "below_min": annualized < CSP_MIN_ANNUALIZED,
+                        "timing": {"signal": f"IVP context only — review before trading"},
+                        "collateral": round(strike * 100, 0),
+                        "max_contracts": max(1, int(PORTFOLIO_SIZE * 0.03 / (strike * 100))),
+                    }
+            except: continue
+        return best
+
+    def find_best_cc_relaxed(ticker, price, qty, avg_cost, contracts):
+        """Relaxed CC finder for dashboard."""
+        if not contracts or price <= 0 or qty < 100: return None
+        best = None; best_score = 0
+        max_contracts = max(1, int(qty / 100))
+        for c in contracts:
+            try:
+                if c.get("option_type") != "C": continue
+                expiry = datetime.strptime(c["expiry"], "%Y-%m-%d")
+                dte = (expiry - datetime.now()).days
+                if not (20 <= dte <= 60): continue
+                strike = float(c["strike"])
+                if strike <= price * 0.98: continue  # must be near or above current price
+                if avg_cost > 0 and strike < avg_cost: continue  # above cost basis
+                bid = float(c.get("nbbo_bid", 0) or 0)
+                ask = float(c.get("nbbo_ask", 0) or 0)
+                mid = (bid + ask) / 2
+                if mid < 0.05: continue
+                delta = float(c.get("delta", 0) or 0)
+                if abs(delta) == 0:
+                    delta = estimate_delta(price, strike, dte, 0.30, "C")
+                if delta is None: continue
+                delta = abs(delta)
+                if not (0.10 <= delta <= 0.50): continue
+                oi = int(c.get("open_interest", 0) or 0)
+                if oi < 100: continue
+                annualized = (mid / strike) * (365 / dte) * 100
+                if annualized < 3 or annualized > 200: continue
+                score = annualized * delta
+                if score > best_score:
+                    best_score = score
+                    best = {
+                        "strike": strike, "expiry": expiry.strftime("%Y-%m-%d"),
+                        "dte": dte, "bid": round(bid,2), "ask": round(ask,2),
+                        "premium": round(mid,2), "delta": round(delta,2),
+                        "annualized_return": round(annualized,1),
+                        "below_min": annualized < CC_MIN_ANNUALIZED,
+                        "avg_cost": round(avg_cost,2),
+                        "max_contracts": max_contracts,
+                        "timing": {"signal": ""},
+                        "otm_pct": round((strike-price)/price*100,1),
+                        "iv": 0,
+                        "ivp": 0,
+                    }
+            except: continue
+        return best
+
     # ── Dashboard-only scan — collect ALL candidates for review ──
     # Relaxed quality gate — shows everything sorted best to worst
     # Telegram stays strict, dashboard shows full picture
@@ -2934,11 +3030,9 @@ def run_scanner():
         contracts_d = contracts_cache.get(ticker, [])
         if not contracts_d: continue
 
-        # CSP — fully relaxed for dashboard: override timing to always recommend
-        # Create permissive ivdata with minimum IVP=30 so timing doesn't block
-        ivdata_permissive = dict(ivdata_d)
-        ivdata_permissive["ivp"] = max(ivdata_d["ivp"], 30)  # floor at 30 so timing passes
-        csp_d, _ = find_best_csp(ticker, price, contracts_d, ivdata_permissive, pir, quality)
+        # CSP — fully relaxed for dashboard
+        # Use wider delta range, no IVP minimum, no timing filter
+        csp_d = find_best_csp_relaxed(ticker, price, contracts_d, ivdata_d)
         if csp_d:
             warnings = []
             if quality["near_high"]:      warnings.append("Near 52w high")
@@ -2966,10 +3060,11 @@ def run_scanner():
         qty_d = float(ibkr_pos_d.get("quantity", ibkr_pos_d.get("qty", qty_cache.get(ticker, 0))) or 0)
         avg_d = float(ibkr_pos_d.get("avg_cost", avg_cache.get(ticker, 0)) or 0)
         if qty_d >= 100:
-            cc_d, _ = find_best_cc(ticker, price, qty_d, avg_d, contracts_d, ivdata_d, pir)
+            cc_d = find_best_cc_relaxed(ticker, price, qty_d, avg_d, contracts_d)
+            cc_d = cc_d  # already a dict or None
             if cc_d:
                 warnings = []
-                if quality["earnings_status"] == "warning": warnings.append(f"Earnings ~{quality['days_to_earnings']}d")
+                if quality.get("earnings_status") == "warning": warnings.append(f"Earnings ~{quality.get('days_to_earnings',0)}d")
                 dashboard_ccs.append({
                     "ticker": ticker, "tier": tier, "price": price,
                     "ivp": round(ivdata_d["ivp"], 1),
@@ -3010,9 +3105,13 @@ def run_scanner():
                     "risk_note": None,
                 })
 
-        # LEAPS — relaxed: use leaps_hard_stop only
+        # LEAPS — relaxed: use leaps_hard_stop only, allow higher extrinsic
         if not quality["leaps_hard_stop"] and ticker not in LEAPS_ONLY:
+            # Temporarily relax extrinsic max for dashboard display
+            _orig_max = LEAPS_EXTRINSIC_MAX
+            globals()["LEAPS_EXTRINSIC_MAX"] = 30.0  # show up to 30% for review
             leaps_d, lt = find_best_leaps(ticker, price, contracts_d, ivdata_d, pir)
+            globals()["LEAPS_EXTRINSIC_MAX"] = _orig_max  # restore
             if leaps_d:
                 warnings = []
                 if not quality["checks"].get("above_ma200", True): warnings.append("Below 200MA")
