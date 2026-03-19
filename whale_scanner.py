@@ -741,12 +741,14 @@ def calculate_ivp(contracts: list) -> dict:
     today = datetime.now()
     ivs   = []
     for c in contracts:
-        parsed = parse_option_symbol(c.get("option_symbol",""))
-        if not parsed: continue
-        expiry, _, _ = parsed
-        dte = (expiry - today).days
-        if not (25 <= dte <= 50): continue
-        iv = float(c.get("implied_volatility",0) or 0)
+        try:
+            expiry = datetime.strptime(c["expiry"], "%Y-%m-%d")
+            dte = (expiry - today).days
+            if not (25 <= dte <= 50): continue
+            # Schwab uses "iv" field (already divided by 100 in chain parser)
+            iv = float(c.get("iv", 0) or c.get("implied_volatility", 0) or 0)
+            if iv > 1.0: iv = iv / 100  # normalize if percentage
+        except Exception: continue
         if 0.05 < iv < 5.0:
             ivs.append(iv)
     if not ivs:
@@ -1491,6 +1493,8 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality) -> tuple:
         if c.get("option_type") != "P":
             continue
         try:
+            opt_type = c.get("option_type", "P")
+            if opt_type != "P": continue
             expiry = datetime.strptime(c["expiry"], "%Y-%m-%d")
             dte    = (expiry - datetime.now()).days
             if not (CSP_MIN_DTE <= dte <= CSP_MAX_DTE):
@@ -1579,12 +1583,15 @@ def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir):
     best          = None; best_score = 0
 
     for c in contracts:
-        parsed = parse_option_symbol(c.get("option_symbol",""))
-        if not parsed: continue
-        expiry, opt_type, strike = parsed
-        if opt_type != "C": continue
-        dte = (expiry - today).days
-        if not (CC_DTE_MIN <= dte <= CC_DTE_MAX): continue
+        try:
+            opt_type = c.get("option_type", "")
+            if opt_type != "C": continue
+            strike = float(c.get("strike", 0) or 0)
+            if strike <= 0: continue
+            expiry = datetime.strptime(c["expiry"], "%Y-%m-%d")
+            dte = (expiry - today).days
+            if not (CC_DTE_MIN <= dte <= CC_DTE_MAX): continue
+        except Exception: continue
         otm_pct = (strike - price) / price * 100
         if not (1 <= otm_pct <= 15): continue
         if avg_cost > 0 and strike < avg_cost * 1.01: continue  # protect cost basis
@@ -1628,12 +1635,15 @@ def find_best_leaps(ticker, price, contracts, ivdata, pir):
     candidates = []
 
     for c in contracts:
-        parsed = parse_option_symbol(c.get("option_symbol",""))
-        if not parsed: continue
-        expiry, opt_type, strike = parsed
-        if opt_type != "C": continue
-        dte = (expiry - today).days
-        if dte < LEAPS_DTE_MIN: continue
+        try:
+            opt_type = c.get("option_type", "")
+            if opt_type != "C": continue
+            strike = float(c.get("strike", 0) or 0)
+            if strike <= 0: continue
+            expiry = datetime.strptime(c["expiry"], "%Y-%m-%d")
+            dte = (expiry - today).days
+            if dte < LEAPS_DTE_MIN: continue
+        except Exception: continue
         itm_pct = (price - strike) / price * 100  # positive = ITM
         if not (-5 <= itm_pct <= 35): continue
         bid = float(c.get("nbbo_bid",0) or 0)
@@ -1699,12 +1709,15 @@ def find_pmcc_short_call(ticker, price, existing_leaps, contracts, ivdata, pir):
     best        = None; best_score = 0
 
     for c in contracts:
-        parsed = parse_option_symbol(c.get("option_symbol",""))
-        if not parsed: continue
-        expiry, opt_type, strike = parsed
-        if opt_type != "C": continue
-        dte = (expiry - today).days
-        if not (CC_DTE_MIN <= dte <= CC_DTE_MAX): continue
+        try:
+            opt_type = c.get("option_type", "")
+            if opt_type != "C": continue
+            strike = float(c.get("strike", 0) or 0)
+            if strike <= 0: continue
+            expiry = datetime.strptime(c["expiry"], "%Y-%m-%d")
+            dte = (expiry - today).days
+            if not (CC_DTE_MIN <= dte <= CC_DTE_MAX): continue
+        except Exception: continue
         # Short call must be below LEAPS strike (spread protection)
         if strike >= leaps_strike: continue
         otm_pct = (strike - price) / price * 100
@@ -1754,11 +1767,14 @@ def find_bull_call_spread(ticker, price, contracts, ivdata, pir, quality):
     # Get calls in 30-60 DTE range
     calls = []
     for c in contracts:
-        parsed = parse_option_symbol(c.get("option_symbol",""))
-        if not parsed: continue
-        expiry, opt_type, strike = parsed
-        if opt_type != "C": continue
-        dte = (expiry - today).days
+        try:
+            opt_type = c.get("option_type", "")
+            if opt_type != "C": continue
+            strike = float(c.get("strike", 0) or 0)
+            if strike <= 0: continue
+            expiry = datetime.strptime(c["expiry"], "%Y-%m-%d")
+            dte = (expiry - today).days
+        except Exception: continue
         if not (30 <= dte <= 60): continue
         bid = float(c.get("nbbo_bid",0) or 0)
         ask = float(c.get("nbbo_ask",0) or 0)
@@ -2757,6 +2773,114 @@ def run_scanner():
     if top_bcss:
         send_telegram("━━━ *BULL CALL SPREADS* ━━━"); time.sleep(1)
         for o in top_bcss: send_telegram(fmt_bcs(o)); time.sleep(2)
+
+    # ── Save results.json for dashboard ─────────────────────
+    def opp_to_dict(o, strategy_key):
+        """Convert opportunity to clean dict for JSON."""
+        s = o.get(strategy_key, {})
+        return {
+            "ticker":            o.get("ticker",""),
+            "tier":              o.get("tier",""),
+            "price":             o.get("price",0),
+            "ivp":               round(o.get("ivp",0),1),
+            "mode":              strategy_key.upper(),
+            "strike":            s.get("strike",0),
+            "expiry":            s.get("expiry",""),
+            "dte":               s.get("dte",0),
+            "premium":           s.get("premium",0),
+            "annualized_return": s.get("annualized_return",0),
+            "delta":             s.get("delta",0),
+            "signal":            s.get("timing",{}).get("signal","") or "",
+            "below_min":         s.get("below_min", False),
+            "risk_note":         None,
+        }
+
+    all_opps = []
+    for o in top_csps:   all_opps.append(opp_to_dict(o, "csp"))
+    for o in top_ccs:    all_opps.append(opp_to_dict(o, "cc"))
+    for o in top_leaps:  all_opps.append(opp_to_dict(o, "leaps"))
+    for o in top_pmccs:  all_opps.append(opp_to_dict(o, "pmcc"))
+    for o in top_bcss:   all_opps.append(opp_to_dict(o, "bcs"))
+    for o in top_spikes:
+        s = o.get("spike_cc", {})
+        all_opps.append({
+            "ticker": o.get("ticker",""), "tier": o.get("tier",""),
+            "price": o.get("price",0), "ivp": round(o.get("ivp",0),1),
+            "mode": "SPIKE_CC", "strike": s.get("strike",0),
+            "expiry": s.get("expiry",""), "dte": s.get("dte",0),
+            "premium": s.get("premium",0),
+            "annualized_return": s.get("annualized_return",0),
+            "delta": s.get("delta",0), "signal": "", "below_min": False, "risk_note": None,
+        })
+    for o in top_drops:
+        s = o.get("drop_csp", {})
+        all_opps.append({
+            "ticker": o.get("ticker",""), "tier": o.get("tier",""),
+            "price": o.get("price",0), "ivp": round(o.get("ivp",0),1),
+            "mode": "DROP_CSP", "strike": s.get("strike",0),
+            "expiry": s.get("expiry",""), "dte": s.get("dte",0),
+            "premium": s.get("premium",0),
+            "annualized_return": s.get("annualized_return",0),
+            "delta": s.get("delta",0),
+            "signal": s.get("timing",{}).get("signal","") or "",
+            "below_min": s.get("below_min", False), "risk_note": "60% normal size",
+        })
+    for o in top_pio:
+        s = o.get("pio_cc", {})
+        all_opps.append({
+            "ticker": o.get("ticker",""), "tier": o.get("tier",""),
+            "price": o.get("price",0), "ivp": round(o.get("ivp",0),1),
+            "mode": "PIO", "strike": s.get("strike",0),
+            "expiry": s.get("expiry",""), "dte": s.get("dte",0),
+            "premium": s.get("premium",0),
+            "annualized_return": s.get("annualized_return",0),
+            "delta": s.get("delta",0), "signal": o.get("pnl_status",""),
+            "below_min": False, "risk_note": None,
+        })
+
+    # Build positions list
+    pos_list = []
+    for ticker, pos in ibkr.items():
+        if pos.get("asset_class") == "STK" and pos.get("market_value",0) > 0:
+            price_now = mkt.get(ticker,{}).get("price", pos.get("avg_cost",0))
+            avg = pos.get("avg_cost",0)
+            pnl = round((price_now - avg) / avg * 100, 1) if avg > 0 else 0
+            tier = ("Core" if ticker in CORE_STOCKS else
+                    "Growth" if ticker in GROWTH_STOCKS else
+                    "Cyclical" if ticker in CYCLICAL_STOCKS else "Opportunistic")
+            pos_list.append({
+                "ticker":        ticker,
+                "shares":        int(pos.get("qty",0)),
+                "avg_cost":      round(avg,2),
+                "current_price": round(price_now,2),
+                "pnl_pct":       pnl,
+                "pnl_status":    "profit" if pnl>5 else "loss" if pnl<-5 else "breakeven",
+                "tier":          tier,
+                "account":       pos.get("account","Schwab"),
+                "global_pct":    round(pos.get("market_value",0)/PORTFOLIO_SIZE*100,1),
+            })
+
+    results = {
+        "scan_time":      now_et().strftime("%Y-%m-%d %H:%M ET"),
+        "scan_date":      now_et().strftime("%Y-%m-%d"),
+        "portfolio_size": PORTFOLIO_SIZE,
+        "market": {
+            "vix":        gng["vix"],
+            "vix_label":  vix_data.get("label",""),
+            "spy":        round(spy_regime.get("spy",0),2),
+            "spy_ma200":  round(spy_regime.get("ma200",0),2),
+            "spy_above":  spy_regime.get("above_ma200",True),
+            "verdict":    gng.get("quality",""),
+        },
+        "opportunities":  all_opps,
+        "positions":      pos_list,
+        "analysis":       analysis,
+        "total_opps":     len(all_opps),
+    }
+
+    with open("results.json","w") as f:
+        json.dump(results, f, indent=2)
+    print("   💾 results.json saved")
 
     print("\n✅ Done!")
 
