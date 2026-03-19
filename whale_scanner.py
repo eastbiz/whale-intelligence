@@ -2550,9 +2550,10 @@ def run_scanner():
 
         # Use Schwab option chain — fetch short (75d) for CSP/CC and long (750d) for LEAPS
         if SCHWAB_APP_KEY:
+            from datetime import timedelta as _td
             from_d       = datetime.now().strftime("%Y-%m-%d")
-            to_d_short   = (datetime.now() + timedelta(days=75)).strftime("%Y-%m-%d")
-            to_d_leaps   = (datetime.now() + timedelta(days=750)).strftime("%Y-%m-%d")
+            to_d_short   = (datetime.now() + _td(days=75)).strftime("%Y-%m-%d")
+            to_d_leaps   = (datetime.now() + _td(days=750)).strftime("%Y-%m-%d")
             contracts_short = schwab_get_option_chain(ticker, from_d, to_d_short)
             contracts_leaps = schwab_get_option_chain(ticker, from_d, to_d_leaps)
             # Merge: use short for CSP/CC (more contracts, faster), add leaps-range
