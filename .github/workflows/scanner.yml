@@ -18,12 +18,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.4.0
         with:
           python-version: '3.11'
 
@@ -47,6 +47,11 @@ jobs:
         run: |
           git config user.name "whale-scanner"
           git config user.email "scanner@whale-intelligence"
-          git add results.json
-          git diff --staged --quiet || git commit -m "scan results $(date -u '+%Y-%m-%d %H:%M UTC')"
-          git push
+          if [ -f results.json ]; then
+            git add results.json
+            git diff --staged --quiet || git commit -m "scan results $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git push
+            echo "results.json committed OK"
+          else
+            echo "WARNING: results.json not found — check scanner logs above"
+          fi
