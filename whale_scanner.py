@@ -1501,13 +1501,14 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality) -> tuple:
                 continue
 
             strike = float(c["strike"])
-            if strike >= price: continue  # must be OTM
+            if strike <= 0 or strike >= price: continue  # must be OTM
 
             bid    = float(c.get("nbbo_bid", 0) or 0)
             ask    = float(c.get("nbbo_ask", 0) or 0)
             mid    = (bid + ask) / 2
             if mid < 0.10: continue
 
+            # Use real delta from Schwab if available
             delta  = float(c.get("delta", 0) or 0)
             if abs(delta) == 0:
                 delta = estimate_delta(price, strike, dte, atm_iv, "P")
@@ -1532,6 +1533,7 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality) -> tuple:
             annualized    = (mid / strike) * (365 / dte) * 100
             below_min     = annualized < CSP_MIN_ANNUALIZED
             if annualized > MAX_ANNUALIZED: continue  # filter bad data
+            if annualized < 5: continue  # reject truly garbage premiums
 
             otm_pct       = round((price - strike) / price * 100, 1)
             max_contracts = max(1, int(PORTFOLIO_SIZE * get_max_alloc(ticker) / (strike * 100)))
@@ -1540,7 +1542,7 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality) -> tuple:
 
             iv   = round(float(c.get("iv", 0) or atm_iv) * 100, 1)
             timing = timing_score("CSP", pir, ivdata["ivp"])
-            if not timing["recommend"] and not below_min: continue
+            # Always include — let dashboard decide what to show
 
             score = timing["score"] * delta * annualized
             candidates.append({
@@ -2862,6 +2864,7 @@ def run_scanner():
     dashboard_csps  = []
     dashboard_ccs   = []
     dashboard_leaps = []
+    dashboard_bcss  = []
 
     for ticker in all_tickers:
         if ticker in CORE_STOCKS:        tier = "Core"
@@ -2881,6 +2884,8 @@ def run_scanner():
         ivdata_d = calculate_ivp(contracts_cache.get(ticker, []))
         if schwab_ivp_cache.get(ticker, 0) > 0:
             ivdata_d["ivp"] = schwab_ivp_cache[ticker]
+        if "iv_current" not in ivdata_d:
+            ivdata_d["iv_current"] = ivdata_d.get("atm_iv", 0.30)
 
         # Hard earnings stop still applies — never trade near earnings
         if quality["earnings_status"] == "hard_stop": continue
@@ -2958,19 +2963,64 @@ def run_scanner():
                     "risk_note": ", ".join(warnings) if warnings else None,
                 })
 
+        # BCS — relaxed
+        bcs_d, _ = find_bull_call_spread(ticker, price, contracts_d, ivdata_d, pir, quality)
+        if bcs_d:
+            b = bcs_d
+            dashboard_bcss.append({
+                "ticker": ticker, "tier": tier, "price": price,
+                "ivp": round(ivdata_d["ivp"], 1),
+                "mode": "BCS",
+                "strike": b["long_strike"],
+                "long_strike": b["long_strike"],
+                "short_strike": b["short_strike"],
+                "expiry": b["expiry"],
+                "dte": b["dte"],
+                "premium": b["debit"],
+                "annualized_return": b["ror"],
+                "delta": b.get("short_delta", 0),
+                "below_min": b["ror"] < BCS_MIN_ROR * 100,
+                "warnings": [],
+                "passes_quality": not quality["hard_stop"],
+                "signal": b["timing"].get("signal", ""),
+                "risk_note": f"Max profit: ${b['max_profit']} | Breakeven: ${b['breakeven']}",
+            })
+
     # Sort each category by annualized return (or score for LEAPS)
     dashboard_csps.sort(key=lambda x: x["annualized_return"], reverse=True)
     dashboard_ccs.sort(key=lambda x: x["annualized_return"], reverse=True)
     dashboard_leaps.sort(key=lambda x: x["ivp"], reverse=False)  # lowest IVP first = cheapest
+    dashboard_bcss.sort(key=lambda x: x["annualized_return"], reverse=True)
 
-    print(f"   📊 Dashboard: {len(dashboard_csps)} CSPs | {len(dashboard_ccs)} CCs | {len(dashboard_leaps)} LEAPS")
+    print(f"   📊 Dashboard: {len(dashboard_csps)} CSPs | {len(dashboard_ccs)} CCs | {len(dashboard_leaps)} LEAPS | {len(dashboard_bcss)} BCS")
 
     all_opps = []
     for o in top_csps:   all_opps.append(opp_to_dict(o, "csp"))
     for o in top_ccs:    all_opps.append(opp_to_dict(o, "cc"))
     for o in top_leaps:  all_opps.append(opp_to_dict(o, "leaps"))
     for o in top_pmccs:  all_opps.append(opp_to_dict(o, "pmcc"))
-    for o in top_bcss:   all_opps.append(opp_to_dict(o, "bcs"))
+    for o in top_bcss:
+        b = o.get("bcs", {})
+        all_opps.append({
+            "ticker":            o.get("ticker",""),
+            "tier":              o.get("tier",""),
+            "price":             o.get("price",0),
+            "ivp":               round(o.get("ivp",0),1),
+            "mode":              "BCS",
+            "strike":            b.get("long_strike",0),
+            "long_strike":       b.get("long_strike",0),
+            "short_strike":      b.get("short_strike",0),
+            "expiry":            b.get("expiry",""),
+            "dte":               b.get("dte",0),
+            "premium":           b.get("debit",0),
+            "annualized_return": b.get("ror",0),
+            "delta":             b.get("short_delta",0),
+            "signal":            b.get("timing",{}).get("signal","") or "",
+            "below_min":         b.get("ror",0) < BCS_MIN_ROR * 100,
+            "risk_note":         f"Max profit: ${b.get('max_profit',0)} | Breakeven: ${b.get('breakeven',0)}",
+            "passes_quality":    True,
+            "warnings":          [],
+        })
     for o in top_spikes:
         s = o.get("spike_cc", {})
         all_opps.append({
@@ -3034,7 +3084,7 @@ def run_scanner():
         "scan_time":      now_et().strftime("%Y-%m-%d %H:%M ET"),
         "scan_date":      now_et().strftime("%Y-%m-%d"),
         "portfolio_size": PORTFOLIO_SIZE,
-        "dashboard_opportunities": dashboard_csps + dashboard_ccs + dashboard_leaps,
+        "dashboard_opportunities": dashboard_csps + dashboard_ccs + dashboard_leaps + dashboard_bcss,
         "market": {
             "vix":        gng["vix"],
             "vix_label":  vix_data.get("label",""),
