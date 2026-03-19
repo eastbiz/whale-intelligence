@@ -1359,6 +1359,215 @@ def find_spike_cc(ticker, price, qty, avg_cost, contracts, ivdata, spike_info) -
     return best, {"signal": f"✅ Spike CC | {spike_info['today_change']:+.1f}% move | IVP {ivdata['ivp']:.0f}%"}
 
 
+def timing_score(strategy, pir, ivp, is_spec=False, ivp_override=None) -> dict:
+    """
+    Score timing quality for a trade setup.
+    Returns dict with: score (0-100), recommend (bool), signal (str)
+    strategy: CSP, CC, LEAPS, PMCC, BCS
+    pir: position in 52w range (0=at low, 1=at high)
+    ivp: IV percentile (0-100)
+    """
+    effective_ivp_min = ivp_override if ivp_override else IVP_MIN_SELL
+    if strategy in ("CSP","CC") and ivp < effective_ivp_min:
+        return {"score":10,"recommend":False,
+                "signal":f"❌ SKIP — IVP {ivp:.0f}% below minimum ({effective_ivp_min})"}
+
+    high_ivp  = ivp >= IVP_MIN_SELL
+    near_low  = pir < 0.30
+    near_high = pir > 0.70
+    spec = " (use wider strikes — speculative)" if is_spec else ""
+
+    if strategy == "CSP":
+        if high_ivp and near_low:
+            return {"score":95,"recommend":True,
+                    "signal":f"🔥 EXCELLENT — IVP {ivp:.0f}% + near 52w low{spec}"}
+        elif high_ivp and not near_high:
+            return {"score":80,"recommend":True,
+                    "signal":f"✅ GOOD — IVP {ivp:.0f}%, healthy price level{spec}"}
+        elif high_ivp and near_high:
+            return {"score":55,"recommend":True,
+                    "signal":f"⚠️ CAUTION — IVP {ivp:.0f}% but near 52w high{spec}"}
+        else:
+            return {"score":20,"recommend":False,
+                    "signal":f"❌ SKIP — IVP {ivp:.0f}% too low for premium selling"}
+
+    elif strategy == "CC":
+        if near_low:
+            return {"score":5,"recommend":False,
+                    "signal":"❌ AVOID — Never sell CC near 52w low (limits upside in recovery)"}
+        elif near_high and high_ivp:
+            return {"score":90,"recommend":True,
+                    "signal":f"🔥 EXCELLENT — Near highs + IVP {ivp:.0f}%"}
+        elif near_high:
+            return {"score":75,"recommend":True,
+                    "signal":f"✅ GOOD — Stock near highs, income opportunity"}
+        elif high_ivp:
+            return {"score":65,"recommend":True,
+                    "signal":f"✅ OK — IVP {ivp:.0f}% boosts CC premium"}
+        else:
+            return {"score":30,"recommend":False,
+                    "signal":f"⚠️ WEAK — IVP {ivp:.0f}% too low for CC"}
+
+    elif strategy == "LEAPS":
+        very_cheap = ivp < 30
+        cheap      = ivp <= 50
+        expensive  = ivp > 50
+
+        if is_spec and near_high:
+            return {"score":5,"recommend":False,
+                    "signal":"❌ AVOID — Speculative + near highs, wait for bigger drawdown"}
+        elif expensive and near_high:
+            return {"score":5,"recommend":False,
+                    "signal":f"❌ POOR — IVP {ivp:.0f}% expensive + near highs"}
+        elif expensive and not near_low:
+            return {"score":20,"recommend":False,
+                    "signal":f"❌ SKIP — IVP {ivp:.0f}% too expensive to buy LEAPS (want <50%)"}
+        elif very_cheap and near_low:
+            return {"score":98,"recommend":True,
+                    "signal":f"🔥 EXCEPTIONAL — IVP {ivp:.0f}% (very cheap) + near 52w low"}
+        elif very_cheap and not near_high:
+            return {"score":85,"recommend":True,
+                    "signal":f"🔥 EXCELLENT — IVP {ivp:.0f}% very cheap LEAPS"}
+        elif cheap and near_low:
+            return {"score":82,"recommend":True,
+                    "signal":f"✅ GOOD — IVP {ivp:.0f}% + near 52w low = solid LEAPS entry"}
+        elif cheap and not near_high:
+            return {"score":68,"recommend":True,
+                    "signal":f"✅ ACCEPTABLE — IVP {ivp:.0f}%, reasonable LEAPS entry"}
+        elif expensive and near_low:
+            return {"score":45,"recommend":True,
+                    "signal":f"⚠️ MIXED — Near 52w low but IVP {ivp:.0f}% makes options pricey"}
+        else:
+            return {"score":25,"recommend":False,
+                    "signal":f"⚠️ WEAK — IVP {ivp:.0f}% elevated + not near lows"}
+
+    elif strategy == "PMCC":
+        if near_low:
+            return {"score":5,"recommend":False,
+                    "signal":"❌ AVOID — Don't sell calls near 52w lows"}
+        elif high_ivp:
+            return {"score":82,"recommend":True,
+                    "signal":f"✅ GOOD — IVP {ivp:.0f}% gives fat PMCC premium"}
+        else:
+            return {"score":40,"recommend":False,
+                    "signal":f"⚠️ WEAK — Low IVP {ivp:.0f}% for PMCC short call"}
+
+    elif strategy == "BCS":
+        if near_low and not high_ivp:
+            return {"score":88,"recommend":True,
+                    "signal":f"✅ GOOD — Near lows + IVP {ivp:.0f}%, directional setup"}
+        elif near_low and high_ivp:
+            return {"score":70,"recommend":True,
+                    "signal":f"✅ OK — Near lows but IVP {ivp:.0f}% makes spread wider"}
+        elif near_high:
+            return {"score":20,"recommend":False,
+                    "signal":"❌ AVOID — Don't buy bull spreads near 52w highs"}
+        else:
+            return {"score":55,"recommend":True,
+                    "signal":f"✅ NEUTRAL — Mid-range entry, moderate setup"}
+
+    return {"score":50,"recommend":True,"signal":"—"}
+
+
+def get_max_alloc(ticker: str) -> float:
+    """Return max allocation as decimal for a ticker based on tier."""
+    if ticker in CORE_STOCKS:        return 0.08
+    elif ticker in GROWTH_STOCKS:    return 0.05
+    elif ticker in CYCLICAL_STOCKS:  return 0.04
+    else:                            return 0.025
+
+
+def find_best_csp(ticker, price, contracts, ivdata, pir, quality) -> tuple:
+    """
+    Find best cash-secured put opportunity.
+    Returns (csp_dict, timing_dict) or (None, {})
+    """
+    if not contracts: return None, {}
+
+    atm_iv     = ivdata.get("atm_iv", 0.3)
+    candidates = []
+
+    for c in contracts:
+        if c.get("option_type") != "P":
+            continue
+        try:
+            expiry = datetime.strptime(c["expiry"], "%Y-%m-%d")
+            dte    = (expiry - datetime.now()).days
+            if not (CSP_MIN_DTE <= dte <= CSP_MAX_DTE):
+                continue
+
+            strike = float(c["strike"])
+            if strike >= price: continue  # must be OTM
+
+            bid    = float(c.get("nbbo_bid", 0) or 0)
+            ask    = float(c.get("nbbo_ask", 0) or 0)
+            mid    = (bid + ask) / 2
+            if mid < 0.10: continue
+
+            delta  = float(c.get("delta", 0) or 0)
+            if abs(delta) == 0:
+                delta = estimate_delta(price, strike, dte, atm_iv, "P")
+            if delta is None: continue
+            delta = abs(delta)
+
+            # PLTR stricter delta
+            d_min = CSP_DELTA_PLTR_MIN if ticker == "PLTR" else CSP_DELTA_MIN
+            d_max = CSP_DELTA_PLTR_MAX if ticker == "PLTR" else CSP_DELTA_MAX
+            if ivdata["ivp"] > 50: d_max = CSP_DELTA_HIGH_IVP_MAX
+            if not (d_min <= delta <= d_max): continue
+
+            # Liquidity checks
+            oi     = int(c.get("open_interest", 0) or 0)
+            vol    = int(c.get("volume", 0) or 0)
+            spread = (ask - bid) / ask if ask > 0 else 1
+            if oi  < MIN_OPEN_INTEREST:    continue
+            if vol < MIN_DAILY_VOLUME:     continue
+            if spread > MAX_BID_ASK_SPREAD: continue
+
+            # Annualized return — matches spreadsheet formula
+            annualized    = (mid / strike) * (365 / dte) * 100
+            below_min     = annualized < CSP_MIN_ANNUALIZED
+            if annualized > MAX_ANNUALIZED: continue  # filter bad data
+
+            otm_pct       = round((price - strike) / price * 100, 1)
+            max_contracts = max(1, int(PORTFOLIO_SIZE * get_max_alloc(ticker) / (strike * 100)))
+            collateral    = strike * 100 * max_contracts
+            prem_pct      = round(mid / strike * 100, 2)
+
+            iv   = round(float(c.get("iv", 0) or atm_iv) * 100, 1)
+            timing = timing_score("CSP", pir, ivdata["ivp"])
+            if not timing["recommend"] and not below_min: continue
+
+            score = timing["score"] * delta * annualized
+            candidates.append({
+                "strike":            strike,
+                "expiry":            expiry.strftime("%Y-%m-%d"),
+                "dte":               dte,
+                "bid":               round(bid, 2),
+                "ask":               round(ask, 2),
+                "premium":           round(mid, 2),
+                "delta":             round(delta, 2),
+                "iv":                iv,
+                "ivp":               round(ivdata["ivp"], 1),
+                "otm_pct":           otm_pct,
+                "annualized_return": round(annualized, 1),
+                "below_min":         below_min,
+                "max_contracts":     max_contracts,
+                "collateral":        round(collateral, 0),
+                "prem_pct":          prem_pct,
+                "timing":            timing,
+                "score":             score,
+            })
+        except Exception:
+            continue
+
+    if not candidates:
+        return None, {}
+
+    best = max(candidates, key=lambda x: x["score"])
+    return best, best["timing"]
+
+
 def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir):
     timing = timing_score("CC", pir, ivdata["ivp"])
     if not timing["recommend"]: return None, timing
