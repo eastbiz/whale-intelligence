@@ -1752,13 +1752,25 @@ def find_pmcc_short_call(ticker, price, existing_leaps, contracts, ivdata, pir):
 
 def find_bull_call_spread(ticker, price, contracts, ivdata, pir, quality):
     """
-    Bull Call Spread: buy ITM call, sell OTM call.
-    Target ROR ≥ 80%, prefer 100-200%.
-    Rank by: stock quality → pullback → ROR → liquidity
+    Bull Call Spread — Final Rules:
+    - DTE: 45-120 days (min 45, preferred 60-120)
+    - IVP: 20-80 (reject <20 or >80)
+    - Short call delta: 0.25-0.40
+    - Spread width: min $10 or 1-2% of stock price
+    - Distance to short strike: 3-5% at 45-60 DTE, 5-8% at 60-90, 8-10% at 90-120
+    - ROR: min 80%, preferred 80-200% (not driven by short DTE)
+    - Trend filter: stock above 50 DMA OR within 20% of 52w low
     """
     timing = timing_score("BCS", pir, ivdata["ivp"])
+    # IVP filter: reject <20 or >80
+    if ivdata["ivp"] < 20 or ivdata["ivp"] > 80: return None, {"score":0,"recommend":False,"signal":f"❌ IVP {ivdata['ivp']:.0f}% out of range (need 20-80)"}
     if not timing["recommend"]: return None, timing
     if not contracts or price <= 0: return None, timing
+    # Trend filter: above 50 DMA or within 20% of 52w low
+    pct_above_ma50 = quality.get("pct_above_ma50", 0)
+    pullback = quality.get("pullback_pct", 0)
+    trend_ok = pct_above_ma50 >= 0 or pullback >= 80  # above 50MA or near 52w low
+    if not trend_ok: return None, {"score":0,"recommend":False,"signal":"❌ Below 50 DMA and not near 52w low"}
 
     atm_iv = ivdata["iv_current"]
     today  = datetime.now()
@@ -1775,7 +1787,7 @@ def find_bull_call_spread(ticker, price, contracts, ivdata, pir, quality):
             expiry = datetime.strptime(c["expiry"], "%Y-%m-%d")
             dte = (expiry - today).days
         except Exception: continue
-        if not (30 <= dte <= 60): continue
+        if not (45 <= dte <= 120): continue  # min 45, preferred 60-120
         bid = float(c.get("nbbo_bid",0) or 0)
         ask = float(c.get("nbbo_ask",0) or 0)
         mid = (bid + ask) / 2
@@ -1790,16 +1802,49 @@ def find_bull_call_spread(ticker, price, contracts, ivdata, pir, quality):
             if short_c["strike"] <= price: continue  # short must be OTM
             if short_c["strike"] <= long_c["strike"]: continue
             if short_c["dte"] != long_c["dte"]: continue  # same expiry
-            if short_c["strike"] - long_c["strike"] > price * 0.15: continue  # not too wide
+
+            dte = long_c["dte"]
+            width = short_c["strike"] - long_c["strike"]
+
+            # Spread width: min $10 or 1-2% of stock price
+            min_width = max(10, price * 0.01)
+            if width < min_width: continue
+            if width > price * 0.15: continue  # not too wide
+
+            # Distance to short strike based on DTE
+            dist_pct = (short_c["strike"] - price) / price * 100
+            if 45 <= dte < 60:
+                if dist_pct > 5: continue   # max 3-5% away
+            elif 60 <= dte < 90:
+                if dist_pct > 8: continue   # max 5-8% away
+            elif dte >= 90:
+                if dist_pct > 10: continue  # max 8-10% away
+
+            # Short call delta: 0.25-0.40
+            short_delta = estimate_delta(price, short_c["strike"], dte, atm_iv, "C")
+            if short_delta is None or not (0.25 <= short_delta <= 0.40): continue
 
             debit = long_c["mid"] - short_c["mid"]
             if debit <= 0: continue
-            width = short_c["strike"] - long_c["strike"]
             max_profit = width - debit
             if max_profit <= 0: continue
             ror = max_profit / debit  # return on risk
 
+            # ROR: min 80%, reject if inflated by very short DTE
             if ror < BCS_MIN_ROR: continue
+            if ror > 2.0 and dte < 60: continue  # >200% ROR on short DTE = lottery trap
+
+            # Quality tier label
+            if ror >= 1.5 and dte >= 90 and 30 <= ivdata["ivp"] <= 70:
+                tier_label = "A"
+            elif ror >= 1.0 and dte >= 60:
+                tier_label = "B"
+            elif ror >= 0.8:
+                tier_label = "C"
+            else:
+                tier_label = "D"
+
+            if tier_label == "D": continue
 
             score = (timing["score"]/100) * (quality["quality_score"]/5) * ror * quality["pullback"]
             if score > best_score:
@@ -1816,7 +1861,10 @@ def find_bull_call_spread(ticker, price, contracts, ivdata, pir, quality):
                     "breakeven": round(long_c["strike"] + debit, 2),
                     "iv": round(atm_iv*100,1),
                     "ivp": ivdata["ivp"],
-                    "timing": timing
+                    "timing": timing,
+                    "tier_label": tier_label,
+                    "dist_pct": round(dist_pct, 1),
+                    "short_delta": round(short_delta, 2),
                 }
     return best, timing
 
@@ -2291,17 +2339,20 @@ def fmt_spike_cc(opp) -> str:
 
 def fmt_bcs(opp) -> str:
     t = opp["bcs"]["timing"]; b = opp["bcs"]; q = opp["quality"]
+    tier = b.get("tier_label","B")
+    tier_emoji = {"A":"🟢","B":"🟡","C":"🟠","D":"🔴"}.get(tier,"⚪")
+    width = b["short_strike"] - b["long_strike"]
     return "\n".join([
         f"📊 *Bull Call Spread — {opp['ticker']} @ ${opp['price']}*",
         f"_{t['signal']}_",
-        *([f"  {opp['darkpool']['label']}"]
-           if opp.get('darkpool',{}).get('show') else []),
         f"  {fmt_quality(q)}",
+        f"  Quality: {tier_emoji} Tier {tier}",
         f"  Buy ${b['long_strike']} Call / Sell ${b['short_strike']} Call",
+        f"  Spread width: ${width:.0f} | Short δ{b.get('short_delta',0)} | {b.get('dist_pct',0):.1f}% OTM",
         f"  Expiry: {b['expiry']} | {b['dte']} DTE",
-        f"  Debit: ${b['debit']} | Max Profit: ${b['max_profit']}",
+        f"  Debit: ${b['debit']} | Max Profit: ${b['max_profit']} | Max Risk: ${b['max_risk']}",
         f"  Return on Risk: {b['ror']}% | Breakeven: ${b['breakeven']}",
-        f"  IVP: {b['ivp']:.0f}%",
+        f"  IVP: {b['ivp']:.0f}% | IV: {b['iv']}%",
         f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
     ])
 
