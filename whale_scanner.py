@@ -64,7 +64,7 @@ MAX_ANNUALIZED        = 120.0 # cap bad data
 IVP_MIN_SELL          = 30    # floor — skip below 30
 IVP_ELEVATED          = 50    # "elevated" — allow wider delta, flag as excellent
 IVP_MAX_BUY           = 50    # max IVP to buy LEAPS
-LEAPS_EXTRINSIC_MAX   = 25.0  # tightened from 30% — target <20%
+LEAPS_EXTRINSIC_MAX   = 20.0  # 20% max extrinsic — primary cost filter for LEAPS — target <20%
 # Earnings filter: <14 days = hard stop, 14-21 = warning, >21 = normal
 EARNINGS_HARD_STOP    = 14    # hard stop
 EARNINGS_WARNING      = 21    # warning label
@@ -1660,17 +1660,20 @@ def find_best_leaps(ticker, price, contracts, ivdata, pir):
         intrinsic     = max(0, price - strike)
         extrinsic     = max(0, mid - intrinsic)
         extrinsic_pct = (extrinsic / mid * 100) if mid > 0 else 100
-        if extrinsic_pct > LEAPS_EXTRINSIC_MAX: continue  # reject >25% extrinsic
+        if extrinsic_pct > LEAPS_EXTRINSIC_MAX: continue  # reject per config (default 20%)
 
-        # Extrinsic quality label (from framework)
+        # Extrinsic quality label — PRIMARY signal for LEAPS cost
+        # Extrinsic % is what you actually pay in time decay, IVP is secondary
         if extrinsic_pct < 10:
-            ext_label = f"🔥 Excellent ({extrinsic_pct:.1f}%)"
+            ext_label = f"🔥 Excellent ({extrinsic_pct:.1f}%) — minimal time decay"
+        elif extrinsic_pct < 15:
+            ext_label = f"✅ Good ({extrinsic_pct:.1f}%) — reasonable cost"
         elif extrinsic_pct < 20:
-            ext_label = f"✅ Good ({extrinsic_pct:.1f}%)"
-        elif extrinsic_pct < 30:
-            ext_label = f"⚠️ Acceptable ({extrinsic_pct:.1f}%)"
+            ext_label = f"⚠️ Acceptable ({extrinsic_pct:.1f}%) — moderate time value"
+        elif extrinsic_pct < 25:
+            ext_label = f"🔶 Expensive ({extrinsic_pct:.1f}%) — significant time decay"
         else:
-            ext_label = f"❌ Too expensive ({extrinsic_pct:.1f}%)"
+            ext_label = f"❌ Too expensive ({extrinsic_pct:.1f}%) — avoid"
 
         # Score heavily penalizes high extrinsic — prefers <20% target
         # <10%: full score, 10-20%: slight penalty, 20-30%: significant penalty
@@ -2219,31 +2222,31 @@ def fmt_leaps(opp) -> str:
     t = opp["leaps"]["timing"]; s = opp["sizing"]; l = opp["leaps"]
     d = f" | δ{l['delta']}" if l.get('delta') else ""
     itm = f"{l['itm_pct']}% ITM" if l['itm_pct'] > 0 else f"{abs(l['itm_pct'])}% OTM"
-
-    # Downgrade timing signal if extrinsic doesn't match the label
-    # "Exceptional" requires extrinsic <10%, "Good" requires <20%
-    signal = t["signal"]
     ext_pct = l.get("extrinsic_pct", 100)
-    if "EXCEPTIONAL" in signal and ext_pct >= 10:
-        if ext_pct < 20:
-            signal = signal.replace("🔥 EXCEPTIONAL", "✅ GOOD")
-        elif ext_pct < 30:
-            signal = signal.replace("🔥 EXCEPTIONAL", "⚠️ ACCEPTABLE")
-        else:
-            signal = signal.replace("🔥 EXCEPTIONAL", "⚠️ POOR EXTRINSIC")
-    elif "GOOD" in signal and ext_pct >= 20:
-        signal = signal.replace("✅ GOOD", "⚠️ ACCEPTABLE")
+    ext_label = l.get("ext_label", f"{ext_pct:.1f}%")
+
+    # PRIMARY signal = extrinsic quality (what you actually pay)
+    # SECONDARY = IVP context (historical cheapness)
+    if ext_pct < 10:
+        primary = f"🔥 EXCELLENT — Extrinsic {ext_pct:.1f}% (minimal time decay)"
+    elif ext_pct < 15:
+        primary = f"✅ GOOD — Extrinsic {ext_pct:.1f}% (reasonable cost)"
+    elif ext_pct < 20:
+        primary = f"⚠️ ACCEPTABLE — Extrinsic {ext_pct:.1f}% (moderate time value)"
+    else:
+        primary = f"🔶 EXPENSIVE — Extrinsic {ext_pct:.1f}% (significant time decay)"
+
+    ivp_context = f"IVP {l['ivp']:.0f}% — {'historically cheap' if l['ivp'] < 30 else 'moderate' if l['ivp'] < 50 else 'elevated'}"
 
     return "\n".join([
         f"🚀 *LEAPS — {opp['ticker']} @ ${opp['price']}*",
-        f"_{signal}_",
-        *([f"  {opp['darkpool_leaps']['label']}"]
-           if opp.get('darkpool_leaps',{}).get('show') else []),
+        f"_{primary}_",
+        f"_({ivp_context})_",
         f"  52w: ${opp['w52_low']} — ${opp['w52_high']} | {opp['pullback_pct']}% off high",
         f"  Buy Call ${l['strike']} | {l['expiry']} | {l['dte']} DTE",
         f"  Bid ${l['bid']} / Ask ${l['ask']} | Cost ${l['premium']}",
-        f"  {itm} | IVP {l['ivp']:.0f}%{d}",
-        f"  Intrinsic: ${l['intrinsic']} | Extrinsic: ${l['extrinsic']} — {l.get('ext_label', str(l['extrinsic_pct'])+'%')}",
+        f"  {itm}{d}",
+        f"  Intrinsic: ${l['intrinsic']} | Extrinsic: ${l['extrinsic']} ({ext_pct:.1f}%)",
         f"  Leverage: {l['leverage']}x | Tier: {s['tier']} | Room: ${s['room_usd']:,.0f}",
         f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
     ])
@@ -2572,8 +2575,8 @@ def run_scanner():
         sizing     = position_check(ticker, ibkr)
         qty        = sizing["quantity"]
         avg        = sizing["avg_cost"]
-        # Cache for dashboard scan
-        contracts_cache[ticker]  = contracts
+        # Cache full merged contracts (short + leaps) for dashboard scan
+        contracts_cache[ticker]  = contracts  # already merged short+leaps
         schwab_ivp_cache[ticker] = schwab_ivp
         qty_cache[ticker]        = qty
         avg_cache[ticker]        = avg
