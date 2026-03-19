@@ -29,7 +29,7 @@ ANTHROPIC_API_KEY      = os.environ.get("ANTHROPIC_API_KEY", "")
 IBKR_FLEX_TOKEN        = os.environ.get("IBKR_FLEX_TOKEN", "")
 IBKR_FLEX_QUERY_ID     = os.environ.get("IBKR_FLEX_QUERY_ID", "")
 
-PORTFOLIO_SIZE = 7_000_000
+PORTFOLIO_SIZE = 7_000_000  # fallback — overridden at runtime by live account data
 
 # ── Position limits by tier ─────────────────────────────────
 # Core: 8% | Growth: 5% | Cyclical: 4% | Opportunistic: 2.5%
@@ -837,6 +837,55 @@ STRICT_IVP = {
 # Options income priority — these 6 have best liquidity/volatility structure
 # Scanner scores these higher automatically
 OPTIONS_INCOME_PRIORITY = {"NVDA", "MSFT", "AMZN", "TSLA", "META", "NFLX"}
+
+
+def position_check(ticker: str, ibkr: dict) -> dict:
+    """
+    Check current position size and return sizing info.
+    Returns: status, current_pct, max_pct, room_usd, quantity, tier, avg_cost
+    """
+    TIER_MAX = {"Core": 8.0, "Growth": 5.0, "Cyclical": 4.0, "Opportunistic": 2.5}
+
+    # Determine tier
+    tier = "Core"
+    for t, tickers in STOCK_UNIVERSE.items():
+        if ticker in tickers:
+            tier = t
+            break
+
+    max_pct     = TIER_MAX.get(tier, 2.5)
+    max_usd     = PORTFOLIO_SIZE * max_pct / 100
+
+    # Look up current position from IBKR/Schwab
+    pos         = ibkr.get(ticker, {})
+    qty         = float(pos.get("qty", 0) or 0)
+    avg_cost    = float(pos.get("avg_cost", 0) or 0)
+    mkt_val     = float(pos.get("market_value", qty * avg_cost) or 0)
+
+    current_pct = round(mkt_val / PORTFOLIO_SIZE * 100, 2) if PORTFOLIO_SIZE > 0 else 0
+    room_usd    = max(0, max_usd - mkt_val)
+
+    if current_pct >= max_pct:
+        status = "OVERWEIGHT"
+    elif current_pct >= max_pct * 0.8:
+        status = "NEAR_MAX"
+    elif current_pct >= max_pct * 0.5:
+        status = "NORMAL"
+    else:
+        status = "LIGHT"
+
+    return {
+        "ticker":      ticker,
+        "tier":        tier,
+        "status":      status,
+        "current_pct": current_pct,
+        "max_pct":     max_pct,
+        "max_usd":     round(max_usd, 0),
+        "room_usd":    round(room_usd, 0),
+        "quantity":    qty,
+        "avg_cost":    avg_cost,
+        "market_value": mkt_val,
+    }
 
 
 def stock_quality_check(ticker: str, md: dict, earn_date) -> dict:
@@ -2042,6 +2091,8 @@ def run_scanner():
     print(f"   Framework: Quality → Pullback → Option Yield")
     print(f"{'='*60}\n")
 
+    global PORTFOLIO_SIZE
+
     print("📊 IBKR positions...")
     ibkr     = get_ibkr_positions()
     stk_hold = {k:v for k,v in ibkr.items() if v.get("asset_class")=="STK"}
@@ -2073,6 +2124,17 @@ def run_scanner():
     for ticker, pos in schwab_positions.items():
         if ticker not in ibkr or ibkr[ticker].get("market_value", 0) == 0:
             ibkr[ticker] = pos
+
+    # ── Calculate real portfolio size from live account data ──
+    schwab_total = sum(a.get("net_liquidation", 0) for a in schwab_accounts)
+    ibkr_total   = sum(v.get("market_value", 0) for v in ibkr.values()
+                       if v.get("asset_class") == "STK")
+    live_total   = schwab_total + ibkr_total
+    if live_total >= 100_000:  # sanity check — must be at least $100k to trust
+        PORTFOLIO_SIZE = round(live_total, -3)  # round to nearest $1000
+        print(f"   💼 Portfolio size: ${PORTFOLIO_SIZE:,.0f} (Schwab: ${schwab_total:,.0f} | IBKR stocks: ${ibkr_total:,.0f})")
+    else:
+        print(f"   💼 Portfolio size: ${PORTFOLIO_SIZE:,.0f} (fallback — live data unavailable)")
     ok  = sum(1 for v in mkt.values() if v["price"]>0)
     print(f"   {ok}/{len(all_tickers)} prices ✓")
 
@@ -2109,7 +2171,7 @@ def run_scanner():
     print(f"\n{'='*50}")
     print(f"📡 MARKET CONTEXT")
     print(f"   {gng['quality']}")
-    print(f"   VIX: {gng['vix']} | Tide: {gng['tide_score']:+.1f}")
+    print(f"   VIX: {gng['vix']}")
     print(f"   Scanner always runs — IVP filters per stock")
     print(f"{'='*50}\n")
 
@@ -2131,8 +2193,6 @@ def run_scanner():
         f"\n"
 
 
-        f"_Tide = net call minus put premium across the whole market."
-        f" Positive = money flowing into calls. Negative = put hedging (fear)._\n"
         f"\n"
         f"*S&P 500:* {spy_regime['label']}\n"
         f"_S&P below 200MA = reduce size, lower delta._\n"
