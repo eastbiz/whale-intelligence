@@ -2925,8 +2925,11 @@ def run_scanner():
         contracts_d = contracts_cache.get(ticker, [])
         if not contracts_d: continue
 
-        # CSP — relaxed: skip near-high/ma50/gap checks, keep earnings
-        csp_d, _ = find_best_csp(ticker, price, contracts_d, ivdata_d, pir, quality)
+        # CSP — fully relaxed for dashboard: override timing to always recommend
+        # Create permissive ivdata with minimum IVP=30 so timing doesn't block
+        ivdata_permissive = dict(ivdata_d)
+        ivdata_permissive["ivp"] = max(ivdata_d["ivp"], 30)  # floor at 30 so timing passes
+        csp_d, _ = find_best_csp(ticker, price, contracts_d, ivdata_permissive, pir, quality)
         if csp_d:
             warnings = []
             if quality["near_high"]:      warnings.append("Near 52w high")
@@ -2949,10 +2952,10 @@ def run_scanner():
                 "risk_note": ", ".join(warnings) if warnings else None,
             })
 
-        # CC — relaxed — check both ibkr and schwab positions for shares
-        ibkr_pos_d = ibkr.get(ticker, {})
-        qty_d = float(ibkr_pos_d.get("quantity", ibkr_pos_d.get("qty", 0)) or 0)
-        avg_d = float(ibkr_pos_d.get("avg_cost", 0) or 0)
+        # CC — check ibkr AND schwab positions for shares
+        ibkr_pos_d   = ibkr.get(ticker, {})
+        qty_d = float(ibkr_pos_d.get("quantity", ibkr_pos_d.get("qty", qty_cache.get(ticker, 0))) or 0)
+        avg_d = float(ibkr_pos_d.get("avg_cost", avg_cache.get(ticker, 0)) or 0)
         if qty_d >= 100:
             cc_d, _ = find_best_cc(ticker, price, qty_d, avg_d, contracts_d, ivdata_d, pir)
             if cc_d:
@@ -2974,13 +2977,13 @@ def run_scanner():
                 })
 
         # PIO — always run for positions, ignores quality filters
-        qty_d = qty_cache.get(ticker, 0)
-        avg_d = avg_cache.get(ticker, 0)
-        if qty_d >= 100 and avg_d > 0:
+        pio_qty = qty_cache.get(ticker, 0) or float(ibkr.get(ticker,{}).get("qty", 0) or 0)
+        pio_avg = avg_cache.get(ticker, 0) or float(ibkr.get(ticker,{}).get("avg_cost", 0) or 0)
+        if pio_qty >= 100 and pio_avg > 0:
             pos_status_d = get_position_status(sizing["current_pct"] if sizing else 0)
-            pnl_status_d = get_pnl_status(avg_d, price)
+            pnl_status_d = get_pnl_status(pio_avg, price)
             pio_d, _ = find_position_income_cc(
-                ticker, price, qty_d, avg_d, contracts_d, ivdata_d, pos_status_d, pnl_status_d)
+                ticker, price, pio_qty, pio_avg, contracts_d, ivdata_d, pos_status_d, pnl_status_d)
             if pio_d:
                 pnl_labels = {"profit":"📈 Profit","loss":"📉 Loss","breakeven":"➡️ Break-even","unknown":"❓"}
                 dashboard_ccs.append({
@@ -3050,7 +3053,9 @@ def run_scanner():
     dashboard_leaps.sort(key=lambda x: x["ivp"], reverse=False)  # lowest IVP first = cheapest
     dashboard_bcss.sort(key=lambda x: x["annualized_return"], reverse=True)
 
-    print(f"   📊 Dashboard: {len(dashboard_csps)} CSPs | {len(dashboard_ccs)} CCs | {len(dashboard_leaps)} LEAPS | {len(dashboard_bcss)} BCS")
+    pio_count = sum(1 for o in dashboard_ccs if o.get("mode") == "PIO")
+    cc_count  = sum(1 for o in dashboard_ccs if o.get("mode") == "CC")
+    print(f"   📊 Dashboard: {len(dashboard_csps)} CSPs | {cc_count} CCs | {pio_count} PIOs | {len(dashboard_leaps)} LEAPS | {len(dashboard_bcss)} BCS")
 
     all_opps = []
     for o in top_csps:   all_opps.append(opp_to_dict(o, "csp"))
