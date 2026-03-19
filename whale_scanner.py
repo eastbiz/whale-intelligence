@@ -1063,7 +1063,7 @@ def find_position_income_cc(ticker, price, qty, avg_cost, contracts,
         d_min, d_max = 0.20, 0.25
         status_label = "➡️ Near break-even"
 
-    atm_iv     = ivdata.get("atm_iv", 0.3)
+    atm_iv     = ivdata.get("iv_current", ivdata.get("atm_iv", 0.3))
     breakeven  = avg_cost  # simplified — would subtract collected premiums
     candidates = []
 
@@ -1073,7 +1073,7 @@ def find_position_income_cc(ticker, price, qty, avg_cost, contracts,
         try:
             expiry = datetime.strptime(c["expiry"], "%Y-%m-%d")
             dte    = (expiry - datetime.now()).days
-            if not (30 <= dte <= 45):
+            if not (14 <= dte <= 60):
                 continue
 
             strike = float(c["strike"])
@@ -1710,8 +1710,15 @@ def find_pmcc_short_call(ticker, price, existing_leaps, contracts, ivdata, pir):
 
     atm_iv      = ivdata["iv_current"]
     today       = datetime.now()
-    leaps_strike= existing_leaps["strike"]
-    best        = None; best_score = 0
+    leaps_strike    = existing_leaps["strike"]
+    leaps_cost_per  = existing_leaps["avg_cost"]  # cost per contract (not x100)
+    leaps_qty       = existing_leaps["quantity"]
+
+    # PMCC breakeven = LEAPS strike + LEAPS cost per share (net of credits collected)
+    # We conservatively use just LEAPS cost since we don't track credits collected yet
+    # Short call strike MUST be above this breakeven to protect profit potential
+    pmcc_breakeven  = leaps_strike + leaps_cost_per  # e.g. $120 strike + $15 cost = $135 breakeven
+    best            = None; best_score = 0
 
     for c in contracts:
         try:
@@ -1723,8 +1730,16 @@ def find_pmcc_short_call(ticker, price, existing_leaps, contracts, ivdata, pir):
             dte = (expiry - today).days
             if not (CC_DTE_MIN <= dte <= CC_DTE_MAX): continue
         except Exception: continue
-        # Short call must be below LEAPS strike (spread protection)
+
+        # ── PMCC safety rules ─────────────────────────────────
+        # Rule 1: Short call must be BELOW LEAPS strike (defines max spread width)
         if strike >= leaps_strike: continue
+        # Rule 2: Short call must be ABOVE PMCC breakeven (protect profit potential)
+        # e.g. if LEAPS strike=$120, cost=$15 → breakeven=$135
+        # Never sell short call below $135 or you cap profit below your cost
+        if strike < pmcc_breakeven * 0.99:  # 1% tolerance
+            continue
+
         otm_pct = (strike - price) / price * 100
         if not (1 <= otm_pct <= 15): continue
         bid = float(c.get("nbbo_bid",0) or 0)
@@ -1733,25 +1748,34 @@ def find_pmcc_short_call(ticker, price, existing_leaps, contracts, ivdata, pir):
         if mid < 0.50: continue
         delta = estimate_delta(price, strike, dte, atm_iv, "C")
         if delta is None or not (CC_DELTA_MIN <= delta <= CC_DELTA_MAX): continue
-        # Annualized based on LEAPS cost
-        leaps_cost = existing_leaps["avg_cost"] * 100
-        if leaps_cost > 0:
-            months_to_recover = leaps_cost / (mid * 100 * existing_leaps["quantity"])
-        else:
-            months_to_recover = 999
+
+        # How many months of premiums to recover LEAPS cost
+        leaps_cost_total = leaps_cost_per * 100 * leaps_qty
+        months_to_recover = leaps_cost_total / (mid * 100 * leaps_qty / (dte/30)) if mid > 0 and dte > 0 else 999
+
         score = (timing["score"]/100) * mid * (1 + atm_iv)
         if score > best_score:
             best_score = score
             annualized = (mid / price) * (365 / dte) * 100
-            best = {"strike":strike,"expiry":expiry.strftime("%Y-%m-%d"),"dte":dte,
-                    "bid":round(bid,2),"ask":round(ask,2),"premium":round(mid,2),
-                    "otm_pct":round(otm_pct,1),"delta":delta,
-                    "iv":round(atm_iv*100,1),"ivp":ivdata["ivp"],
-                    "annualized_return":round(annualized,1),
-                    "leaps_strike":leaps_strike,
-                    "months_to_recover":round(months_to_recover,1) if months_to_recover < 100 else "N/A",
-                    "max_contracts":existing_leaps["quantity"],
-                    "timing":timing}
+            best = {
+                "strike":             strike,
+                "expiry":             expiry.strftime("%Y-%m-%d"),
+                "dte":                dte,
+                "bid":                round(bid,2),
+                "ask":                round(ask,2),
+                "premium":            round(mid,2),
+                "otm_pct":            round(otm_pct,1),
+                "delta":              delta,
+                "iv":                 round(atm_iv*100,1),
+                "ivp":                ivdata["ivp"],
+                "annualized_return":  round(annualized,1),
+                "leaps_strike":       leaps_strike,
+                "leaps_cost":         round(leaps_cost_per,2),
+                "pmcc_breakeven":     round(pmcc_breakeven,2),
+                "months_to_recover":  round(months_to_recover,1) if months_to_recover < 100 else "N/A",
+                "max_contracts":      leaps_qty,
+                "timing":             timing,
+            }
     return best, timing
 
 
@@ -2228,10 +2252,13 @@ def fmt_leaps(opp) -> str:
 def fmt_pmcc(opp) -> str:
     t = opp["pmcc"]["timing"]; p = opp["pmcc"]; l = opp["existing_leaps"]
     d = f" | δ{p['delta']}" if p.get('delta') else ""
+    breakeven = p.get("pmcc_breakeven", l["strike"] + l.get("avg_cost",0))
     return "\n".join([
         f"⚡ *PMCC — {opp['ticker']} @ ${opp['price']}*",
         f"_{t['signal']}_",
-        f"  You own: LEAPS ${l['strike']} call ({l['dte']}DTE, {l['quantity']} contracts)",
+        f"  📋 LEAPS position: ${l['strike']} call | Cost: ${l.get('avg_cost',0):.2f}/share | {l['dte']}DTE | {l['quantity']} contracts",
+        f"  ⚠️ PMCC breakeven: ${breakeven:.2f} (LEAPS strike + cost)",
+        f"  ✅ Short call ${p['strike']} is above breakeven ${breakeven:.2f}",
         f"  Sell Call ${p['strike']} | {p['expiry']} | {p['dte']} DTE",
         f"  Bid ${p['bid']} / Ask ${p['ask']}",
         f"  {p['otm_pct']}% OTM | IVP {p['ivp']:.0f}%{d}",
@@ -2586,7 +2613,8 @@ def run_scanner():
         if qty >= 100 and avg > 0:
             pos_status = get_position_status(sizing["current_pct"])
             pnl_status = get_pnl_status(avg, price)
-            # Only run if not already flagged for standard CC
+            # Always run PIO — different delta rules than standard CC
+            # PIO adjusts delta by P&L status, ignores quality filters
             pio_cc, _ = find_position_income_cc(
                 ticker, price, qty, avg, contracts, ivdata, pos_status, pnl_status)
             if pio_cc:
@@ -2943,6 +2971,31 @@ def run_scanner():
                     "passes_quality": not quality["hard_stop"],
                     "signal": cc_d["timing"].get("signal", ""),
                     "risk_note": ", ".join(warnings) if warnings else None,
+                })
+
+        # PIO — always run for positions, ignores quality filters
+        qty_d = qty_cache.get(ticker, 0)
+        avg_d = avg_cache.get(ticker, 0)
+        if qty_d >= 100 and avg_d > 0:
+            pos_status_d = get_position_status(sizing["current_pct"] if sizing else 0)
+            pnl_status_d = get_pnl_status(avg_d, price)
+            pio_d, _ = find_position_income_cc(
+                ticker, price, qty_d, avg_d, contracts_d, ivdata_d, pos_status_d, pnl_status_d)
+            if pio_d:
+                pnl_labels = {"profit":"📈 Profit","loss":"📉 Loss","breakeven":"➡️ Break-even","unknown":"❓"}
+                dashboard_ccs.append({
+                    "ticker": ticker, "tier": tier, "price": price,
+                    "ivp": round(ivdata_d["ivp"], 1),
+                    "mode": "PIO",
+                    "strike": pio_d["strike"], "expiry": pio_d["expiry"],
+                    "dte": pio_d["dte"], "premium": pio_d["premium"],
+                    "annualized_return": pio_d["annualized_return"],
+                    "delta": pio_d["delta"],
+                    "below_min": pio_d["annualized_return"] < 8,
+                    "warnings": [],
+                    "passes_quality": True,
+                    "signal": f"{pnl_labels.get(pnl_status_d,'')} | δ{pio_d['delta']} | Above break-even ${pio_d['breakeven']}",
+                    "risk_note": None,
                 })
 
         # LEAPS — relaxed: use leaps_hard_stop only
