@@ -3066,12 +3066,21 @@ def run_scanner():
             if near_high: warnings.append("Near 52w high")
             if below_ma200: warnings.append("Below 200MA")
             if md.get("pct_above_ma50",0)*100 > 8: warnings.append(">8% above MA50")
+            # Risk level: based on tier and warnings
+            if tier == "Core" and not warnings:          risk_level = "Low"
+            elif tier in ("Core","Growth") and warnings: risk_level = "Medium"
+            elif tier == "Opportunistic":                risk_level = "Elevated"
+            else:                                        risk_level = "Medium"
+            # Breakeven = strike (for CSP, breakeven = strike - premium)
+            breakeven = round(best_csp["strike"] - best_csp["premium"], 2)
+            ppd = round(best_csp["premium"] / max(1, best_csp["dte"]), 2)
             dashboard_csps.append({
                 "ticker":ticker,"tier":tier,"price":price,"ivp":ivp_d,"mode":"CSP",
                 "strike":best_csp["strike"],"expiry":best_csp["expiry"],"dte":best_csp["dte"],
                 "premium":best_csp["premium"],"annualized_return":best_csp["annualized_return"],
                 "delta":best_csp["delta"],"below_min":best_csp["below_min"],
                 "warnings":warnings,"passes_quality":not bool(warnings),
+                "risk_level":risk_level,"breakeven":breakeven,"premium_per_day":ppd,
                 "signal":f"IVP {ivp_d:.0f}% | {pullback}% off highs",
                 "risk_note":", ".join(warnings) if warnings else None,
             })
@@ -3107,13 +3116,18 @@ def run_scanner():
                                    "avg_cost":round(avg_d,2),"below_min":ann<CC_MIN_ANNUALIZED,"ivp":ivp_d}
                 except: continue
             if best_cc:
+                pnl_pct_cc = (price - avg_d)/avg_d*100 if avg_d > 0 else 0
+                pos_status = "Profit" if pnl_pct_cc>5 else "Loss" if pnl_pct_cc<-5 else "Break-even"
+                ppd_cc = round(best_cc["premium"] / max(1, best_cc["dte"]), 2)
                 dashboard_ccs.append({
                     "ticker":ticker,"tier":tier,"price":price,"ivp":ivp_d,"mode":"CC",
                     "strike":best_cc["strike"],"expiry":best_cc["expiry"],"dte":best_cc["dte"],
                     "premium":best_cc["premium"],"annualized_return":best_cc["annualized_return"],
                     "delta":best_cc["delta"],"below_min":best_cc["below_min"],
                     "warnings":[],"passes_quality":True,
-                    "signal":f"Hold {int(qty_d)} shares @ ${avg_d:.0f} avg | IVP {ivp_d:.0f}%",
+                    "risk_level":"Low","breakeven":round(avg_d,2),
+                    "premium_per_day":ppd_cc,"position_status":pos_status,
+                    "signal":f"{pos_status} @ ${avg_d:.0f} avg | IVP {ivp_d:.0f}%",
                     "risk_note":None,
                 })
 
@@ -3210,8 +3224,18 @@ def run_scanner():
                     "risk_note":", ".join(warnings) if warnings else None,
                 })
 
-    dashboard_csps.sort(key=lambda x: x["annualized_return"], reverse=True)
-    dashboard_ccs.sort(key=lambda x: x["annualized_return"], reverse=True)
+    # Sort by: delta distance from 0.28 target, then IVP, then premium/day
+    dashboard_csps.sort(key=lambda x: (
+        abs(x.get("delta",0.5) - 0.28),     # 1. closest to target delta
+        -x.get("ivp", 0),                    # 2. higher IVP preferred
+        -(x.get("premium",0)/max(1,x.get("dte",1)))  # 3. premium per day
+    ))
+    # Sort by: delta distance from target, IVP, premium/day
+    dashboard_ccs.sort(key=lambda x: (
+        abs(x.get("delta",0.5) - 0.25),
+        -x.get("ivp", 0),
+        -(x.get("premium",0)/max(1,x.get("dte",1)))
+    ))
     dashboard_leaps.sort(key=lambda x: x["extrinsic_pct"])
     dashboard_bcss = []  # BCS uses main scan results only
 
