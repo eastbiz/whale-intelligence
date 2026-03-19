@@ -22,7 +22,7 @@ def now_et():
     """Current time in Pacific Time (handles DST automatically)."""
     return datetime.now(tz.utc).astimezone(PT)
 
-UNUSUAL_WHALES_API_KEY = os.environ.get("UW_API_KEY", "")
+UNUSUAL_WHALES_API_KEY = ""  # Removed — no longer used
 TELEGRAM_BOT_TOKEN     = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID       = os.environ.get("TELEGRAM_CHAT_ID", "")
 ANTHROPIC_API_KEY      = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -135,8 +135,7 @@ SPIKE_CC_CANDIDATES = {"NBIS", "IBIT", "PLTR"}
 
 # NVO is now a Core holding with valuation awareness
 
-UW_BASE    = "https://api.unusualwhales.com"
-UW_HEADERS = {"Authorization": f"Bearer {UNUSUAL_WHALES_API_KEY}"}
+# Unusual Whales removed — using Schwab API for all market data
 
 
 # ── Schwab API ───────────────────────────────────────────
@@ -597,90 +596,22 @@ def find_existing_leaps(ticker: str, ibkr_positions: dict) -> Optional[dict]:
 # ════════════════════════════════════════════════════════════
 
 def get_option_contracts(ticker: str) -> list:
-    try:
-        r = requests.get(f"{UW_BASE}/api/stock/{ticker}/option-contracts",
-                         headers=UW_HEADERS, timeout=15)
-        if r.status_code == 200:
-            return r.json().get("data", [])
-    except: pass
+    """Replaced by schwab_get_option_chain — returns empty fallback."""
     return []
 
 
-def get_darkpool(ticker: str) -> list:
-    try:
-        r = requests.get(f"{UW_BASE}/api/darkpool/{ticker}",
-                         headers=UW_HEADERS, timeout=10)
-        if r.status_code == 200:
-            return r.json().get("data", [])
-    except: pass
+def get_darkpool(ticker: str = "", **kwargs) -> list:
     return []
 
 
 def get_flow_alerts_market() -> list:
-    try:
-        r = requests.get(f"{UW_BASE}/api/option-trades/flow-alerts",
-                         headers=UW_HEADERS, timeout=10)
-        if r.status_code == 200:
-            return r.json().get("data", [])
-    except: pass
     return []
-# ════════════════════════════════════════════════════════════
-# MARKET INTELLIGENCE (Tide, OI Change, Expiry Breakdown)
-# ════════════════════════════════════════════════════════════
+
 
 def get_market_tide() -> dict:
-    """
-    Market Tide = net options premium flow (calls - puts) market-wide.
-    Positive = call premium dominating = bullish environment
-    Negative = put premium dominating = bearish/hedging environment
-    Returns score -100 to +100 and a human label.
-    """
-    try:
-        r = requests.get(f"{UW_BASE}/api/market/market-tide",
-                         headers=UW_HEADERS, timeout=10)
-        if r.status_code != 200:
-            return {"score": 0, "label": "Unknown", "raw": {}, "available": False}
-        data = r.json()
-        # Debug: print raw structure to identify correct field names
-        items = data.get("data", data.get("results", []))
-        if not items:
-            print(f"   Tide raw keys: {list(data.keys()) if isinstance(data,dict) else 'list'}")
-            print(f"   Tide raw sample: {str(data)[:200]}")
-            return {"score": 0, "label": "Tide: no data from API", "available": False}
+    return {"score": 0, "label": "Market Tide removed", "available": False}
 
-        latest = items[-1] if isinstance(items, list) else items
 
-        # Correct field names from UW API
-        call_prem = float(latest.get("net_call_premium", 0) or 0)
-        put_prem  = abs(float(latest.get("net_put_premium", 0) or 0))  # stored as negative
-        net       = call_prem - put_prem
-        total     = call_prem + put_prem
-        print(f"   Tide: calls=${call_prem/1e6:.1f}M puts=${put_prem/1e6:.1f}M net=${net/1e6:.1f}M")
-        # Normalize to -100/+100
-        score = round((net / total * 100), 1) if total > 0 else 0
-
-        if score > 20:
-            label = f"🟢 BULLISH TIDE ({score:+.0f}) — Call premium dominating, good for CSP"
-        elif score > 5:
-            label = f"🟡 MILD BULLISH TIDE ({score:+.0f}) — Slight call premium edge"
-        elif score > -5:
-            label = f"⚪ NEUTRAL TIDE ({score:+.0f}) — Balanced, selective trades only"
-        elif score > -20:
-            label = f"🟠 MILD BEARISH TIDE ({score:+.0f}) — Put premium building, be cautious"
-        else:
-            label = f"🔴 BEARISH TIDE ({score:+.0f}) — Put premium dominating, avoid new CSPs"
-
-        return {
-            "score": score,
-            "label": label,
-            "call_premium": round(call_prem/1e6, 1),
-            "put_premium":  round(put_prem/1e6, 1),
-            "net_million":  round(net/1e6, 1),
-            "available": True
-        }
-    except Exception as e:
-        print(f"   Market tide error: {e}")
-        return {"score": 0, "label": "Tide data unavailable", "available": False}
 def get_vix() -> dict:
     """Fetch VIX from Yahoo Finance. VIX = market fear gauge."""
     try:
@@ -713,152 +644,15 @@ def get_vix() -> dict:
 
 
 def get_spike() -> dict:
-    """
-    Fetch SPIKE index from Unusual Whales.
-    SPIKE is UW's proprietary fear gauge based on options flow.
-    Similar to VIX but calculated from actual order flow, not just prices.
-    High SPIKE = market fear elevated = great time to sell CSP/CC premium.
-    Low SPIKE = complacency = avoid selling premium, consider buying LEAPS.
-    """
-    try:
-        r = requests.get(f"{UW_BASE}/api/market/spike",
-                         headers=UW_HEADERS, timeout=8)
-        if r.status_code != 200:
-            return {"spike": 0, "label": "SPIKE unavailable", "available": False}
-        data  = r.json()
-        items = data.get("data", data.get("results", []))
-        if not items:
-            # SPIKE endpoint exists but returns empty on this plan
-            # Fall back to VIX-based fear gauge only
-            print("   SPIKE: no data (not available on current UW plan)")
-            return {"spike": 0, "label": None, "available": False}
-
-        latest = items[-1] if isinstance(items, list) else items
-        spike  = float(latest.get("spike",
-                  latest.get("value",
-                  latest.get("index",
-                  latest.get("score", 0)))) or 0)
-
-        if spike < 20:
-            label  = f"😴 SPIKE {spike:.1f} — Low fear (options flow calm). Avoid selling premium."
-            regime = "low"
-            action = "Consider LEAPS — options are cheap"
-        elif spike < 30:
-            label  = f"😐 SPIKE {spike:.1f} — Moderate fear. Selective premium selling OK."
-            regime = "moderate"
-            action = "Selective CSP/CC on strongest setups only"
-        elif spike < 40:
-            label  = f"😬 SPIKE {spike:.1f} — Elevated fear. Good CSP/CC opportunity."
-            regime = "elevated"
-            action = "Good time to sell premium on quality stocks"
-        else:
-            label  = f"😱 SPIKE {spike:.1f} — Extreme fear. Exceptional premium opportunity."
-            regime = "extreme"
-            action = "Excellent CSP/CC conditions — be selective on quality"
-
-        return {"spike": spike, "label": label, "regime": regime,
-                "action": action, "available": True}
-    except Exception as e:
-        return {"spike": 0, "label": "SPIKE unavailable", "available": False}
-
-
+    return {"available": False}
 
 
 def get_oi_change() -> dict:
-    """
-    Overnight OI change — which strikes saw largest new positioning.
-    Large put OI increase on a ticker = warning for CSP sellers.
-    Large call OI increase = institutions opening new bullish bets.
-    Returns dict of {ticker: {call_oi_change, put_oi_change, net_signal}}
-    """
-    try:
-        r = requests.get(f"{UW_BASE}/api/market/oi-change",
-                         headers=UW_HEADERS, timeout=10)
-        if r.status_code != 200:
-            return {}
-        items = r.json().get("data", r.json().get("results", []))
-        if not items:
-            return {}
-
-
-        oi_signals = {}
-        for item in items[:50]:  # top 50 by OI change
-            ticker = item.get("ticker","")
-            if not ticker: continue
-            # Try multiple field variations
-            # UW OI change: use prev premium volume as proxy for directional bias
-            # ask_volume > bid_volume = bought = bullish
-            ask_vol = float(item.get("prev_ask_volume", 0) or 0)
-            bid_vol = float(item.get("prev_bid_volume", 0) or 0)
-            sym     = item.get("option_symbol", "")
-            is_call = "C" in sym
-            is_put  = "P" in sym
-            premium = float(item.get("prev_total_premium", 0) or 0)
-            # Net: positive = call buying, negative = put buying
-            direction = (ask_vol - bid_vol)
-            call_oi = premium if (is_call and direction > 0) else 0
-            put_oi  = premium if (is_put  and direction > 0) else 0
-            if abs(call_oi) < 100 and abs(put_oi) < 100: continue
-            net_flow = call_oi - put_oi
-            existing = oi_signals.get(ticker, {"call_flow":0,"put_flow":0})
-            oi_signals[ticker] = {
-                "call_flow":  existing["call_flow"] + call_oi,
-                "put_flow":   existing["put_flow"]  + put_oi,
-                "net":        existing["call_flow"] + call_oi - existing["put_flow"] - put_oi,
-                "signal": ("🟢 Bullish OI" if net_flow > 100_000
-                           else "🔴 Bearish OI" if net_flow < -100_000
-                           else "⚪ Neutral OI")
-            }
-        return oi_signals
-    except Exception as e:
-        print(f"   OI change error: {e}")
-        return {}
+    return {}
 
 
 def get_expiry_breakdown(ticker: str) -> dict:
-    """
-    Where is OI concentrated by strike and expiry?
-    Used to avoid selling CSP/CC at strikes targeted by heavy put OI.
-    Returns max_pain strike and risky put strikes to avoid.
-    """
-    try:
-        r = requests.get(f"{UW_BASE}/api/stock/{ticker}/expiry-breakdown",
-                         headers=UW_HEADERS, timeout=10)
-        if r.status_code != 200:
-            return {}
-        items = r.json().get("data", [])
-        if not items:
-            return {}
-
-        # Find expiry with most total OI (most relevant)
-        best_expiry = None
-        best_oi     = 0
-        for item in items:
-            total_oi = int(item.get("total_oi", 0) or 0)
-            if total_oi > best_oi:
-                best_oi     = total_oi
-                best_expiry = item
-
-        if not best_expiry:
-            return {}
-
-        # Max pain = strike where total option value is minimized
-        # Approximate: weighted average of put/call OI
-        call_oi = float(best_expiry.get("call_oi", 0) or 0)
-        put_oi  = float(best_expiry.get("put_oi",  0) or 0)
-        max_pain_strike = float(best_expiry.get("max_pain_strike",
-                                best_expiry.get("strike", 0)) or 0)
-
-        return {
-            "expiry":          best_expiry.get("expiry",""),
-            "max_pain_strike": max_pain_strike,
-            "call_oi":         int(call_oi),
-            "put_oi":          int(put_oi),
-            "put_call_ratio":  round(put_oi/call_oi, 2) if call_oi > 0 else 0,
-            "high_put_oi":     put_oi > call_oi * 1.5  # warning: heavy put side
-        }
-    except Exception as e:
-        return {}
+    return {}
 
 
 def market_go_nogo(tide: dict, vix_data: dict,
@@ -1035,471 +829,6 @@ STRICT_IVP = {
 # Options income priority — these 6 have best liquidity/volatility structure
 # Scanner scores these higher automatically
 OPTIONS_INCOME_PRIORITY = {"NVDA", "MSFT", "AMZN", "TSLA", "META", "NFLX"}
-
-# Dark Pool notional thresholds by tier (notable, significant)
-DP_THRESHOLDS = {
-    # Mega cap
-    "AAPL":  (50_000_000, 200_000_000),
-    "NVDA":  (50_000_000, 200_000_000),
-    "AMZN":  (50_000_000, 200_000_000),
-    "GOOGL": (50_000_000, 200_000_000),
-    "MSFT":  (50_000_000, 200_000_000),
-    "META":  (50_000_000, 200_000_000),
-    # Large cap core
-    "ASML":  (25_000_000, 100_000_000),
-    "MELI":  (25_000_000, 100_000_000),
-    "TSM":   (25_000_000, 100_000_000),
-    "BRK-B": (25_000_000, 100_000_000),
-    "CPRT":  (20_000_000,  80_000_000),
-    "VRTX":  (20_000_000,  80_000_000),
-    "NVO":   (20_000_000,  80_000_000),
-    "NFLX":  (20_000_000,  80_000_000),
-    # Standard
-    "IBKR":  (15_000_000,  50_000_000),
-    "MU":    (15_000_000,  50_000_000),
-    "NOW":   (15_000_000,  50_000_000),
-    "DDOG":  (10_000_000,  40_000_000),
-    "UBER":  (10_000_000,  40_000_000),
-    "PLTR":  (10_000_000,  40_000_000),
-    "__DEFAULT__": (10_000_000, 30_000_000),
-}
-DP_LEAPS_MIN = 50_000_000  # LEAPS needs much higher bar
-
-
-def score_darkpool(trades: list, ticker: str = "", for_leaps: bool = False) -> dict:
-    """
-    Tiered dark pool analysis. Only surfaces signal when genuinely meaningful.
-    Rules:
-    1. Only show if notional exceeds tier threshold — below = noise, ignored
-    2. Notable  = single large block above threshold
-    3. Significant = multiple blocks (3+) + above VWAP = real accumulation
-    4. Score boost only on Significant — not Notable
-    5. LEAPS bar = $50M+ minimum (single $8.5M print is noise for LEAPS)
-    """
-    empty = {"score":50,"total_notional":0,"label":None,
-             "significant":False,"notable":False,"show":False}
-    if not trades:
-        return empty
-
-    total = bullish = ask_side = 0
-    block_count = 0
-    for t in trades[:30]:
-        size  = float(t.get("size",  0) or 0)
-        price = float(t.get("price", 0) or 0)
-        vwap  = float(t.get("vwap",  price) or price)
-        n     = size * price
-        total += n
-        if n > 1_000_000:
-            block_count += 1
-        if price >= vwap:
-            bullish  += n
-            ask_side += n
-
-    if total == 0:
-        return empty
-
-    score        = round(bullish / total * 100, 1)
-    ask_side_pct = round(ask_side / total * 100, 1)
-    is_bullish   = score > 55
-    is_bearish   = score < 45
-
-    thresh       = DP_THRESHOLDS.get(ticker, DP_THRESHOLDS["__DEFAULT__"])
-    notable_min  = thresh[0]
-    sig_min      = thresh[1]
-    if for_leaps:
-        notable_min = max(notable_min, DP_LEAPS_MIN)
-        sig_min     = max(sig_min, DP_LEAPS_MIN * 2)
-
-    significant  = (total >= sig_min and block_count >= 3 and is_bullish)
-    notable      = (total >= notable_min and not significant)
-    show         = significant or notable
-
-    if not show:
-        return {**empty, "score":score, "total_notional":round(total,0)}
-
-    notional_str = f"${total/1e6:.0f}M" if total >= 1_000_000 else f"${total/1e3:.0f}K"
-
-    if significant and is_bullish:
-        label = (f"🟢 *Dark Pool: Significant accumulation* — "
-                 f"{notional_str} | {block_count} blocks | {ask_side_pct:.0f}% ask-side")
-    elif significant and is_bearish:
-        label = f"🔴 *Dark Pool: Significant distribution* — {notional_str} | {block_count} blocks"
-    elif notable and is_bullish:
-        label = f"🟡 *Dark Pool: Notable buying* — {notional_str}"
-    elif notable and is_bearish:
-        label = f"🟡 *Dark Pool: Notable selling* — {notional_str}"
-    else:
-        label = f"⚪ Dark Pool: Mixed — {notional_str}"
-
-    return {
-        "score":          score,
-        "total_notional": round(total, 0),
-        "block_count":    block_count,
-        "ask_side_pct":   ask_side_pct,
-        "significant":    significant,
-        "notable":        notable,
-        "show":           show,
-        "is_bullish":     is_bullish,
-        "label":          label,
-    }
-
-
-
-def get_max_alloc(ticker): return POSITION_TIERS.get(ticker, POSITION_TIERS["__DEFAULT__"])
-
-
-# Sector mapping for exposure cap
-SECTOR_MAP = {
-    "NVDA":"Technology","MSFT":"Technology","AAPL":"Technology",
-    "ASML":"Technology","TSM":"Technology","CRDO":"Technology","CLS":"Technology",
-    "AMZN":"Consumer","MELI":"Consumer","LULU":"Consumer","NFLX":"Consumer","UBER":"Consumer",
-    "GOOGL":"Communication","META":"Communication",
-    "IBKR":"Financials","BRK-B":"Financials","IBIT":"Financials",
-    "NVO":"Healthcare","VRTX":"Healthcare",
-    "MU":"Semiconductors","AMD":"Semiconductors",
-    "CPRT":"Industrials","KNX":"Industrials","POWL":"Industrials","FIX":"Industrials","VRT":"Industrials",
-    "NOW":"SaaS","DDOG":"SaaS",
-    "TSLA":"Automotive","BABA":"China","PLTR":"Defense/AI",
-}
-
-
-def get_sector_exposure(ibkr_positions: dict) -> dict:
-    """Calculate current sector exposure as % of portfolio."""
-    sector_vals = {}
-    for ticker, pos in ibkr_positions.items():
-        if pos.get("asset_class") != "STK": continue
-        sector = SECTOR_MAP.get(ticker, "Other")
-        sector_vals[sector] = sector_vals.get(sector, 0) + abs(pos.get("market_value", 0))
-    return {s: round(v / PORTFOLIO_SIZE * 100, 1) for s, v in sector_vals.items()}
-
-
-def position_check(ticker, ibkr):
-    pos    = ibkr.get(ticker,{})
-    val    = pos.get("market_value",0)
-    qty    = pos.get("quantity",0)
-    avg    = pos.get("avg_cost",0)
-    pct    = (val / PORTFOLIO_SIZE) * 100
-    max_a  = get_max_alloc(ticker)
-    room   = max(0, round(PORTFOLIO_SIZE * max_a - val, 0))
-    sector = SECTOR_MAP.get(ticker, "Other")
-
-    # Determine tier label
-    if ticker in CORE_STOCKS:        tier = "Core"
-    elif ticker in GROWTH_STOCKS:    tier = "Growth"
-    elif ticker in CYCLICAL_STOCKS:  tier = "Cyclical"
-    else:                            tier = "Opportunistic"
-
-    return {
-        "current_value": round(val,0), "quantity":qty, "avg_cost":avg,
-        "current_pct":   round(pct,2), "max_pct":round(max_a*100,1),
-        "room_usd":      room, "tier":tier, "sector":sector,
-        "status":("OVERWEIGHT" if pct > max_a*100*1.2
-                  else "FULL"  if pct > max_a*100*0.9
-                  else "HAS ROOM" if val > 0 else "NEW POSITION")
-    }
-
-
-# ════════════════════════════════════════════════════════════
-# STOCK QUALITY GATE
-# Framework: quality stock → pullback → check option yield
-# ════════════════════════════════════════════════════════════
-
-def stock_quality_check(ticker, md, earnings_date) -> dict:
-    """
-    Full quality gate based on finalized rules document.
-    Quality stock → pullback → check option yield (never reverse this)
-    """
-    price          = md["price"]
-    w52h           = md.get("week52_high", price)
-    w52l           = md.get("week52_low",  price)
-    pullback       = pullback_from_high(price, w52h)
-    vol            = md.get("avg_volume", 0)
-    ma200          = md.get("ma200", 0)
-    ma50           = md.get("ma50", 0)
-    above_ma200    = md.get("above_ma200", True)
-    pct_above_ma50 = md.get("pct_above_ma50", 0)
-    day_change_pct = md.get("day_change_pct", 0)
-
-    checks = {}
-    warnings = []
-
-    # ── Hard filters ─────────────────────────────────────
-    # Price > $20
-    checks["price_ok"] = price >= 20
-
-    # Volume > 1M shares/day
-    checks["volume_ok"] = vol >= 1_000_000
-
-    # Gap risk: skip if moved >8% today (distorted premiums)
-    checks["no_gap"] = day_change_pct <= GAP_RISK_PCT
-    if not checks["no_gap"]:
-        warnings.append(f"⚡ Gap risk: {day_change_pct*100:.1f}% move today — premiums distorted")
-
-    # Price location: within 8% of 52w high = skip CSP (near highs, poor risk/reward)
-    near_high = pullback < NEAR_HIGH_SKIP
-    checks["not_near_high"] = not near_high
-    if near_high:
-        warnings.append(f"📍 Near 52w high ({pullback*100:.1f}% below) — skip CSP")
-    elif pullback < NEAR_HIGH_CAUTION:
-        warnings.append(f"⚠️ Caution zone ({pullback*100:.1f}% below high)")
-
-    # MA50: skip CSP if >8% above 50-day MA (extended short-term)
-    ma50_extended = pct_above_ma50 > MA50_EXTENDED
-    checks["ma50_ok"] = not ma50_extended
-    if ma50_extended:
-        warnings.append(f"📈 Extended {pct_above_ma50*100:.1f}% above 50MA — wait for pullback")
-
-    # ── Earnings filter ──────────────────────────────────
-    days_to_earnings = None
-    earnings_status = "ok"
-    if earnings_date:
-        days_to_earnings = (earnings_date - datetime.now()).days
-        if 0 < days_to_earnings < EARNINGS_HARD_STOP:
-            checks["earnings_ok"] = False
-            earnings_status = "hard_stop"
-            warnings.append(f"🚨 Earnings in {days_to_earnings}d — HARD STOP")
-        elif 0 < days_to_earnings < EARNINGS_WARNING:
-            checks["earnings_ok"] = True   # allowed but flagged
-            earnings_status = "warning"
-            warnings.append(f"⚠️ Earnings in {days_to_earnings}d — proceed with caution")
-        else:
-            checks["earnings_ok"] = True
-            earnings_status = "ok"
-    else:
-        checks["earnings_ok"] = True
-
-    # ── Soft checks (affect score but not hard filter) ──
-    # Above 200MA (trend health)
-    checks["ma200_ok"] = above_ma200 or (ma200 > 0 and price >= ma200 * 0.95)
-    if not checks["ma200_ok"]:
-        warnings.append("⚠️ Below 200MA — downtrend warning")
-
-    # Pullback in preferred zone
-    checks["pullback_ok"] = PULLBACK_MIN <= pullback <= PULLBACK_MAX
-    if not checks["pullback_ok"] and pullback >= PULLBACK_MIN:
-        pass  # already caught by near_high check above
-
-    # Hard stop conditions
-    # Note: 200MA check is NOT a hard stop for LEAPS on Core holdings
-    # For LEAPS, we're making a 2-year business bet, not a 30-day trend trade
-    hard_stop = (not checks["price_ok"] or
-                 not checks["volume_ok"] or
-                 not checks["no_gap"] or
-                 not checks["not_near_high"] or
-                 not checks["ma50_ok"] or
-                 earnings_status == "hard_stop")
-
-    # Separate LEAPS hard stop — more lenient on 200MA
-    leaps_hard_stop = (not checks["price_ok"] or
-                       not checks["volume_ok"] or
-                       earnings_status == "hard_stop")  # gap/near_high/ma50 not blocking LEAPS
-
-    quality_score = sum(checks.values())
-
-    return {
-        "checks":           checks,
-        "quality_score":    quality_score,
-        "pullback":         pullback,
-        "pullback_pct":     round(pullback * 100, 1),
-        "days_to_earnings": days_to_earnings,
-        "earnings_status":  earnings_status,
-        "pct_above_ma50":   round(pct_above_ma50 * 100, 1),
-        "ma50_extended":    ma50_extended,
-        "near_high":        near_high,
-        "warnings":         warnings,
-        "hard_stop":        hard_stop,
-        "leaps_hard_stop":  leaps_hard_stop,
-        "passes":           not hard_stop and quality_score >= 3,
-    }
-
-
-# ════════════════════════════════════════════════════════════
-# TIMING INTELLIGENCE (IVP + price position)
-# ════════════════════════════════════════════════════════════
-
-def timing_score(strategy, pir, ivp, is_spec=False, ivp_override=None) -> dict:
-    # Allow per-stock IVP floor override (e.g. PLTR needs IVP > 40)
-    effective_ivp_min = ivp_override if ivp_override else IVP_MIN_SELL
-    if strategy in ("CSP","CC") and ivp < effective_ivp_min:
-        return {"score": 10, "recommend": False,
-                "signal": f"❌ SKIP — IVP {ivp:.0f}% below minimum ({effective_ivp_min})"}
-    high_ivp  = ivp >= IVP_MIN_SELL
-    low_ivp   = ivp <= IVP_MAX_BUY
-    near_low  = pir < 0.30
-    near_high = pir > 0.70
-    spec = " (use wider strikes — speculative)" if is_spec else ""
-
-    if strategy == "CSP":
-        if high_ivp and near_low:
-            return {"score":95,"recommend":True,
-                    "signal":f"🔥 EXCELLENT — IVP {ivp:.0f}% + near 52w low{spec}"}
-        elif high_ivp and not near_high:
-            return {"score":80,"recommend":True,
-                    "signal":f"✅ GOOD — IVP {ivp:.0f}%, healthy price level{spec}"}
-        elif high_ivp and near_high:
-            return {"score":55,"recommend":True,
-                    "signal":f"⚠️ CAUTION — IVP {ivp:.0f}% but near 52w high{spec}"}
-        elif not high_ivp:
-            return {"score":20,"recommend":False,
-                    "signal":f"❌ SKIP — IVP {ivp:.0f}% too low for premium selling"}
-
-    elif strategy == "CC":
-        if near_low:
-            return {"score":5,"recommend":False,
-                    "signal":"❌ AVOID — Never sell CC near 52w low (limits upside in recovery)"}
-        elif near_high and high_ivp:
-            return {"score":90,"recommend":True,
-                    "signal":f"🔥 EXCELLENT — Near highs + IVP {ivp:.0f}%"}
-        elif near_high:
-            return {"score":75,"recommend":True,
-                    "signal":f"✅ GOOD — Stock near highs, income opportunity"}
-        elif high_ivp:
-            return {"score":65,"recommend":True,
-                    "signal":f"✅ OK — IVP {ivp:.0f}% boosts CC premium"}
-        else:
-            return {"score":30,"recommend":False,
-                    "signal":f"⚠️ WEAK — IVP {ivp:.0f}% too low for CC"}
-
-    elif strategy == "LEAPS":
-        # LEAPS logic: want LOW IVP (cheap options) + good price entry
-        # IVP < 30  = cheap options = ideal to buy
-        # IVP 30-50 = moderate = acceptable
-        # IVP > 50  = expensive = avoid
-        # Price location: near 52w low = best entry, mid-range = ok, near high = avoid
-        very_cheap = ivp < 30
-        cheap      = ivp <= 50   # same as low_ivp
-        expensive  = ivp > 50
-
-        if is_spec and near_high:
-            return {"score":5,"recommend":False,
-                    "signal":"❌ AVOID — Speculative + near highs, wait for bigger drawdown"}
-        elif expensive and near_high:
-            return {"score":5,"recommend":False,
-                    "signal":f"❌ POOR — IVP {ivp:.0f}% expensive + near highs"}
-        elif expensive and not near_low:
-            return {"score":20,"recommend":False,
-                    "signal":f"❌ SKIP — IVP {ivp:.0f}% too expensive to buy LEAPS (want <50%)"}
-        elif very_cheap and near_low:
-            return {"score":98,"recommend":True,
-                    "signal":f"🔥 EXCEPTIONAL — IVP {ivp:.0f}% (very cheap) + near 52w low"}
-        elif very_cheap and not near_high:
-            return {"score":85,"recommend":True,
-                    "signal":f"🔥 EXCELLENT — IVP {ivp:.0f}% very cheap LEAPS"}
-        elif cheap and near_low:
-            return {"score":82,"recommend":True,
-                    "signal":f"✅ GOOD — IVP {ivp:.0f}% + near 52w low = solid LEAPS entry"}
-        elif cheap and not near_high:
-            return {"score":68,"recommend":True,
-                    "signal":f"✅ ACCEPTABLE — IVP {ivp:.0f}%, reasonable LEAPS entry"}
-        elif expensive and near_low:
-            return {"score":45,"recommend":True,
-                    "signal":f"⚠️ MIXED — Near 52w low but IVP {ivp:.0f}% makes options pricey"}
-        else:
-            return {"score":25,"recommend":False,
-                    "signal":f"⚠️ WEAK — IVP {ivp:.0f}% elevated + not near lows"}
-
-    elif strategy == "PMCC":
-        # PMCC short call — same as CC but we own LEAPS not stock
-        if near_low:
-            return {"score":5,"recommend":False,"signal":"❌ AVOID — Don't sell calls near lows"}
-        elif high_ivp:
-            return {"score":82,"recommend":True,
-                    "signal":f"✅ GOOD — IVP {ivp:.0f}% gives fat PMCC premium"}
-        else:
-            return {"score":40,"recommend":False,
-                    "signal":f"⚠️ WEAK — Low IVP {ivp:.0f}% for PMCC short call"}
-
-    elif strategy == "BCS":
-        # Bull call spread — want moderate to high IVP, near lows preferred
-        if near_low and not high_ivp:
-            return {"score":88,"recommend":True,
-                    "signal":f"✅ GOOD — Near lows + IVP {ivp:.0f}%, directional setup"}
-        elif near_low and high_ivp:
-            return {"score":70,"recommend":True,
-                    "signal":f"✅ OK — Near lows but IVP {ivp:.0f}% makes spread wider"}
-        elif near_high:
-            return {"score":20,"recommend":False,
-                    "signal":"❌ AVOID — Don't buy bull spreads near 52w highs"}
-        else:
-            return {"score":55,"recommend":True,
-                    "signal":f"⚠️ NEUTRAL — Moderate timing for bull spread"}
-
-    return {"score":50,"recommend":True,"signal":"Neutral"}
-
-
-# ════════════════════════════════════════════════════════════
-# OPPORTUNITY FINDERS
-# ════════════════════════════════════════════════════════════
-
-def find_best_csp(ticker, price, contracts, ivdata, pir, quality):
-    # Per-stock IVP minimum (stricter for PLTR/BABA)
-    ivp_min = STRICT_IVP.get(ticker, IVP_MIN_SELL)
-    timing = timing_score("CSP", pir, ivdata["ivp"], ticker in SPECULATIVE,
-                          ivp_override=ivp_min)
-    if not timing["recommend"]: return None, timing
-    if not contracts or price <= 0: return None, timing
-
-    atm_iv = ivdata["iv_current"]
-    today  = datetime.now()
-    best   = None; best_score = 0
-
-    # Wider OTM for speculative names
-    otm_min = 10 if ticker in SPECULATIVE else 3
-    otm_max = 20
-
-    for c in contracts:
-        parsed = parse_option_symbol(c.get("option_symbol",""))
-        if not parsed: continue
-        expiry, opt_type, strike = parsed
-        if opt_type != "P": continue
-        dte = (expiry - today).days
-        if not (CSP_DTE_MIN <= dte <= CSP_DTE_MAX): continue
-        otm_pct = (price - strike) / price * 100
-        if not (otm_min <= otm_pct <= otm_max): continue
-        bid = float(c.get("nbbo_bid",0) or 0)
-        ask = float(c.get("nbbo_ask",0) or 0)
-        mid = (bid + ask) / 2
-        if mid < 1.0: continue
-        if mid > strike * 0.25: continue
-        # Liquidity filter: OI > 1000, volume > 100, spread < 5%
-        oi_val  = int(c.get("open_interest", 0) or 0)
-        vol_val = int(c.get("volume", 0) or 0)
-        spread  = (ask - bid) / ask if ask > 0 else 1
-        if oi_val < MIN_OPEN_INTEREST: continue
-        if vol_val < MIN_DAILY_VOLUME: continue
-        if spread > MAX_BID_ASK_SPREAD: continue
-        # Premium efficiency: must be ≥1.5% of strike for 30-45 DTE
-        prem_pct = mid / strike
-        min_prem_pct = MIN_PREMIUM_PCT_30_45 if dte <= 45 else MIN_PREMIUM_PCT_45_60
-        if prem_pct < min_prem_pct: continue
-        delta = estimate_delta(price, strike, dte, atm_iv, "P")
-        # Use stricter delta for specific stocks (PLTR, TSLA, BABA)
-        d_min, d_max = STRICT_DELTA.get(ticker, (CSP_DELTA_MIN, CSP_DELTA_MAX))
-        # Allow up to 0.35 delta when IVP is elevated (>50)
-        if ivdata["ivp"] >= IVP_ELEVATED:
-            d_max = min(CSP_DELTA_MAX_HIGH_IV, d_max + 0.05)
-        if delta is None or not (d_min <= delta <= d_max): continue
-        # Correct formula: premium / (strike×100 collateral) × (365/dte)
-        # Matches spreadsheet: $385 / $28,000 × (365/29) = 17%
-        annualized = (mid / strike) * (365 / dte) * 100
-        below_min  = annualized < CSP_MIN_ANNUALIZED
-        if annualized > MAX_ANNUALIZED: continue  # filter bad data only
-        max_contracts = max(1, int((PORTFOLIO_SIZE * get_max_alloc(ticker)) / (strike * 100)))
-        # Options income priority stocks score 20% higher (better liquidity/fills)
-        priority_boost = 1.2 if ticker in OPTIONS_INCOME_PRIORITY else 1.0
-        score = (timing["score"]/100) * (quality["quality_score"]/5) * mid * (1 + atm_iv) * (1 - abs(dte-37)/37) * priority_boost
-        if score > best_score:
-            best_score = score
-            best = {"strike":strike,"expiry":expiry.strftime("%Y-%m-%d"),"dte":dte,
-                    "bid":round(bid,2),"ask":round(ask,2),"premium":round(mid,2),
-                    "otm_pct":round(otm_pct,1),"iv":round(atm_iv*100,1),
-                    "ivp":ivdata["ivp"],"delta":delta,
-                    "annualized_return":round(annualized,1),
-                "below_min":       below_min,
-                    "max_contracts":max_contracts,
-                    "collateral":round(strike*100*max_contracts,0),
-                    "timing":timing}
-    return best, timing
 
 
 def get_position_status(current_pct: float) -> str:
@@ -2627,11 +1956,9 @@ def run_scanner():
     print(f"   {ok}/{len(all_tickers)} prices ✓")
 
     print("🌊 Market intelligence...")
-    flow       = get_flow_alerts_market()
+    flow       = []  # UW flow removed
 
-    print("   📊 Fetching Market Tide...")
-    tide       = get_market_tide()
-    print(f"   {tide['label']}")
+    tide = {"score": 0, "label": "—", "available": False}
 
     print("   📈 Fetching S&P 500 regime...")
     spy_md     = get_market_data(["SPY"]).get("SPY", {})
@@ -2682,8 +2009,7 @@ def run_scanner():
         f" Higher VIX = fatter premiums = better CSP/CC income._\n"
         f"\n"
 
-        f"*Market Tide: {gng['tide_score']:+.1f}*\n"
-        f"{tide['label']}\n"
+
         f"_Tide = net call minus put premium across the whole market."
         f" Positive = money flowing into calls. Negative = put hedging (fear)._\n"
         f"\n"
@@ -2744,17 +2070,14 @@ def run_scanner():
         if schwab_ivp > 0:
             ivdata["ivp"] = schwab_ivp  # replace proxy with real IVP
         sizing     = position_check(ticker, ibkr)
-        dp_stock   = score_darkpool(get_darkpool(ticker), ticker=ticker)
-        dp_leaps   = score_darkpool(get_darkpool(ticker), ticker=ticker, for_leaps=True)
-        dp         = dp_stock  # default used for CSP/CC
+        dp_stock   = {"show": False, "score": 50, "total_notional": 0}
+        dp_leaps   = {"show": False, "score": 50, "total_notional": 0}
+        dp         = dp_stock
         dp_boost   = 1.2 if dp.get("significant") else 1.0  # only boost on significant dark pool
 
-        # OI signal for this ticker — warns if puts are being targeted
-        oi_sig     = oi_signals.get(ticker, {})
-        oi_warning = oi_sig.get("net", 0) < -500  # heavy new put OI = warning
-
-        # Expiry breakdown — find max pain and risky strikes
-        exp_bdown  = get_expiry_breakdown(ticker)
+        oi_sig     = {}
+        oi_warning = False
+        exp_bdown  = {}
 
         base = {"ticker":ticker,"price":price,"pir":pir,
                 "tier":tier,
