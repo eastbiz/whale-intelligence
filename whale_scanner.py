@@ -863,9 +863,9 @@ def position_check(ticker: str, ibkr: dict) -> dict:
 
     # Look up current position from IBKR/Schwab
     pos         = ibkr.get(ticker, {})
-    qty         = float(pos.get("qty", 0) or 0)
-    avg_cost    = float(pos.get("avg_cost", 0) or 0)
-    mkt_val     = float(pos.get("market_value", qty * avg_cost) or 0)
+    qty         = float(pos.get("qty", 0) or pos.get("quantity", 0) or 0)
+    avg_cost    = float(pos.get("avg_cost", 0) or pos.get("averagePrice", 0) or 0)
+    mkt_val     = float(pos.get("market_value", 0) or pos.get("marketValue", qty * avg_cost) or 0)
 
     current_pct = round(mkt_val / PORTFOLIO_SIZE * 100, 2) if PORTFOLIO_SIZE > 0 else 0
     room_usd    = max(0, max_usd - mkt_val)
@@ -3039,11 +3039,17 @@ def run_scanner():
                 if mid < 0.05: continue
                 delta = abs(float(c.get("delta",0) or 0))
                 if delta == 0: delta = abs(estimate_delta(price,strike,dte,0.30,"P") or 0)
-                if not (0.10 <= delta <= 0.45): continue
+                # Target income CSP delta: 0.20-0.35 preferred, allow 0.15-0.40
+                if not (0.15 <= delta <= 0.40): continue
+                # Must be at least 3% OTM
+                otm = (price - strike) / price * 100
+                if otm < 3: continue
                 if int(c.get("open_interest",0) or 0) < 50: continue
                 ann = (mid/strike)*(365/dte)*100
                 if ann < 3 or ann > 300: continue
-                score = ann * delta
+                # Score: favor 0.25-0.35 delta range (ideal income zone)
+                delta_score = 1.0 - abs(delta - 0.28) * 3  # peaks at delta=0.28
+                score = ann * max(0.1, delta_score)
                 if score > best_csp_score:
                     best_csp_score = score
                     best_csp = {"strike":strike,"expiry":c["expiry"],"dte":dte,
