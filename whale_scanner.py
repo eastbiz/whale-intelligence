@@ -201,7 +201,11 @@ def schwab_get_token() -> str:
             print("   ✅ Schwab token refreshed")
             return c["access_token"]
         else:
-            print(f"   ⚠️ Schwab token refresh failed ({r.status_code}) — using stored token")
+            if r.status_code == 400:
+                print(f"   ⚠️ Schwab refresh token expired (400)")
+                print(f"   ℹ️  Run schwab_test.py on Windows, then update SCHWAB_REFRESH_TOKEN in GitHub Secrets")
+            else:
+                print(f"   ⚠️ Schwab token refresh failed ({r.status_code}) — using stored token")
             return SCHWAB_ACCESS_TOKEN
     except Exception as e:
         print(f"   ⚠️ Schwab token error: {e}")
@@ -447,11 +451,15 @@ def get_market_data(tickers: list) -> dict:
             ma200 = sum(closes_clean[-200:]) / min(200, len(closes_clean)) if closes_clean else 0
             ma50  = sum(closes_clean[-50:])  / min(50,  len(closes_clean)) if closes_clean else 0
             price = float(meta.get("regularMarketPrice", 0))
-            prev_close = float(meta.get("regularMarketPreviousClose",
-                              meta.get("previousClose",
-                              meta.get("chartPreviousClose", price))) or price)
-            day_change_pct = abs(price - prev_close) / prev_close if prev_close > 0 else 0
-            print(f"   {ticker}: price=${price} prev=${prev_close} change={day_change_pct*100:.1f}%")
+            # Only use regularMarketPreviousClose — chartPreviousClose can be stale
+            prev_close = float(meta.get("regularMarketPreviousClose", 0) or 0)
+            if prev_close <= 0:
+                prev_close = price  # can't calculate change, assume 0%
+            day_change_pct = (price - prev_close) / prev_close if prev_close > 0 else 0
+            # Sanity check — ignore if change looks like stale data (>50% single day move)
+            if abs(day_change_pct) > 0.50:
+                day_change_pct = 0.0
+                prev_close = price
 
             data[ticker] = {
                 "price":          round(price, 2),
@@ -829,6 +837,119 @@ STRICT_IVP = {
 # Options income priority — these 6 have best liquidity/volatility structure
 # Scanner scores these higher automatically
 OPTIONS_INCOME_PRIORITY = {"NVDA", "MSFT", "AMZN", "TSLA", "META", "NFLX"}
+
+
+def stock_quality_check(ticker: str, md: dict, earn_date) -> dict:
+    """
+    Quality gate for all strategies.
+    Returns dict with: passes, hard_stop, leaps_hard_stop, quality_score,
+    pullback, pullback_pct, warnings, checks, earnings_status, near_high,
+    ma50_extended, pct_above_ma50, days_to_earnings.
+    """
+    price     = md.get("price", 0)
+    w52_high  = md.get("w52_high", price * 1.3)
+    w52_low   = md.get("w52_low",  price * 0.7)
+    ma50      = md.get("ma50",  price)
+    ma200     = md.get("ma200", price * 0.95)
+    volume    = md.get("volume", 0)
+    avg_vol   = md.get("avg_volume", volume)
+
+    # ── Price / volume checks ────────────────────────────
+    price_ok  = price >= 10
+    volume_ok = volume >= 50_000 or avg_vol >= 50_000
+
+    # ── Gap / spike check ────────────────────────────────
+    day_change = md.get("day_change_pct", 0)
+    no_gap     = abs(day_change) < 0.08   # >8% move = gap risk
+
+    # ── 52-week high proximity ────────────────────────────
+    pir        = position_in_range(price, w52_low, w52_high)
+    near_high  = pir > 0.92               # within 8% of 52w high
+    pullback   = pullback_from_high(price, w52_high)
+
+    # ── MA50 extension check ──────────────────────────────
+    pct_above_ma50 = (price - ma50) / ma50 if ma50 > 0 else 0
+    ma50_extended  = pct_above_ma50 > 0.08  # >8% above 50MA
+
+    # ── MA200 check ───────────────────────────────────────
+    above_ma200 = price >= ma200 * 0.97   # within 3% tolerance
+
+    # ── Earnings check ────────────────────────────────────
+    days_to_earnings = 999
+    if earn_date:
+        try:
+            delta = (earn_date - datetime.now()).days
+            days_to_earnings = max(0, delta)
+        except:
+            pass
+
+    if days_to_earnings < 14:
+        earnings_status = "hard_stop"
+    elif days_to_earnings < 21:
+        earnings_status = "warning"
+    else:
+        earnings_status = "ok"
+
+    # ── Build checks dict ─────────────────────────────────
+    checks = {
+        "price_ok":      price_ok,
+        "volume_ok":     volume_ok,
+        "no_gap":        no_gap,
+        "not_near_high": not near_high,
+        "ma50_ok":       not ma50_extended,
+        "above_ma200":   above_ma200,
+    }
+
+    # ── Quality score 0-5 ─────────────────────────────────
+    quality_score = sum([
+        1 if price_ok else 0,
+        1 if volume_ok else 0,
+        1 if no_gap else 0,
+        1 if not near_high else 0,
+        1 if not ma50_extended else 0,
+    ])
+
+    # ── Warnings ──────────────────────────────────────────
+    warnings = []
+    if near_high:          warnings.append("Near 52w high")
+    if ma50_extended:      warnings.append(">8% above MA50")
+    if not above_ma200:    warnings.append("Below 200MA")
+    if earnings_status == "warning": warnings.append(f"Earnings in {days_to_earnings}d")
+    if not no_gap:         warnings.append(f"Gap/spike {day_change:.1%}")
+
+    # ── Hard stops ────────────────────────────────────────
+    hard_stop = (
+        not price_ok or
+        not volume_ok or
+        not no_gap or
+        near_high or
+        ma50_extended or
+        earnings_status == "hard_stop"
+    )
+
+    # LEAPS hard stop is more lenient — only earnings and price matter
+    leaps_hard_stop = (
+        not price_ok or
+        not volume_ok or
+        earnings_status == "hard_stop"
+    )
+
+    return {
+        "checks":           checks,
+        "quality_score":    quality_score,
+        "pullback":         pullback,
+        "pullback_pct":     round(pullback * 100, 1),
+        "days_to_earnings": days_to_earnings,
+        "earnings_status":  earnings_status,
+        "pct_above_ma50":   round(pct_above_ma50 * 100, 1),
+        "ma50_extended":    ma50_extended,
+        "near_high":        near_high,
+        "above_ma200":      above_ma200,
+        "warnings":         warnings,
+        "hard_stop":        hard_stop,
+        "leaps_hard_stop":  leaps_hard_stop,
+        "passes":           not hard_stop and quality_score >= 3,
+    }
 
 
 def get_position_status(current_pct: float) -> str:
