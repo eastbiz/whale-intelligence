@@ -848,10 +848,10 @@ def position_check(ticker: str, ibkr: dict) -> dict:
 
     # Determine tier
     tier = "Core"
-    for t, tickers in STOCK_UNIVERSE.items():
-        if ticker in tickers:
-            tier = t
-            break
+    if ticker in CORE_STOCKS:        tier = "Core"
+    elif ticker in GROWTH_STOCKS:    tier = "Growth"
+    elif ticker in CYCLICAL_STOCKS:  tier = "Cyclical"
+    else:                            tier = "Opportunistic"
 
     max_pct     = TIER_MAX.get(tier, 2.5)
     max_usd     = PORTFOLIO_SIZE * max_pct / 100
