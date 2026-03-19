@@ -2251,6 +2251,8 @@ def run_scanner():
         if schwab_ivp > 0:
             ivdata["ivp"] = schwab_ivp  # replace proxy with real IVP
         sizing     = position_check(ticker, ibkr)
+        qty        = sizing["quantity"]
+        avg        = sizing["avg_cost"]
         dp_stock   = {"show": False, "score": 50, "total_notional": 0}
         dp_leaps   = {"show": False, "score": 50, "total_notional": 0}
         dp         = dp_stock
