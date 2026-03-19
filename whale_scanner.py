@@ -2487,6 +2487,11 @@ def run_scanner():
 
     csp_opps = []; cc_opps  = []; leaps_opps = []
     pmcc_opps= []; bcs_opps = []; spike_opps = []; drop_opps = []; pio_opps = []
+    # Caches for dashboard reuse — avoid re-fetching chains
+    contracts_cache = {}
+    schwab_ivp_cache = {}
+    qty_cache = {}
+    avg_cache = {}
 
     print(f"\n🔍 Scanning {len(all_tickers)} stocks...")
     for ticker in all_tickers:
@@ -2529,6 +2534,11 @@ def run_scanner():
         sizing     = position_check(ticker, ibkr)
         qty        = sizing["quantity"]
         avg        = sizing["avg_cost"]
+        # Cache for dashboard scan
+        contracts_cache[ticker]  = contracts
+        schwab_ivp_cache[ticker] = schwab_ivp
+        qty_cache[ticker]        = qty
+        avg_cache[ticker]        = avg
         dp_stock   = {"show": False, "score": 50, "total_notional": 0}
         dp_leaps   = {"show": False, "score": 50, "total_notional": 0}
         dp         = dp_stock
@@ -2846,6 +2856,115 @@ def run_scanner():
             "risk_note":         None,
         }
 
+    # ── Dashboard-only scan — collect ALL candidates for review ──
+    # Relaxed quality gate — shows everything sorted best to worst
+    # Telegram stays strict, dashboard shows full picture
+    dashboard_csps  = []
+    dashboard_ccs   = []
+    dashboard_leaps = []
+
+    for ticker in all_tickers:
+        if ticker in CORE_STOCKS:        tier = "Core"
+        elif ticker in GROWTH_STOCKS:    tier = "Growth"
+        elif ticker in CYCLICAL_STOCKS:  tier = "Cyclical"
+        else:                            tier = "Opportunistic"
+
+        md    = mkt.get(ticker, {})
+        price = md.get("price", 0)
+        if price <= 0: continue
+
+        w52h     = md.get("week52_high", price)
+        w52l     = md.get("week52_low",  price)
+        pir      = position_in_range(price, w52l, w52h)
+        earn_date = get_earnings_date(ticker)
+        quality  = stock_quality_check(ticker, md, earn_date)
+        ivdata_d = calculate_ivp(contracts_cache.get(ticker, []))
+        if schwab_ivp_cache.get(ticker, 0) > 0:
+            ivdata_d["ivp"] = schwab_ivp_cache[ticker]
+
+        # Hard earnings stop still applies — never trade near earnings
+        if quality["earnings_status"] == "hard_stop": continue
+        if price < 10: continue
+
+        contracts_d = contracts_cache.get(ticker, [])
+        if not contracts_d: continue
+
+        # CSP — relaxed: skip near-high/ma50/gap checks, keep earnings
+        csp_d, _ = find_best_csp(ticker, price, contracts_d, ivdata_d, pir, quality)
+        if csp_d:
+            warnings = []
+            if quality["near_high"]:      warnings.append("Near 52w high")
+            if quality["ma50_extended"]:  warnings.append(">8% above MA50")
+            if not quality["checks"].get("above_ma200", True): warnings.append("Below 200MA")
+            if not quality["checks"].get("no_gap", True):      warnings.append("Gap/spike day")
+            if quality["earnings_status"] == "warning":        warnings.append(f"Earnings ~{quality['days_to_earnings']}d")
+            dashboard_csps.append({
+                "ticker": ticker, "tier": tier, "price": price,
+                "ivp": round(ivdata_d["ivp"], 1),
+                "mode": "CSP",
+                "strike": csp_d["strike"], "expiry": csp_d["expiry"],
+                "dte": csp_d["dte"], "premium": csp_d["premium"],
+                "annualized_return": csp_d["annualized_return"],
+                "delta": csp_d["delta"],
+                "below_min": csp_d.get("below_min", False),
+                "warnings": warnings,
+                "passes_quality": not quality["hard_stop"],
+                "signal": csp_d["timing"].get("signal", ""),
+                "risk_note": ", ".join(warnings) if warnings else None,
+            })
+
+        # CC — relaxed
+        if qty_cache.get(ticker, 0) >= 100:
+            avg_d = avg_cache.get(ticker, 0)
+            cc_d, _ = find_best_cc(ticker, price, qty_cache[ticker], avg_d, contracts_d, ivdata_d, pir)
+            if cc_d:
+                warnings = []
+                if quality["earnings_status"] == "warning": warnings.append(f"Earnings ~{quality['days_to_earnings']}d")
+                dashboard_ccs.append({
+                    "ticker": ticker, "tier": tier, "price": price,
+                    "ivp": round(ivdata_d["ivp"], 1),
+                    "mode": "CC",
+                    "strike": cc_d["strike"], "expiry": cc_d["expiry"],
+                    "dte": cc_d["dte"], "premium": cc_d["premium"],
+                    "annualized_return": cc_d["annualized_return"],
+                    "delta": cc_d["delta"],
+                    "below_min": cc_d["annualized_return"] < CC_MIN_ANNUALIZED,
+                    "warnings": warnings,
+                    "passes_quality": not quality["hard_stop"],
+                    "signal": cc_d["timing"].get("signal", ""),
+                    "risk_note": ", ".join(warnings) if warnings else None,
+                })
+
+        # LEAPS — relaxed: use leaps_hard_stop only
+        if not quality["leaps_hard_stop"] and ticker not in LEAPS_ONLY:
+            leaps_d, lt = find_best_leaps(ticker, price, contracts_d, ivdata_d, pir)
+            if leaps_d:
+                warnings = []
+                if not quality["checks"].get("above_ma200", True): warnings.append("Below 200MA")
+                if quality["earnings_status"] == "warning":        warnings.append(f"Earnings ~{quality['days_to_earnings']}d")
+                dashboard_leaps.append({
+                    "ticker": ticker, "tier": tier, "price": price,
+                    "ivp": round(ivdata_d["ivp"], 1),
+                    "mode": "LEAPS",
+                    "strike": leaps_d["strike"], "expiry": leaps_d["expiry"],
+                    "dte": leaps_d["dte"], "premium": leaps_d["premium"],
+                    "annualized_return": 0,
+                    "delta": leaps_d["delta"],
+                    "extrinsic_pct": leaps_d["extrinsic_pct"],
+                    "below_min": False,
+                    "warnings": warnings,
+                    "passes_quality": not quality["hard_stop"],
+                    "signal": lt.get("signal", ""),
+                    "risk_note": ", ".join(warnings) if warnings else None,
+                })
+
+    # Sort each category by annualized return (or score for LEAPS)
+    dashboard_csps.sort(key=lambda x: x["annualized_return"], reverse=True)
+    dashboard_ccs.sort(key=lambda x: x["annualized_return"], reverse=True)
+    dashboard_leaps.sort(key=lambda x: x["ivp"], reverse=False)  # lowest IVP first = cheapest
+
+    print(f"   📊 Dashboard: {len(dashboard_csps)} CSPs | {len(dashboard_ccs)} CCs | {len(dashboard_leaps)} LEAPS")
+
     all_opps = []
     for o in top_csps:   all_opps.append(opp_to_dict(o, "csp"))
     for o in top_ccs:    all_opps.append(opp_to_dict(o, "cc"))
@@ -2915,6 +3034,7 @@ def run_scanner():
         "scan_time":      now_et().strftime("%Y-%m-%d %H:%M ET"),
         "scan_date":      now_et().strftime("%Y-%m-%d"),
         "portfolio_size": PORTFOLIO_SIZE,
+        "dashboard_opportunities": dashboard_csps + dashboard_ccs + dashboard_leaps,
         "market": {
             "vix":        gng["vix"],
             "vix_label":  vix_data.get("label",""),
