@@ -48,6 +48,9 @@ POSITION_TIERS = {
 
 # ── Strategy parameters (from framework doc) ────────────────
 CSP_DTE_MIN           = 30;   CSP_DTE_MAX     = 45
+CSP_MIN_DTE           = 30;   CSP_MAX_DTE     = 45   # aliases
+CSP_DELTA_PLTR_MIN    = 0.20; CSP_DELTA_PLTR_MAX = 0.25  # PLTR stricter
+CSP_DELTA_HIGH_IVP_MAX= 0.35  # allowed when IVP > 50
 CC_DTE_MIN            = 30;   CC_DTE_MAX      = 45
 LEAPS_DTE_MIN         = 500   # 2+ years
 # CSP: default delta 0.25-0.30, up to 0.35 only when IVP > 50
@@ -1542,8 +1545,7 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality) -> tuple:
 
             iv   = round(float(c.get("iv", 0) or atm_iv) * 100, 1)
             timing = timing_score("CSP", pir, ivdata["ivp"])
-            # Always include — let dashboard decide what to show
-
+            # score lower if timing doesn't recommend — but still include
             score = timing["score"] * delta * annualized
             candidates.append({
                 "strike":            strike,
@@ -1576,8 +1578,8 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality) -> tuple:
 
 def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir):
     timing = timing_score("CC", pir, ivdata["ivp"])
-    if not timing["recommend"]: return None, timing
     if not contracts or price <= 0 or qty < 100: return None, timing
+    # Note: timing["recommend"] is advisory only — dashboard shows all
 
     atm_iv        = ivdata["iv_current"]
     today         = datetime.now()
@@ -1611,7 +1613,8 @@ def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir):
         delta = estimate_delta(price, strike, dte, atm_iv, "C")
         if delta is None or not (CC_DELTA_MIN <= delta <= CC_DELTA_MAX): continue
         annualized = (mid / price) * (365 / dte) * 100
-        if not (CC_MIN_ANNUALIZED <= annualized <= MAX_ANNUALIZED): continue
+        if annualized > MAX_ANNUALIZED: continue  # filter bad data only
+        if annualized < 3: continue  # reject truly garbage premiums
         score = (timing["score"]/100) * mid * (1 + atm_iv) * (1 - abs(dte-37)/37)
         if score > best_score:
             best_score = score
@@ -2918,10 +2921,12 @@ def run_scanner():
                 "risk_note": ", ".join(warnings) if warnings else None,
             })
 
-        # CC — relaxed
-        if qty_cache.get(ticker, 0) >= 100:
-            avg_d = avg_cache.get(ticker, 0)
-            cc_d, _ = find_best_cc(ticker, price, qty_cache[ticker], avg_d, contracts_d, ivdata_d, pir)
+        # CC — relaxed — check both ibkr and schwab positions for shares
+        ibkr_pos_d = ibkr.get(ticker, {})
+        qty_d = float(ibkr_pos_d.get("quantity", ibkr_pos_d.get("qty", 0)) or 0)
+        avg_d = float(ibkr_pos_d.get("avg_cost", 0) or 0)
+        if qty_d >= 100:
+            cc_d, _ = find_best_cc(ticker, price, qty_d, avg_d, contracts_d, ivdata_d, pir)
             if cc_d:
                 warnings = []
                 if quality["earnings_status"] == "warning": warnings.append(f"Earnings ~{quality['days_to_earnings']}d")
@@ -3058,32 +3063,62 @@ def run_scanner():
             "below_min": False, "risk_note": None,
         })
 
-    # Build positions list
+    # Build positions list — anonymized for public dashboard
+    # No share counts, no dollar values, no exact P&L or portfolio size
     pos_list = []
     for ticker, pos in ibkr.items():
         if pos.get("asset_class") == "STK" and pos.get("market_value",0) > 0:
-            price_now = mkt.get(ticker,{}).get("price", pos.get("avg_cost",0))
-            avg = pos.get("avg_cost",0)
+            price_now = mkt.get(ticker,{}).get("price", 0) or pos.get("avg_cost",0)
+            avg = float(pos.get("avg_cost",0) or 0)
+            qty_p = int(pos.get("quantity", pos.get("qty", 0)) or 0)
             pnl = round((price_now - avg) / avg * 100, 1) if avg > 0 else 0
+            mv  = float(pos.get("market_value", qty_p * price_now) or 0)
             tier = ("Core" if ticker in CORE_STOCKS else
                     "Growth" if ticker in GROWTH_STOCKS else
                     "Cyclical" if ticker in CYCLICAL_STOCKS else "Opportunistic")
+            global_pct = round(mv/PORTFOLIO_SIZE*100, 1) if PORTFOLIO_SIZE > 0 else 0
+            max_pct = {"Core":8.0,"Growth":5.0,"Cyclical":4.0,"Opportunistic":2.5}.get(tier,2.5)
+
+            # Broad P&L buckets — no exact numbers
+            if pnl > 15:      pnl_status = "strong_profit"
+            elif pnl > 5:     pnl_status = "profit"
+            elif pnl > -5:    pnl_status = "breakeven"
+            elif pnl > -15:   pnl_status = "loss"
+            else:             pnl_status = "significant_loss"
+
+            # Position size status
+            if global_pct >= max_pct:       size_status = "overweight"
+            elif global_pct >= max_pct*0.8: size_status = "near_max"
+            elif global_pct >= max_pct*0.4: size_status = "normal"
+            else:                           size_status = "light"
+
+            # Action signal
+            if pnl_status in ("strong_profit","profit") and size_status in ("overweight","near_max"):
+                action = "REDUCE"; action_note = "In profit + overweight — consider trimming"
+            elif pnl_status in ("strong_profit","profit"):
+                action = "GENERATE INCOME"; action_note = "In profit — sell covered calls"
+            elif pnl_status == "breakeven":
+                action = "HOLD"; action_note = "Near break-even — conservative CC if possible"
+            elif pnl_status in ("loss","significant_loss") and size_status == "light":
+                action = "MONITOR"; action_note = "In loss — monitor, no averaging down"
+            else:
+                action = "PROTECT"; action_note = "In loss — sell conservative CC to reduce cost basis"
+
+            has_cc = any(o.get("ticker")==ticker and o.get("mode")=="CC" for o in dashboard_ccs)
+
             pos_list.append({
-                "ticker":        ticker,
-                "shares":        int(pos.get("qty",0)),
-                "avg_cost":      round(avg,2),
-                "current_price": round(price_now,2),
-                "pnl_pct":       pnl,
-                "pnl_status":    "profit" if pnl>5 else "loss" if pnl<-5 else "breakeven",
-                "tier":          tier,
-                "account":       pos.get("account","Schwab"),
-                "global_pct":    round(pos.get("market_value",0)/PORTFOLIO_SIZE*100,1),
+                "ticker":      ticker,
+                "tier":        tier,
+                "pnl_status":  pnl_status,
+                "size_status": size_status,
+                "action":      action,
+                "action_note": action_note,
+                "has_cc":      has_cc,
             })
 
     results = {
         "scan_time":      now_et().strftime("%Y-%m-%d %H:%M ET"),
         "scan_date":      now_et().strftime("%Y-%m-%d"),
-        "portfolio_size": PORTFOLIO_SIZE,
         "dashboard_opportunities": dashboard_csps + dashboard_ccs + dashboard_leaps + dashboard_bcss,
         "market": {
             "vix":        gng["vix"],
