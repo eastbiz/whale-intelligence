@@ -2548,12 +2548,17 @@ def run_scanner():
         # Stock quality gate — framework step 1
         quality    = stock_quality_check(ticker, md, earn_date)
 
-        # Use Schwab option chain if available (real Greeks/IV), else UW
+        # Use Schwab option chain — fetch short (75d) for CSP/CC and long (750d) for LEAPS
         if SCHWAB_APP_KEY:
-            from datetime import timedelta
-            from_d = datetime.now().strftime("%Y-%m-%d")
-            to_d   = (datetime.now() + timedelta(days=75)).strftime("%Y-%m-%d")
-            contracts = schwab_get_option_chain(ticker, from_d, to_d)
+            from_d       = datetime.now().strftime("%Y-%m-%d")
+            to_d_short   = (datetime.now() + timedelta(days=75)).strftime("%Y-%m-%d")
+            to_d_leaps   = (datetime.now() + timedelta(days=750)).strftime("%Y-%m-%d")
+            contracts_short = schwab_get_option_chain(ticker, from_d, to_d_short)
+            contracts_leaps = schwab_get_option_chain(ticker, from_d, to_d_leaps)
+            # Merge: use short for CSP/CC (more contracts, faster), add leaps-range
+            leaps_contracts = [c for c in contracts_leaps
+                               if (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days >= LEAPS_DTE_MIN]
+            contracts = contracts_short + leaps_contracts
         if not SCHWAB_APP_KEY or not contracts:
             contracts = get_option_contracts(ticker)
         if not contracts: continue
