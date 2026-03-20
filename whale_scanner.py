@@ -54,9 +54,11 @@ CSP_DELTA_HIGH_IVP_MAX= 0.35  # allowed when IVP > 50
 CC_DTE_MIN            = 30;   CC_DTE_MAX      = 45
 LEAPS_DTE_MIN         = 500   # 2+ years
 # CSP: default delta 0.25-0.30, up to 0.35 only when IVP > 50
-CSP_DELTA_MIN         = 0.25; CSP_DELTA_MAX   = 0.30
+CSP_DELTA_MIN         = 0.25; CSP_DELTA_MAX   = 0.35  # target 0.25-0.30, hard max 0.35
 CSP_DELTA_MAX_HIGH_IV = 0.35  # allowed when IVP > 50
-CC_DELTA_MIN          = 0.15; CC_DELTA_MAX    = 0.25
+CC_DELTA_MIN          = 0.20; CC_DELTA_MAX    = 0.30  # target range per doc
+CC_DELTA_HARD_MAX     = 0.35  # absolute ceiling for income CC
+CC_DELTA_OW_MAX       = 0.50  # overweight positions — allow closer strikes
 LEAPS_DELTA_MIN       = 0.80; LEAPS_DELTA_MAX = 0.90
 CSP_MIN_ANNUALIZED    = 20.0  # preferred minimum (high vol stocks)
 CC_MIN_ANNUALIZED     = 8.0   # lowered — stable core names rarely give 15%
@@ -83,8 +85,8 @@ OPP_SPIKE_MIN         = 0.08  # minimum upward spike to trigger
 OPP_SPIKE_DAYS        = 3
 OPP_CC_DTE_MIN        = 14
 OPP_CC_DTE_MAX        = 30
-OPP_CC_DELTA_MIN      = 0.20
-OPP_CC_DELTA_MAX      = 0.35
+OPP_CC_DELTA_MIN      = 0.25  # post-spike: slightly aggressive ok
+OPP_CC_DELTA_MAX      = 0.40  # post-spike hard max per doc
 OPP_IVP_MIN           = 40
 OPP_EARNINGS_MIN      = 7
 
@@ -92,8 +94,8 @@ OPP_EARNINGS_MIN      = 7
 DROP_TRIGGER_MIN      = 0.08  # minimum drop to trigger (8-12%+)
 DROP_CSP_DTE_MIN      = 25    # DTE range
 DROP_CSP_DTE_MAX      = 45
-DROP_CSP_DELTA_MIN    = 0.20  # more conservative than income scanner
-DROP_CSP_DELTA_MAX    = 0.25
+DROP_CSP_DELTA_MIN    = 0.20  # post-drop: conservative
+DROP_CSP_DELTA_MAX    = 0.25  # tighter range — post-drop is higher risk
 DROP_IVP_MIN          = 40    # preferred >50
 DROP_EARNINGS_MIN     = 7     # hard stop
 DROP_SIZE_FACTOR      = 0.60  # 50-70% of normal position size
@@ -290,12 +292,18 @@ def schwab_get_option_chain(ticker: str, from_date: str, to_date: str) -> list:
         data      = r.json()
         contracts = []
         price     = float(data.get("underlyingPrice", 0) or 0)
+        # Schwab returns real IVP and current IV at chain level — store as metadata
+        # ivPercentile = % of past year where IV was lower than today (0-100)
+        _ivp  = float(data.get("volatilityIndex", data.get("ivPercentile", 0)) or 0)
+        _iv   = float(data.get("volatility", 0) or 0) / 100  # as decimal
+        # Attach to first contract slot as chain-level metadata
+        _chain_meta = {"_ivp": _ivp, "_iv_current": _iv}
         for opt_type, map_key in [("P","putExpDateMap"),("C","callExpDateMap")]:
             for exp_str, strikes in data.get(map_key, {}).items():
                 exp_date = exp_str.split(":")[0]
                 for strike_str, opts in strikes.items():
                     for opt in opts:
-                        contracts.append({
+                        c = {
                             "option_symbol":   opt.get("symbol",""),
                             "strike":          float(strike_str),
                             "expiry":          exp_date,
@@ -309,7 +317,10 @@ def schwab_get_option_chain(ticker: str, from_date: str, to_date: str) -> list:
                             "open_interest":   int(opt.get("openInterest",    0) or 0),
                             "volume":          int(opt.get("totalVolume",     0) or 0),
                             "underlying_price": price,
-                        })
+                            "_chain_ivp":      _ivp,
+                            "_chain_iv":       _iv,
+                        }
+                        contracts.append(c)
         print(f"   Schwab chain {ticker}: {len(contracts)} contracts ✓")
         return contracts
     except Exception as e:
@@ -558,22 +569,33 @@ def get_ibkr_positions() -> dict:
         )
         root2 = ET.fromstring(r2.text)
         for pos in root2.iter("OpenPosition"):
-            sym = pos.get("symbol","")
+            sym = pos.get("symbol","").strip()
             if not sym: continue
+            # XML uses assetCategory (not assetClass), accountId (not clientAccountID)
+            asset = pos.get("assetCategory", pos.get("assetClass",""))
+            qty   = float(pos.get("position", 0) or 0)
+            # Normalize BRK B → BRK-B for watchlist matching
+            sym        = sym.replace("BRK B", "BRK-B")
+            underlying = pos.get("underlyingSymbol", sym).strip().replace("BRK B","BRK-B")
             positions[sym] = {
-                "market_value": float(pos.get("positionValue",  0) or 0),
-                "quantity":     float(pos.get("position",       0) or 0),
-                "avg_cost":     float(pos.get("costBasisPrice", 0) or 0),
-                "pct_nav":      float(pos.get("percentOfNAV",   0) or 0),
-                "asset_class":  pos.get("assetClass",""),
-                "strike":       pos.get("strike",""),
-                "expiry":       pos.get("expiry",""),
-                "put_call":     pos.get("putCall",""),
-                "underlying":   pos.get("underlyingSymbol", sym),
+                "market_value":   float(pos.get("positionValue",    0) or 0),
+                "quantity":       qty,
+                "avg_cost":       float(pos.get("costBasisPrice",   0) or 0),
+                "pct_nav":        float(pos.get("percentOfNAV",     0) or 0),
+                "asset_class":    asset,
+                "currency":       pos.get("currency", pos.get("currencyPrimary","USD")),
+                "strike":         pos.get("strike",""),
+                "expiry":         pos.get("expiry",""),
+                "put_call":       pos.get("putCall",""),
+                "underlying":     underlying,
+                "unrealized_pnl": float(pos.get("fifoPnlUnrealized", 0) or 0),
+                "account":        pos.get("accountId", pos.get("clientAccountID","")),
+                "side":           pos.get("side","Long"),
             }
-        stk = sum(1 for v in positions.values() if v["asset_class"]=="STK")
-        opt = sum(1 for v in positions.values() if v["asset_class"]=="OPT")
-        print(f"   IBKR: {stk} stocks, {opt} options loaded")
+        stk  = sum(1 for v in positions.values() if v["asset_class"]=="STK")
+        lopt = sum(1 for v in positions.values() if v["asset_class"]=="OPT" and v.get("side")=="Long")
+        sopt = sum(1 for v in positions.values() if v["asset_class"]=="OPT" and v.get("side")=="Short")
+        print(f"   IBKR: {stk} stocks, {lopt} long options, {sopt} short options loaded")
     except Exception as e:
         print(f"   IBKR error: {e}")
     return positions
@@ -740,7 +762,20 @@ def estimate_delta(spot, strike, dte, iv, opt_type) -> Optional[float]:
 
 
 def calculate_ivp(contracts: list) -> dict:
-    """IV percentile from ATM contracts in 25-50 DTE range."""
+    """
+    IV Percentile — use Schwab chain-level IVP if available (most accurate).
+    Falls back to ATM IV median calculation if not available.
+    """
+    # Schwab chain response includes real IVP at chain level
+    chain_ivp = next((c.get("_chain_ivp",0) for c in contracts if c.get("_chain_ivp",0) > 0), 0)
+    chain_iv  = next((c.get("_chain_iv",0)  for c in contracts if c.get("_chain_iv",0)  > 0), 0)
+    if chain_ivp > 0 and chain_iv > 0:
+        return {"iv_current": round(chain_iv,3),
+                "iv_low":     round(chain_iv * 0.5, 3),
+                "iv_high":    round(chain_iv * 2.0, 3),
+                "ivp":        round(chain_ivp, 1)}
+
+    # Fallback: calculate from ATM contracts in 25-50 DTE range
     today = datetime.now()
     ivs   = []
     for c in contracts:
@@ -748,18 +783,17 @@ def calculate_ivp(contracts: list) -> dict:
             expiry = datetime.strptime(c["expiry"], "%Y-%m-%d")
             dte = (expiry - today).days
             if not (25 <= dte <= 50): continue
-            # Schwab uses "iv" field (already divided by 100 in chain parser)
             iv = float(c.get("iv", 0) or c.get("implied_volatility", 0) or 0)
-            if iv > 1.0: iv = iv / 100  # normalize if percentage
+            if iv > 1.0: iv = iv / 100
         except Exception: continue
         if 0.05 < iv < 5.0:
             ivs.append(iv)
     if not ivs:
         return {"iv_current":0.30,"iv_low":0.20,"iv_high":0.60,"ivp":50}
-    s       = sorted(ivs)
-    iv_med  = s[len(s)//2]
-    iv_rng  = s[-1] - s[0]
-    ivp     = round((iv_med - s[0]) / iv_rng * 100, 1) if iv_rng > 0 else 50
+    s      = sorted(ivs)
+    iv_med = s[len(s)//2]
+    iv_rng = s[-1] - s[0]
+    ivp    = round((iv_med - s[0]) / iv_rng * 100, 1) if iv_rng > 0 else 50
     return {"iv_current":round(iv_med,3),"iv_low":round(s[0],3),
             "iv_high":round(s[-1],3),"ivp":ivp}
 
@@ -1613,7 +1647,7 @@ def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir):
         if vol_val < MIN_DAILY_VOLUME: continue
         if spread > MAX_BID_ASK_SPREAD: continue
         delta = estimate_delta(price, strike, dte, atm_iv, "C")
-        if delta is None or not (CC_DELTA_MIN <= delta <= CC_DELTA_MAX): continue
+        if delta is None or not (CC_DELTA_MIN <= delta <= CC_DELTA_HARD_MAX): continue
         annualized = (mid / price) * (365 / dte) * 100
         if annualized > MAX_ANNUALIZED: continue  # filter bad data only
         if annualized < 3: continue  # reject truly garbage premiums
@@ -1752,7 +1786,7 @@ def find_pmcc_short_call(ticker, price, existing_leaps, contracts, ivdata, pir):
         mid = (bid + ask) / 2
         if mid < 0.50: continue
         delta = estimate_delta(price, strike, dte, atm_iv, "C")
-        if delta is None or not (CC_DELTA_MIN <= delta <= CC_DELTA_MAX): continue
+        if delta is None or not (CC_DELTA_MIN <= delta <= CC_DELTA_HARD_MAX): continue
 
         # How many months of premiums to recover LEAPS cost
         leaps_cost_total = leaps_cost_per * 100 * leaps_qty
@@ -2569,17 +2603,14 @@ def run_scanner():
             contracts = get_option_contracts(ticker)
         if not contracts: continue
 
-        # Use Schwab real IVP if available
-        schwab_ivp = schwab_get_ivp(ticker) if SCHWAB_APP_KEY else 0
-        ivdata     = calculate_ivp(contracts)
-        if schwab_ivp > 0:
-            ivdata["ivp"] = schwab_ivp  # replace proxy with real IVP
+        # IVP comes from Schwab chain response directly (real IVP, not HV proxy)
+        ivdata = calculate_ivp(contracts)
         sizing     = position_check(ticker, ibkr)
         qty        = sizing["quantity"]
         avg        = sizing["avg_cost"]
         # Cache full merged contracts (short + leaps) for dashboard scan
         contracts_cache[ticker]  = contracts  # already merged short+leaps
-        schwab_ivp_cache[ticker] = schwab_ivp
+        schwab_ivp_cache[ticker] = ivdata["ivp"]
         qty_cache[ticker]        = qty
         avg_cache[ticker]        = avg
         dp_stock   = {"show": False, "score": 50, "total_notional": 0}
@@ -2970,7 +3001,7 @@ def run_scanner():
                     delta = estimate_delta(price, strike, dte, 0.30, "C")
                 if delta is None: continue
                 delta = abs(delta)
-                if not (0.10 <= delta <= 0.50): continue
+                if not (0.15 <= delta <= 0.35): continue  # hard max 0.35 per doc
                 oi = int(c.get("open_interest", 0) or 0)
                 if oi < 100: continue
                 annualized = (mid / strike) * (365 / dte) * 100
@@ -3028,9 +3059,10 @@ def run_scanner():
         elif tier == "Cyclical":    s += 1
         # Delta
         d = opp.get("delta", 0)
-        if 0.20 <= d <= 0.30:       s += 3
-        elif 0.30 <= d <= 0.35:     s += 2
-        elif 0.35 <= d <= 0.40:     s += 1
+        if 0.20 <= d <= 0.30:       s += 3   # optimal per doc
+        elif 0.30 <= d <= 0.35:     s += 2   # acceptable
+        elif 0.35 <= d <= 0.40:     s += 1   # marginal
+        # >0.40 = 0 points
         # IVP
         ivp = opp.get("ivp", 0)
         if 40 <= ivp <= 70:         s += 2
@@ -3137,9 +3169,11 @@ def run_scanner():
                 if int(c.get("open_interest",0) or 0) < 50: continue
                 ann = (mid/strike)*(365/dte)*100
                 if ann < 3 or ann > 300: continue
-                # Score: favor 0.25-0.35 delta range (ideal income zone)
-                delta_score = 1.0 - abs(delta - 0.28) * 3  # peaks at delta=0.28
-                score = ann * max(0.1, delta_score)
+                # Score: delta is a FILTER — reward closeness to 0.28 target + premium/day
+                # Never reward higher delta — that increases risk
+                ppd_s = mid / dte
+                delta_score = 1.0 - abs(delta - 0.28) * 4  # peaks at delta=0.28
+                score = ppd_s * max(0.1, delta_score)
                 if score > best_csp_score:
                     best_csp_score = score
                     best_csp = {"strike":strike,"expiry":c["expiry"],"dte":dte,
@@ -3179,15 +3213,27 @@ def run_scanner():
             dashboard_csps.append(csp_entry)
 
         # ── CC: owned positions only ─────────────────────────
+        # Delta rules per framework doc:
+        #   Normal income:    target 0.20-0.30, hard max 0.35
+        #   Overweight pos:   allow up to 0.50 (happy to be called away)
+        # Strike: must be above cost basis
         if qty_d >= 100:
+            # Determine if overweight to set delta range
+            global_pct_d = (qty_d * price / PORTFOLIO_SIZE * 100) if PORTFOLIO_SIZE > 0 else 0
+            tier_max = {"Core":10,"Growth":6,"Cyclical":5,"Opportunistic":3}.get(tier,3)
+            is_overweight = global_pct_d > tier_max
+            d_min = 0.20; d_max = 0.50 if is_overweight else 0.35  # overweight: closer strikes ok
+            d_target = 0.40 if is_overweight else 0.25  # scoring target
+
             calls_30_60 = [c for c in contracts_d
                            if c.get("option_type") == "C"
                            and 20 <= (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days <= 60
-                           and float(c.get("strike",0) or 0) > price*0.98]
+                           and float(c.get("strike",0) or 0) > price*0.99]
             best_cc = None; best_cc_score = 0
             for c in calls_30_60:
                 try:
                     strike = float(c["strike"])
+                    # Must be above cost basis (never sell below breakeven)
                     if avg_d > 0 and strike < avg_d: continue
                     dte = (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days
                     bid = float(c.get("nbbo_bid",0) or 0)
@@ -3196,11 +3242,16 @@ def run_scanner():
                     if mid < 0.05: continue
                     delta = abs(float(c.get("delta",0) or 0))
                     if delta == 0: delta = abs(estimate_delta(price,strike,dte,0.30,"C") or 0)
-                    if not (0.10 <= delta <= 0.50): continue
+                    # Delta is a FILTER not optimization target — hard max enforced
+                    if not (d_min <= delta <= d_max): continue
                     if int(c.get("open_interest",0) or 0) < 50: continue
                     ann = (mid/strike)*(365/dte)*100
                     if ann < 3 or ann > 300: continue
-                    score = ann * delta
+                    ppd = mid / dte
+                    # Score: reward closeness to target delta + premium/day
+                    # Do NOT reward higher delta — delta is risk control
+                    delta_score = 1.0 - abs(delta - d_target) * 4
+                    score = ppd * max(0.1, delta_score)
                     if score > best_cc_score:
                         best_cc_score = score
                         best_cc = {"strike":strike,"expiry":c["expiry"],"dte":dte,
@@ -3230,9 +3281,13 @@ def run_scanner():
             # ── PIO: position income ─────────────────────────
             if avg_d > 0:
                 pnl_pct = (price - avg_d)/avg_d*100
-                if pnl_pct > 5:      d_min,d_max = 0.30,0.45; pnl_lbl = "📈 Profit"
-                elif pnl_pct > -5:   d_min,d_max = 0.20,0.30; pnl_lbl = "➡️ Break-even"
-                else:                d_min,d_max = 0.10,0.20; pnl_lbl = "📉 Loss"
+                # PIO delta per framework doc:
+                # profit → 0.30-0.40 (more aggressive, happy to reduce)
+                # breakeven → 0.20-0.25 (protect position)
+                # loss → 0.10-0.15 (very conservative, protect recovery)
+                if pnl_pct > 5:      d_min,d_max = 0.25,0.35; pnl_lbl = "📈 Profit"  # in profit — slightly aggressive
+                elif pnl_pct > -5:   d_min,d_max = 0.20,0.30; pnl_lbl = "➡️ Break-even"  # protect position
+                else:                d_min,d_max = 0.15,0.20; pnl_lbl = "📉 Loss"  # very conservative
                 best_pio = None; best_pio_score = 0
                 for c in calls_30_60:
                     try:
