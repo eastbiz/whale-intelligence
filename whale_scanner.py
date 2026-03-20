@@ -890,11 +890,11 @@ def score_cc(opp: dict) -> int:
     if d > 0.40:            s -= 2   # hard penalty — above ceiling
     elif d > 0.35:          s -= 1   # soft penalty — approaching limit
     # 0.20-0.35 = acceptable range, no bonus points for delta itself
-    # IVP quality — CC is neutral, mild preference for elevated
+    # IVP quality — CSP: higher IVP = better premium for selling
     ivp = opp.get("ivp", 0)
-    if 40 <= ivp <= 80:     s += 2   # elevated = good premium
-    elif 20 <= ivp < 40:    s += 1   # moderate = ok
-    # <20 = 0, >80 = 0 (too high may signal risk)
+    if ivp >= 40:            s += 2   # good/elevated = excellent for selling
+    elif ivp >= 20:          s += 1   # moderate = ok
+    # <20 = 0 (low IVP = thin premium environment)
     # Safety buffer: strike above breakeven/cost basis
     strike = opp.get("strike", 0)
     be = opp.get("breakeven", 0) or opp.get("avg_cost", 0)
@@ -921,11 +921,11 @@ def score_csp(opp: dict) -> int:
     if d > 0.35:            s -= 2   # hard penalty — above ceiling
     elif d > 0.30:          s -= 1   # soft penalty — getting aggressive
     # 0.15-0.30 = acceptable, no bonus for delta itself
-    # IVP quality — CC is neutral, mild preference for elevated
+    # IVP quality — CSP: higher IVP = better premium for selling
     ivp = opp.get("ivp", 0)
-    if 40 <= ivp <= 80:     s += 2   # elevated = good premium
-    elif 20 <= ivp < 40:    s += 1   # moderate = ok
-    # <20 = 0, >80 = 0 (too high may signal risk)
+    if ivp >= 40:            s += 2   # good/elevated = excellent for selling
+    elif ivp >= 20:          s += 1   # moderate = ok
+    # <20 = 0 (low IVP = thin premium environment)
     # Pullback quality
     pb = opp.get("pullback_pct", 0)
     if pb > 15:             s += 2
