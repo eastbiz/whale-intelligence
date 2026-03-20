@@ -292,10 +292,12 @@ def schwab_get_option_chain(ticker: str, from_date: str, to_date: str) -> list:
         data      = r.json()
         contracts = []
         price     = float(data.get("underlyingPrice", 0) or 0)
-        # Schwab returns real IVP and current IV at chain level — store as metadata
-        # ivPercentile = % of past year where IV was lower than today (0-100)
-        _ivp  = float(data.get("volatilityIndex", data.get("ivPercentile", 0)) or 0)
-        _iv   = float(data.get("volatility", 0) or 0) / 100  # as decimal
+        # Schwab chain-level fields:
+        # "volatility" = current IV of the chain (annualized %)
+        # "ivPercentile" = true IVP (% of past year where IV was lower) — use this
+        # "volatilityIndex" = NOT IVP — it's the current IV level, ignore for IVP
+        _ivp  = float(data.get("ivPercentile", 0) or 0)  # true IVP 0-100
+        _iv   = float(data.get("volatility", 0) or 0) / 100  # current IV as decimal
         # Attach to first contract slot as chain-level metadata
         _chain_meta = {"_ivp": _ivp, "_iv_current": _iv}
         for opt_type, map_key in [("P","putExpDateMap"),("C","callExpDateMap")]:
@@ -2049,7 +2051,7 @@ def fmt_opp_cc(opp: dict) -> str:
         f"⚡ *VOLATILITY SPIKE — {opp['ticker']} @ ${opp['price']}*",
         f"_+{spk['spike_pct']}% spike in {spk['spike_days']}d — IV elevated — sell calls now_",
         "",
-        f"  [{opp['tier']}] | Hold {int(s['quantity'])} shares @ ${cc['avg_cost']} avg",
+        f"  [{opp['tier']}] | Breakeven: ${cc.get('avg_cost','—')}",
         f"  Sell Call ${cc['strike']} | {cc['expiry']} | {cc['dte']} DTE",
         f"  Bid ${cc['bid']} / Ask ${cc['ask']} | Premium ${cc['premium']}",
         f"  δ{cc['delta']} | Annualized: {cc['annualized_return']}% | {cc['max_contracts']} contracts",
@@ -2238,18 +2240,17 @@ def fmt_csp(opp) -> str:
 
 
 def fmt_cc(opp) -> str:
-    t = opp["cc"]["timing"]; s = opp["sizing"]
-    d = f" | δ{opp['cc']['delta']}" if opp['cc'].get('delta') else ""
+    cc = opp["cc"]; t = cc["timing"]; s = opp["sizing"]
+    ppd = round(cc["premium"] / max(1, cc["dte"]), 2)
+    ivp_label = "Low" if cc["ivp"] < 30 else "Good" if cc["ivp"] < 50 else "Elevated"
     return "\n".join([
         f"📈 *CC — {opp['ticker']} @ ${opp['price']}*",
         f"_{t['signal']}_",
-        *([f"  {opp['darkpool']['label']}"]
-           if opp.get('darkpool',{}).get('show') else []),
-        f"  Hold {int(s['quantity'])} shares @ ${opp['cc']['avg_cost']} avg",
-        f"  Sell Call ${opp['cc']['strike']} | {opp['cc']['expiry']} | {opp['cc']['dte']} DTE",
-        f"  Bid ${opp['cc']['bid']} / Ask ${opp['cc']['ask']}",
-        f"  {opp['cc']['otm_pct']}% OTM | IV {opp['cc']['iv']}% | IVP {opp['cc']['ivp']:.0f}%{d}",
-        f"  Annualized: {opp['cc']['annualized_return']}% | ${opp['cc']['premium']/opp['cc']['dte']:.2f}/day | {opp['cc']['max_contracts']} contracts",
+        f"  [{opp['tier']}] | Breakeven: ${cc.get('avg_cost','—')}",
+        f"  Sell Call ${cc['strike']} | {cc['expiry']} | {cc['dte']} DTE",
+        f"  Bid ${cc['bid']} / Ask ${cc['ask']} | Mid ${cc['premium']}",
+        f"  δ{cc['delta']} | {cc['otm_pct']}% OTM | IVP {cc['ivp']:.0f}% ({ivp_label})",
+        f"  ${ppd}/day | Annualized: {cc['annualized_return']}%",
         f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
     ])
 
@@ -2272,7 +2273,8 @@ def fmt_leaps(opp) -> str:
     else:
         primary = f"🔶 EXPENSIVE — Extrinsic {ext_pct:.1f}% (significant time decay)"
 
-    ivp_context = f"IVP {l['ivp']:.0f}% — {'historically cheap' if l['ivp'] < 30 else 'moderate' if l['ivp'] < 50 else 'elevated'}"
+    ivp_val = l["ivp"]
+    ivp_context = f"IVP {ivp_val:.0f}% ({'Low' if ivp_val < 30 else 'Good' if ivp_val < 50 else 'Elevated'})"
 
     return "\n".join([
         f"🚀 *LEAPS — {opp['ticker']} @ ${opp['price']}*",
@@ -2308,37 +2310,16 @@ def fmt_pmcc(opp) -> str:
 
 def fmt_pio_cc(opp) -> str:
     """Format Position Income Optimization CC alert."""
-    s  = opp["sizing"]
     p  = opp["pio_cc"]
-    dp = opp.get("darkpool", {})
-    pnl_map = {
-        "profit":    "📈 In profit — aggressive income",
-        "loss":      "📉 In loss — conservative recovery income",
-        "breakeven": "➡️ Near break-even — protect position",
-        "unknown":   "❓ Position status unknown"
-    }
-    pnl_label = pnl_map.get(opp["pnl_status"], "")
-    pos_map = {
-        "light":      "🟢 Light position (<4%) — aggressive",
-        "normal":     "🟡 Normal position (4-8%)",
-        "heavy":      "🟠 Heavy position (8-12%) — conservative",
-        "overweight": "🔴 Overweight (>12%) — reduce exposure"
-    }
-    pos_label = pos_map.get(opp["pos_status"], "")
-
+    ppd = round(p["premium"] / max(1, p["dte"]), 2)
+    ivp_label = "Low" if opp["ivp"] < 30 else "Good" if opp["ivp"] < 50 else "Elevated"
     lines = [
         f"💼 *POSITION INCOME — {opp['ticker']} @ ${opp['price']}*",
-        f"_{pnl_label}_",
-        f"_{pos_label}_",
-        "",
-        *([f"  {dp['label']}"] if dp.get("show") else []),
-        f"  Hold {int(s['quantity'])} shares @ ${p['avg_cost']} avg cost",
-        f"  Break-even: ${p['breakeven']} | Strike above break-even ✅",
+        f"  [{opp['tier']}] | Breakeven: ${p.get('breakeven','—')}",
         f"  Sell Call ${p['strike']} | {p['expiry']} | {p['dte']} DTE",
         f"  Bid ${p['bid']} / Ask ${p['ask']} | Mid ${p['premium']}",
-        f"  δ{p['delta']} | Premium: {p['prem_pct']}% of strike",
-        f"  Annualized: {p['annualized_return']}% | ${p['premium']/p['dte']:.2f}/day",
-        f"  Max {p['max_contracts']} contracts",
+        f"  δ{p['delta']} | IVP {opp['ivp']:.0f}% ({ivp_label})",
+        f"  ${ppd}/day | Annualized: {p['annualized_return']}%",
         f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
     ]
     return "\n".join([l for l in lines if l is not None])
@@ -2398,8 +2379,7 @@ def fmt_spike_cc(opp) -> str:
         f"  Bid ${sc['bid']} / Ask ${sc['ask']} | Mid ${sc['premium']}",
         f"  δ{sc['delta']} | Annualized: {sc['annualized_return']}% | ${sc['premium']/sc['dte']:.2f}/day",
         f"  Protection: {sc['protection_pct']}% downside buffer",
-        f"  Hold {int(s['quantity'])} shares @ ${sc['avg_cost']} avg",
-        f"  Max {sc['max_contracts']} contracts",
+        f"  Breakeven: ${sc.get('avg_cost','—')} | Max {sc['max_contracts']} contracts",
         "",
         f"  ⚠️ _Exit when 50-70% of premium captured_",
         f"  ⚠️ _Close early if stock reverses sharply_",
@@ -3263,16 +3243,18 @@ def run_scanner():
                 pnl_pct_cc = (price - avg_d)/avg_d*100 if avg_d > 0 else 0
                 pos_status = "Profit" if pnl_pct_cc>5 else "Loss" if pnl_pct_cc<-5 else "Break-even"
                 ppd_cc = round(best_cc["premium"] / max(1, best_cc["dte"]), 2)
+                ow_warn = ["Overweight — higher delta allowed"] if is_overweight else []
                 cc_entry = {
                     "ticker":ticker,"tier":tier,"price":price,"ivp":ivp_d,"mode":"CC",
                     "strike":best_cc["strike"],"expiry":best_cc["expiry"],"dte":best_cc["dte"],
                     "premium":best_cc["premium"],"annualized_return":best_cc["annualized_return"],
                     "delta":best_cc["delta"],"below_min":best_cc["below_min"],
-                    "warnings":[],"passes_quality":True,
-                    "risk_level":"Low","breakeven":round(avg_d,2),
+                    "warnings":ow_warn,"passes_quality":not is_overweight,
+                    "risk_level":"Medium" if is_overweight else "Low",
+                    "breakeven":round(avg_d,2) if avg_d > 0 else None,
                     "premium_per_day":ppd_cc,"position_status":pos_status,
-                    "signal":f"{pos_status} @ ${avg_d:.0f} avg | IVP {ivp_d:.0f}%",
-                    "risk_note":None,
+                    "signal":f"{pos_status} | {'⚠️ Overweight — reduce via CC' if is_overweight else 'Income'} | IVP {ivp_d:.0f}%",
+                    "risk_note":"Overweight position — delta up to 0.50 allowed" if is_overweight else None,
                 }
                 cc_entry["score"] = score_cc(cc_entry)
                 cc_entry["quality_label"] = quality_label(cc_entry["score"], 13)
