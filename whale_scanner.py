@@ -272,12 +272,11 @@ def schwab_get_option_chain(ticker: str, from_date: str, to_date: str) -> list:
         contracts = []
         price     = float(data.get("underlyingPrice", 0) or 0)
         # Schwab chain-level fields:
-        # "volatility" = current IV of the chain (annualized %)
-        # "ivPercentile" = true IVP (% of past year where IV was lower) — use this
-        # "volatilityIndex" = NOT IVP — it's the current IV level, ignore for IVP
-        _ivp  = float(data.get("ivPercentile", 0) or 0)  # true IVP 0-100
-        _iv   = float(data.get("volatility", 0) or 0) / 100  # current IV as decimal
-        # Attach to first contract slot as chain-level metadata
+        # "volatility" = current ATM IV of the chain (annualized %) — THIS is what Schwab returns
+        # "ivPercentile" = Schwab does NOT reliably return this field
+        # We store the current IV and compute IVP from per-contract IVs in calculate_ivp
+        _ivp  = float(data.get("ivPercentile", 0) or 0)  # only set if Schwab returns it
+        _iv   = float(data.get("volatility", 0) or 0) / 100  # current ATM IV as decimal
         _chain_meta = {"_ivp": _ivp, "_iv_current": _iv}
         for opt_type, map_key in [("P","putExpDateMap"),("C","callExpDateMap")]:
             for exp_str, strikes in data.get(map_key, {}).items():
@@ -303,16 +302,12 @@ def schwab_get_option_chain(ticker: str, from_date: str, to_date: str) -> list:
                         }
                         contracts.append(c)
         # Debug IVP source — only print first time to avoid log spam
-        if _ivp == 0:
-            # Schwab didn't return ivPercentile — check what fields are available
-            ivp_fields = {k: data.get(k) for k in ["ivPercentile","volatilityIndex",
-                          "volatility","impliedVolatility","iv","vix"] if data.get(k) is not None}
-            if ivp_fields:
-                print(f"   Schwab chain {ticker}: {len(contracts)} contracts ✓ | IVP fields: {ivp_fields}")
-            else:
-                print(f"   Schwab chain {ticker}: {len(contracts)} contracts ✓ | ⚠️ No IVP field returned")
-        else:
+        if _ivp == 0 and _iv > 0:
+            print(f"   Schwab chain {ticker}: {len(contracts)} contracts ✓ | ATM IV={_iv*100:.1f}% (IVP computed from chain)")
+        elif _ivp > 0:
             print(f"   Schwab chain {ticker}: {len(contracts)} contracts ✓ | IVP={_ivp:.1f}%")
+        else:
+            print(f"   Schwab chain {ticker}: {len(contracts)} contracts ✓")
         return contracts
     except Exception as e:
         print(f"   Schwab chain {ticker} error: {e}")
@@ -754,39 +749,71 @@ def estimate_delta(spot, strike, dte, iv, opt_type) -> Optional[float]:
 
 def calculate_ivp(contracts: list) -> dict:
     """
-    IV Percentile — use Schwab chain-level IVP if available (most accurate).
-    Falls back to ATM IV median calculation if not available.
+    IV Percentile calculation from Schwab chain data.
+
+    Schwab does not return ivPercentile reliably. Instead we:
+    1. Use the chain-level ATM IV (from "volatility" field = _chain_iv)
+    2. Collect per-contract IVs across all strikes in the 25-50 DTE window
+    3. IVP = where the ATM IV sits within the full IV range across strikes
+       (low strike = high IV puts, high strike = low IV calls → term structure)
+    4. Scale so that ATM sitting near the high end = high IVP (good for selling)
+
+    This is an approximation but directionally correct and consistent.
     """
-    # Schwab chain response includes real IVP at chain level
+    # Use Schwab chain-level IVP if actually returned
     chain_ivp = next((c.get("_chain_ivp",0) for c in contracts if c.get("_chain_ivp",0) > 0), 0)
     chain_iv  = next((c.get("_chain_iv",0)  for c in contracts if c.get("_chain_iv",0)  > 0), 0)
     if chain_ivp > 0 and chain_iv > 0:
         return {"iv_current": round(chain_iv,3),
-                "iv_low":     round(chain_iv * 0.5, 3),
-                "iv_high":    round(chain_iv * 2.0, 3),
+                "iv_low":     round(chain_iv * 0.6, 3),
+                "iv_high":    round(chain_iv * 1.8, 3),
                 "ivp":        round(chain_ivp, 1)}
 
-    # Fallback: calculate from ATM contracts in 25-50 DTE range
+    # Schwab did not return ivPercentile — compute from contract IVs
     today = datetime.now()
-    ivs   = []
+    atm_ivs_30_50 = []   # ATM contracts 25-50 DTE — closest to "current" IV
+    all_ivs       = []   # All contract IVs — used for range
+
     for c in contracts:
         try:
             expiry = datetime.strptime(c["expiry"], "%Y-%m-%d")
             dte = (expiry - today).days
-            if not (25 <= dte <= 50): continue
-            iv = float(c.get("iv", 0) or c.get("implied_volatility", 0) or 0)
-            if iv > 1.0: iv = iv / 100
-        except Exception: continue
-        if 0.05 < iv < 5.0:
-            ivs.append(iv)
-    if not ivs:
-        return {"iv_current":0.30,"iv_low":0.20,"iv_high":0.60,"ivp":50}
-    s      = sorted(ivs)
-    iv_med = s[len(s)//2]
-    iv_rng = s[-1] - s[0]
-    ivp    = round((iv_med - s[0]) / iv_rng * 100, 1) if iv_rng > 0 else 50
-    return {"iv_current":round(iv_med,3),"iv_low":round(s[0],3),
-            "iv_high":round(s[-1],3),"ivp":ivp}
+            iv = float(c.get("iv", 0) or 0)
+            if iv > 1.0: iv = iv / 100   # normalize if stored as percentage
+            if not (0.02 < iv < 5.0): continue
+            all_ivs.append(iv)
+            if 25 <= dte <= 50:
+                atm_ivs_30_50.append(iv)
+        except Exception:
+            continue
+
+    # Use chain-level IV as ATM IV if available
+    atm_iv = chain_iv if chain_iv > 0.01 else (
+        sorted(atm_ivs_30_50)[len(atm_ivs_30_50)//2] if atm_ivs_30_50 else 0.30
+    )
+
+    if not all_ivs:
+        return {"iv_current": round(atm_iv,3), "iv_low":0.20, "iv_high":0.60, "ivp":50}
+
+    s = sorted(all_ivs)
+    iv_low  = s[int(len(s)*0.10)]   # 10th percentile (low end)
+    iv_high = s[int(len(s)*0.90)]   # 90th percentile (high end)
+    iv_rng  = iv_high - iv_low
+
+    # IVP = where current ATM IV sits in the historical range
+    # Since we only have today's chain (not historical), we use the cross-strike
+    # IV range as a proxy: low IVP = ATM IV near the low end of today's range
+    if iv_rng > 0.005:
+        ivp = round(min(100, max(0, (atm_iv - iv_low) / iv_rng * 100)), 1)
+    else:
+        ivp = 50  # flat term structure — no information
+
+    return {
+        "iv_current": round(atm_iv, 3),
+        "iv_low":     round(iv_low, 3),
+        "iv_high":    round(iv_high, 3),
+        "ivp":        ivp,
+    }
 
 
 # ── Stock Universe ──────────────────────────────────────────
