@@ -302,7 +302,17 @@ def schwab_get_option_chain(ticker: str, from_date: str, to_date: str) -> list:
                             "_chain_iv":       _iv,
                         }
                         contracts.append(c)
-        print(f"   Schwab chain {ticker}: {len(contracts)} contracts ✓")
+        # Debug IVP source — only print first time to avoid log spam
+        if _ivp == 0:
+            # Schwab didn't return ivPercentile — check what fields are available
+            ivp_fields = {k: data.get(k) for k in ["ivPercentile","volatilityIndex",
+                          "volatility","impliedVolatility","iv","vix"] if data.get(k) is not None}
+            if ivp_fields:
+                print(f"   Schwab chain {ticker}: {len(contracts)} contracts ✓ | IVP fields: {ivp_fields}")
+            else:
+                print(f"   Schwab chain {ticker}: {len(contracts)} contracts ✓ | ⚠️ No IVP field returned")
+        else:
+            print(f"   Schwab chain {ticker}: {len(contracts)} contracts ✓ | IVP={_ivp:.1f}%")
         return contracts
     except Exception as e:
         print(f"   Schwab chain {ticker} error: {e}")
