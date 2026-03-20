@@ -3360,10 +3360,74 @@ def run_scanner():
                 "has_cc":      has_cc,
             })
 
+    # Add spike and drop opps to dashboard
+    dash_spikes = []
+    for o in top_spikes:
+        s = o.get("spike_cc", {})
+        if not s: continue
+        ppd = round(s.get("premium",0) / max(1, s.get("dte",1)), 2)
+        dash_spikes.append({
+            "ticker": o.get("ticker",""), "tier": o.get("tier",""),
+            "price": o.get("price",0), "ivp": round(o.get("ivp",0),1),
+            "mode": "SPIKE_CC",
+            "strike": s.get("strike",0), "expiry": s.get("expiry",""),
+            "dte": s.get("dte",0), "premium": s.get("premium",0),
+            "annualized_return": s.get("annualized_return",0),
+            "delta": s.get("delta",0),
+            "below_min": False, "warnings": [], "passes_quality": True,
+            "risk_level": "Medium",
+            "breakeven": None, "premium_per_day": ppd,
+            "signal": s.get("timing",{}).get("signal","") or f"IVP {o.get('ivp',0):.0f}% spike",
+            "risk_note": "⚠️ Exit at 50-70% profit. Close early if stock reverses.",
+        })
+
+    dash_drops = []
+    for o in top_drops:
+        s = o.get("drop_csp", {})
+        if not s: continue
+        ppd = round(s.get("premium",0) / max(1, s.get("dte",1)), 2)
+        breakeven = round(s.get("strike",0) - s.get("premium",0), 2)
+        dash_drops.append({
+            "ticker": o.get("ticker",""), "tier": o.get("tier",""),
+            "price": o.get("price",0), "ivp": round(o.get("ivp",0),1),
+            "mode": "DROP_CSP",
+            "strike": s.get("strike",0), "expiry": s.get("expiry",""),
+            "dte": s.get("dte",0), "premium": s.get("premium",0),
+            "annualized_return": s.get("annualized_return",0),
+            "delta": s.get("delta",0),
+            "below_min": False, "warnings": [], "passes_quality": True,
+            "risk_level": "Elevated",
+            "breakeven": breakeven, "premium_per_day": ppd,
+            "signal": s.get("timing",{}).get("signal","") or f"Post-drop | IVP {o.get('ivp',0):.0f}%",
+            "risk_note": "60% normal size — post-drop rules apply",
+        })
+
+    dash_pio = []
+    for o in top_pio:
+        s = o.get("pio_cc", {})
+        if not s: continue
+        ppd = round(s.get("premium",0) / max(1, s.get("dte",1)), 2)
+        dash_pio.append({
+            "ticker": o.get("ticker",""), "tier": o.get("tier",""),
+            "price": o.get("price",0), "ivp": round(o.get("ivp",0),1),
+            "mode": "PIO",
+            "strike": s.get("strike",0), "expiry": s.get("expiry",""),
+            "dte": s.get("dte",0), "premium": s.get("premium",0),
+            "annualized_return": s.get("annualized_return",0),
+            "delta": s.get("delta",0),
+            "below_min": False, "warnings": [], "passes_quality": True,
+            "risk_level": "Low",
+            "breakeven": s.get("breakeven", s.get("avg_cost",0)),
+            "premium_per_day": ppd,
+            "position_status": o.get("pnl_status","").capitalize(),
+            "signal": f"{o.get('pnl_status','').capitalize()} position | Above cost basis ${s.get('avg_cost',0):.0f}",
+            "risk_note": None,
+        })
+
     results = {
         "scan_time":      now_et().strftime("%Y-%m-%d %H:%M ET"),
         "scan_date":      now_et().strftime("%Y-%m-%d"),
-        "dashboard_opportunities": dashboard_csps + dashboard_ccs + dashboard_leaps + dashboard_bcss,
+        "dashboard_opportunities": dashboard_csps + dashboard_ccs + dashboard_leaps + dashboard_bcss + dash_spikes + dash_drops + dash_pio,
         "market": {
             "vix":        gng["vix"],
             "vix_label":  vix_data.get("label",""),
