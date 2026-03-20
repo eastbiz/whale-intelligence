@@ -83,6 +83,7 @@ PULLBACK_MAX          = 0.65  # not >65% (company may be broken)
 MA50_EXTENDED         = 0.08  # skip CSP if >8% above 50-day MA
 # ── Gap / spike / drop thresholds ───────────────────────
 GAP_RISK_PCT          = 0.08  # Income mode: skip if moved >8% today
+GAP_RISK_PCT_OPP      = 0.20  # Opportunistic mode: allow up to 20% move
 
 # Mode 2: Post-Spike CC — triggered BY upward gaps
 OPP_SPIKE_MIN         = 0.08  # minimum upward spike to trigger
