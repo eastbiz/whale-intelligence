@@ -1106,6 +1106,9 @@ SPECULATIVE = {"IBIT", "BABA", "CRDO", "LULU", "NBIS"}
 # LEAPS/CSP only — no CC income generation
 LEAPS_ONLY = {"BABA", "IBIT"}
 
+# Volatility spike CC candidates — sell calls when stock spikes 8%+ upward
+SPIKE_CC_CANDIDATES = {"NBIS", "IBIT", "PLTR"}
+
 # Stricter delta rules for specific stocks
 STRICT_DELTA = {
     "PLTR": (0.20, 0.25),   # Extreme valuation, stricter
