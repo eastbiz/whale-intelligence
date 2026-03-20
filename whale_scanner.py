@@ -2994,6 +2994,96 @@ def run_scanner():
             except: continue
         return best
 
+    def score_csp(opp):
+        """CSP score: Quality + Delta + IVP + Pullback + Penalties"""
+        s = 0
+        tier = opp.get("tier","")
+        if tier == "Core":          s += 3
+        elif tier == "Growth":      s += 2
+        elif tier == "Cyclical":    s += 1
+        # Delta
+        d = opp.get("delta", 0)
+        if 0.25 <= d <= 0.30:       s += 3
+        elif 0.20 <= d <= 0.35:     s += 2
+        elif 0.15 <= d <= 0.40:     s += 1
+        # IVP
+        ivp = opp.get("ivp", 0)
+        if 40 <= ivp <= 70:         s += 2
+        elif 20 <= ivp <= 40:       s += 1
+        # Pullback (from signal field — use warnings as proxy)
+        warnings = opp.get("warnings", [])
+        if not warnings:            s += 2  # clean setup
+        # Penalties
+        if ">8% above MA50" in warnings:    s -= 2
+        if "Near 52w high" in warnings:     s -= 2
+        if "Below 200MA" in warnings:       s -= 1
+        return max(0, s)
+
+    def score_cc(opp):
+        """CC/PIO score: Quality + Delta + IVP + Safety + Income"""
+        s = 0
+        tier = opp.get("tier","")
+        if tier == "Core":          s += 3
+        elif tier == "Growth":      s += 2
+        elif tier == "Cyclical":    s += 1
+        # Delta
+        d = opp.get("delta", 0)
+        if 0.20 <= d <= 0.30:       s += 3
+        elif 0.30 <= d <= 0.35:     s += 2
+        elif 0.35 <= d <= 0.40:     s += 1
+        # IVP
+        ivp = opp.get("ivp", 0)
+        if 40 <= ivp <= 70:         s += 2
+        elif 20 <= ivp <= 40:       s += 1
+        # Safety: strike vs breakeven buffer
+        strike = opp.get("strike", 0)
+        be = opp.get("breakeven", 0)
+        if be and be > 0:
+            buf = (strike - be) / be * 100
+            if buf > 10:            s += 3
+            elif buf >= 5:          s += 2
+            elif buf >= 0:          s += 1
+        # Income
+        ann = opp.get("annualized_return", 0)
+        if 15 <= ann <= 35:         s += 2
+        elif 8 <= ann <= 15:        s += 1
+        elif ann > 35:              s += 1
+        return max(0, s)
+
+    def score_leaps(opp):
+        """LEAPS score: Quality + Delta + Extrinsic + DTE + IVP"""
+        s = 0
+        tier = opp.get("tier","")
+        if tier == "Core":          s += 3
+        elif tier == "Growth":      s += 2
+        elif tier == "Cyclical":    s += 1
+        # Extrinsic %
+        ext = opp.get("extrinsic_pct", 100)
+        if ext < 15:                s += 3
+        elif ext < 20:              s += 2
+        elif ext < 25:              s += 1
+        # Delta
+        d = opp.get("delta", 0)
+        if 0.80 <= d <= 0.90:       s += 3
+        elif 0.75 <= d <= 0.80:     s += 2
+        elif d >= 0.75:             s += 1
+        # DTE
+        dte = opp.get("dte", 0)
+        if dte > 600:               s += 2
+        elif dte > 400:             s += 1
+        # IVP — lower is better for buying
+        ivp = opp.get("ivp", 100)
+        if ivp < 20:                s += 2
+        elif ivp < 40:              s += 1
+        return max(0, s)
+
+    def quality_label(score, max_score):
+        """Convert score to display label."""
+        pct = score / max_score if max_score > 0 else 0
+        if pct >= 0.75:   return "Strong"
+        elif pct >= 0.50: return "Acceptable"
+        else:             return "Weak"
+
     # ── Dashboard-only scan — ALL candidates, relaxed filters ──
     dashboard_csps  = []
     dashboard_ccs   = []
@@ -3074,7 +3164,7 @@ def run_scanner():
             # Breakeven = strike (for CSP, breakeven = strike - premium)
             breakeven = round(best_csp["strike"] - best_csp["premium"], 2)
             ppd = round(best_csp["premium"] / max(1, best_csp["dte"]), 2)
-            dashboard_csps.append({
+            csp_entry = {
                 "ticker":ticker,"tier":tier,"price":price,"ivp":ivp_d,"mode":"CSP",
                 "strike":best_csp["strike"],"expiry":best_csp["expiry"],"dte":best_csp["dte"],
                 "premium":best_csp["premium"],"annualized_return":best_csp["annualized_return"],
@@ -3083,7 +3173,10 @@ def run_scanner():
                 "risk_level":risk_level,"breakeven":breakeven,"premium_per_day":ppd,
                 "signal":f"IVP {ivp_d:.0f}% | {pullback}% off highs",
                 "risk_note":", ".join(warnings) if warnings else None,
-            })
+            }
+            csp_entry["score"] = score_csp(csp_entry)
+            csp_entry["quality_label"] = quality_label(csp_entry["score"], 10)
+            dashboard_csps.append(csp_entry)
 
         # ── CC: owned positions only ─────────────────────────
         if qty_d >= 100:
@@ -3119,7 +3212,7 @@ def run_scanner():
                 pnl_pct_cc = (price - avg_d)/avg_d*100 if avg_d > 0 else 0
                 pos_status = "Profit" if pnl_pct_cc>5 else "Loss" if pnl_pct_cc<-5 else "Break-even"
                 ppd_cc = round(best_cc["premium"] / max(1, best_cc["dte"]), 2)
-                dashboard_ccs.append({
+                cc_entry = {
                     "ticker":ticker,"tier":tier,"price":price,"ivp":ivp_d,"mode":"CC",
                     "strike":best_cc["strike"],"expiry":best_cc["expiry"],"dte":best_cc["dte"],
                     "premium":best_cc["premium"],"annualized_return":best_cc["annualized_return"],
@@ -3129,7 +3222,10 @@ def run_scanner():
                     "premium_per_day":ppd_cc,"position_status":pos_status,
                     "signal":f"{pos_status} @ ${avg_d:.0f} avg | IVP {ivp_d:.0f}%",
                     "risk_note":None,
-                })
+                }
+                cc_entry["score"] = score_cc(cc_entry)
+                cc_entry["quality_label"] = quality_label(cc_entry["score"], 13)
+                dashboard_ccs.append(cc_entry)
 
             # ── PIO: position income ─────────────────────────
             if avg_d > 0:
@@ -3213,30 +3309,25 @@ def run_scanner():
                 warnings = []
                 if ext_pct > 20: warnings.append(f"High extrinsic {ext_pct:.1f}%")
                 if ivp_d > 50:   warnings.append(f"IVP elevated {ivp_d:.0f}%")
-                dashboard_leaps.append({
+                leaps_entry = {
                     "ticker":ticker,"tier":tier,"price":price,"ivp":ivp_d,"mode":"LEAPS",
                     "strike":best_leaps["strike"],"expiry":best_leaps["expiry"],"dte":best_leaps["dte"],
                     "premium":best_leaps["premium"],"annualized_return":0,
                     "delta":best_leaps["delta"],"extrinsic_pct":ext_pct,
                     "below_min":ext_pct>20,"warnings":warnings,
                     "passes_quality":ext_pct<=20 and ivp_d<=50,
+                    "breakeven":round(best_leaps["strike"] + best_leaps["premium"], 2),
                     "signal":f"{best_leaps['ext_label']} | IVP {ivp_d:.0f}% | {pullback}% off highs",
                     "risk_note":", ".join(warnings) if warnings else None,
-                })
+                }
+                leaps_entry["score"] = score_leaps(leaps_entry)
+                leaps_entry["quality_label"] = quality_label(leaps_entry["score"], 13)
+                dashboard_leaps.append(leaps_entry)
 
-    # Sort by: delta distance from 0.28 target, then IVP, then premium/day
-    dashboard_csps.sort(key=lambda x: (
-        abs(x.get("delta",0.5) - 0.28),     # 1. closest to target delta
-        -x.get("ivp", 0),                    # 2. higher IVP preferred
-        -(x.get("premium",0)/max(1,x.get("dte",1)))  # 3. premium per day
-    ))
-    # Sort by: delta distance from target, IVP, premium/day
-    dashboard_ccs.sort(key=lambda x: (
-        abs(x.get("delta",0.5) - 0.25),
-        -x.get("ivp", 0),
-        -(x.get("premium",0)/max(1,x.get("dte",1)))
-    ))
-    dashboard_leaps.sort(key=lambda x: x["extrinsic_pct"])
+    # Sort by score descending (per framework document)
+    dashboard_csps.sort(key=lambda x: x.get("score", 0), reverse=True)
+    dashboard_ccs.sort(key=lambda x: x.get("score", 0), reverse=True)
+    dashboard_leaps.sort(key=lambda x: x.get("score", 0), reverse=True)
     dashboard_bcss = []  # BCS uses main scan results only
 
     pio_count = sum(1 for o in dashboard_ccs if o.get("mode") == "PIO")
