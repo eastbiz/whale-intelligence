@@ -3398,58 +3398,101 @@ def run_scanner():
             "below_min": False, "risk_note": None,
         })
 
-    # Build positions list — anonymized for public dashboard
-    # No share counts, no dollar values, no exact P&L or portfolio size
-    pos_list = []
+    # ── Build allocation dashboard (Positions tab) ─────────
+    # Combines owned positions + full watchlist
+    # Sorted by opportunity score — BUY at top, REDUCE at bottom
+
+    # Target ranges by tier
+    TARGET_RANGES = {
+        "Core":         (5.0, 10.0),
+        "Growth":       (3.0, 6.0),
+        "Cyclical":     (2.0, 5.0),
+        "Opportunistic":(1.0, 3.0),
+    }
+
+    def opportunity_score(tier, exposure_pct, target_low, target_high, price_opp):
+        """
+        Score = Position Status + Tier + Price Opportunity
+        Score >= 6 = BUY, 4-5 = ADD, 2-3 = HOLD, 0-1 = TRIM, <0 = REDUCE
+        """
+        s = 0
+        # Position status
+        if exposure_pct == 0 or exposure_pct < target_low:   s += 3  # Underweight
+        elif exposure_pct <= target_high:                     s += 1  # On Target
+        else:                                                 s -= 2  # Overweight
+        # Tier quality
+        if tier == "Core":          s += 3
+        elif tier == "Growth":      s += 2
+        elif tier == "Cyclical":    s += 1
+        # Price opportunity
+        if price_opp == "Pullback":     s += 2
+        elif price_opp == "Neutral":    s += 1
+        elif price_opp == "Near High":  s -= 2
+        return s
+
+    def score_to_action(score):
+        if score >= 6:   return "BUY"
+        elif score >= 4: return "ADD"
+        elif score >= 2: return "HOLD"
+        elif score >= 0: return "TRIM"
+        else:            return "REDUCE"
+
+    def pos_status_label(exposure, target_low, target_high):
+        if exposure == 0 or exposure < target_low:   return "Underweight"
+        elif exposure <= target_high:                 return "On Target"
+        else:                                         return "Overweight"
+
+    # Build exposure map from ibkr (combined Schwab + IBKR)
+    exposure_map = {}
     for ticker, pos in ibkr.items():
-        if pos.get("asset_class") == "STK" and pos.get("market_value",0) > 0:
-            price_now = mkt.get(ticker,{}).get("price", 0) or pos.get("avg_cost",0)
-            avg = float(pos.get("avg_cost",0) or 0)
-            qty_p = int(pos.get("quantity", pos.get("qty", 0)) or 0)
-            pnl = round((price_now - avg) / avg * 100, 1) if avg > 0 else 0
-            mv  = float(pos.get("market_value", qty_p * price_now) or 0)
-            tier = ("Core" if ticker in CORE_STOCKS else
-                    "Growth" if ticker in GROWTH_STOCKS else
-                    "Cyclical" if ticker in CYCLICAL_STOCKS else "Opportunistic")
-            global_pct = round(mv/PORTFOLIO_SIZE*100, 1) if PORTFOLIO_SIZE > 0 else 0
-            max_pct = {"Core":8.0,"Growth":5.0,"Cyclical":4.0,"Opportunistic":2.5}.get(tier,2.5)
+        if pos.get("asset_class") == "STK":
+            mv = float(pos.get("market_value", 0) or 0)
+            if mv > 0 and PORTFOLIO_SIZE > 0:
+                exposure_map[ticker] = round(mv / PORTFOLIO_SIZE * 100, 1)
 
-            # Broad P&L buckets — no exact numbers
-            if pnl > 15:      pnl_status = "strong_profit"
-            elif pnl > 5:     pnl_status = "profit"
-            elif pnl > -5:    pnl_status = "breakeven"
-            elif pnl > -15:   pnl_status = "loss"
-            else:             pnl_status = "significant_loss"
+    # Build full list: owned + all watchlist tickers
+    all_allocation_tickers = set(list(exposure_map.keys()) + ALL_TICKERS)
 
-            # Position size status
-            if global_pct >= max_pct:       size_status = "overweight"
-            elif global_pct >= max_pct*0.8: size_status = "near_max"
-            elif global_pct >= max_pct*0.4: size_status = "normal"
-            else:                           size_status = "light"
+    pos_list = []
+    for ticker in all_allocation_tickers:
+        tier = ("Core" if ticker in CORE_STOCKS else
+                "Growth" if ticker in GROWTH_STOCKS else
+                "Cyclical" if ticker in CYCLICAL_STOCKS else "Opportunistic")
 
-            # Action signal
-            if pnl_status in ("strong_profit","profit") and size_status in ("overweight","near_max"):
-                action = "REDUCE"; action_note = "In profit + overweight — consider trimming"
-            elif pnl_status in ("strong_profit","profit"):
-                action = "GENERATE INCOME"; action_note = "In profit — sell covered calls"
-            elif pnl_status == "breakeven":
-                action = "HOLD"; action_note = "Near break-even — conservative CC if possible"
-            elif pnl_status in ("loss","significant_loss") and size_status == "light":
-                action = "MONITOR"; action_note = "In loss — monitor, no averaging down"
-            else:
-                action = "PROTECT"; action_note = "In loss — sell conservative CC to reduce cost basis"
+        target_low, target_high = TARGET_RANGES.get(tier, (1.0, 3.0))
+        exposure = exposure_map.get(ticker, 0.0)
+        status = "Owned" if exposure > 0 else "Watchlist"
+        pos_status = pos_status_label(exposure, target_low, target_high)
 
-            has_cc = any(o.get("ticker")==ticker and o.get("mode")=="CC" for o in dashboard_ccs)
+        # Price opportunity from market data
+        md_t = mkt.get(ticker, {})
+        price_t = md_t.get("price", 0)
+        w52h_t = md_t.get("week52_high", price_t * 1.3)
+        pullback_t = pullback_from_high(price_t, w52h_t) if price_t > 0 else 0
+        above_ma200 = md_t.get("above_ma200", True)
 
-            pos_list.append({
-                "ticker":      ticker,
-                "tier":        tier,
-                "pnl_status":  pnl_status,
-                "size_status": size_status,
-                "action":      action,
-                "action_note": action_note,
-                "has_cc":      has_cc,
-            })
+        if pullback_t > 0.20:       price_opp = "Pullback"
+        elif pullback_t > 0.08:     price_opp = "Neutral"
+        else:                       price_opp = "Near High"
+
+        score = opportunity_score(tier, exposure, target_low, target_high, price_opp)
+        action = score_to_action(score)
+
+        pos_list.append({
+            "ticker":       ticker,
+            "tier":         tier,
+            "status":       status,
+            "exposure_pct": exposure,
+            "target_range": f"{target_low:.0f}–{target_high:.0f}%",
+            "pos_status":   pos_status,
+            "price_opp":    price_opp,
+            "action":       action,
+            "score":        score,
+            "pullback_pct": round(pullback_t * 100, 1),
+        })
+
+    # Sort by score descending — BUY at top, REDUCE at bottom
+    pos_list.sort(key=lambda x: x["score"], reverse=True)
 
     # Add spike and drop opps to dashboard
     dash_spikes = []
