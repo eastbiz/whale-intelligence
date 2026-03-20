@@ -3451,7 +3451,9 @@ def run_scanner():
                 exposure_map[ticker] = round(mv / PORTFOLIO_SIZE * 100, 1)
 
     # Build full list: owned + all watchlist tickers
-    all_allocation_tickers = set(list(exposure_map.keys()) + ALL_TICKERS)
+    # Include owned positions (even if not on watchlist) + full watchlist
+    all_allocation_tickers = set(list(exposure_map.keys()) + list(ALL_TICKERS))
+    print(f"   📋 Allocation tickers: {len(all_allocation_tickers)} total ({len(exposure_map)} owned, {len(ALL_TICKERS)} watchlist)")
 
     pos_list = []
     for ticker in all_allocation_tickers:
@@ -3493,6 +3495,7 @@ def run_scanner():
 
     # Sort by score descending — BUY at top, REDUCE at bottom
     pos_list.sort(key=lambda x: x["score"], reverse=True)
+    print(f"   📋 Positions tab: {len(pos_list)} rows ({sum(1 for p in pos_list if p['status']=='Owned')} owned, {sum(1 for p in pos_list if p['status']=='Watchlist')} watchlist)")
 
     # Add spike and drop opps to dashboard
     dash_spikes = []
