@@ -864,6 +864,13 @@ def quality_label(score: int, max_score: int) -> str:
     elif pct >= 0.50: return "Acceptable"
     else:             return "Weak"
 
+def clean_signal(signal: str) -> str:
+    """Remove IVP from signal text — IVP shown once in card header."""
+    if not signal: return ''
+    parts = [p.strip() for p in signal.split('|')]
+    parts = [p for p in parts if not p.startswith('IVP') and not p.startswith('ivp')]
+    return ' | '.join(parts).strip()
+
 def normalized_score(raw_score: int, mode: str) -> float:
     """Normalize score to 0-1 for cross-strategy comparison."""
     mx = SCORE_MAX.get(mode, 12)
@@ -3394,7 +3401,7 @@ def run_scanner():
                 "warnings":warnings,"passes_quality":not bool(warnings),
                 "risk_level":risk_level,"breakeven":breakeven,"premium_per_day":ppd,
                 "pullback_pct":pullback,"above_ma200": not below_ma200,
-                "signal":f"IVP {ivp_d:.0f}% | {pullback:.0f}% off highs",
+                "signal":f"{pullback:.0f}% off highs",  # IVP shown in header
                 "risk_note":", ".join(warnings) if warnings else None,
             }
             csp_entry["score"] = score_csp(csp_entry)
@@ -3569,7 +3576,7 @@ def run_scanner():
                     "below_min":ext_pct>20,"warnings":warnings,
                     "passes_quality":ext_pct<=20 and ivp_d<=50,
                     "breakeven":round(best_leaps["strike"] + best_leaps["premium"], 2),
-                    "signal":f"{best_leaps['ext_label']} | IVP {ivp_d:.0f}% | {pullback}% off highs",
+                    "signal":f"{best_leaps['ext_label']} | {pullback:.0f}% off highs",  # IVP in header
                     "risk_note":", ".join(warnings) if warnings else None,
                 }
                 leaps_entry["score"] = score_leaps(leaps_entry)
