@@ -371,7 +371,8 @@ def schwab_parse_positions(accounts: list) -> dict:
         acc_type = acc.get("account_type", "")
         for pos in acc.get("positions", []):
             inst = pos.get("instrument", {})
-            if inst.get("assetType") != "EQUITY":
+            # Include EQUITY and ETF (e.g. IBIT is an ETF, not EQUITY)
+            if inst.get("assetType") not in ("EQUITY", "ETF", "COLLECTIVE_INVESTMENT"):
                 continue
             ticker = inst.get("symbol", "").replace("/", "-")
             qty    = float(pos.get("longQuantity",  0) or 0)
@@ -1145,6 +1146,21 @@ LEAPS_ONLY = {"BABA", "IBIT"}
 
 # Volatility spike CC candidates — sell calls when stock spikes 8%+ upward
 SPIKE_CC_CANDIDATES = {"NBIS", "IBIT", "PLTR"}
+
+# Positions dashboard exclusion list — non-tradable, synthetic, or explicitly excluded
+# Per spec section 4: excluded symbols must not appear in rankings, actions, or summaries
+EXCLUDED_SYMBOLS = {
+    "XIOR.CP27",   # Non-tradable synthetic/warrant — excluded per user spec
+    "HOM.U",       # Income trust — not actively traded options
+    "EDEN", "SHUR", "VNA", "HTWS", "SGRO", "SVI", "GRBK", "GRAB",
+    # Add any other non-US or non-tradable holdings here
+}
+
+# Grouped tickers — economically equivalent share classes
+# Per spec section 6: combined exposure drives recommendation, preferred symbol displayed
+GROUPED_TICKERS = {
+    "GOOG":  "GOOGL",   # GOOG class C → prefer GOOGL class A for recommendations
+}
 
 # Stricter delta rules for specific stocks
 STRICT_DELTA = {
@@ -3708,70 +3724,118 @@ def run_scanner():
         })
 
     # ── Build allocation dashboard (Positions tab) ─────────
-    # Uses canonical TARGET_RANGES and scoring from module level
+    # Spec: strict rules for ownership, exclusions, grouping, action logic
 
-    # Allocation helpers now use canonical module-level functions:
-    # score_allocation(), score_to_action(), tier_position_status()
-
-    # Build exposure map from ibkr (combined Schwab + IBKR)
+    # ── Build exposure map: combined IBKR + Schwab (Spec §3) ──
     exposure_map = {}
     for ticker, pos in ibkr.items():
         if pos.get("asset_class") == "STK":
             mv = float(pos.get("market_value", 0) or 0)
             if mv > 0 and PORTFOLIO_SIZE > 0:
-                exposure_map[ticker] = round(mv / PORTFOLIO_SIZE * 100, 1)
+                t = ticker.replace("BRK B","BRK-B").strip()
+                exposure_map[t] = round(mv / PORTFOLIO_SIZE * 100, 1)
 
-    # Build full list: owned + all watchlist tickers
-    # Include owned positions (even if not on watchlist) + full watchlist
-    all_allocation_tickers = set(list(exposure_map.keys()) + list(ALL_TICKERS))
-    print(f"   📋 Allocation tickers: {len(all_allocation_tickers)} total ({len(exposure_map)} owned, {len(ALL_TICKERS)} watchlist)")
+    # ── Apply grouped ticker rule (Spec §6) ──
+    # GOOG + GOOGL → combined exposure under GOOGL
+    for alias, canonical in GROUPED_TICKERS.items():
+        if alias in exposure_map:
+            exposure_map[canonical] = round(
+                exposure_map.get(canonical, 0) + exposure_map.pop(alias), 1)
+
+    # ── Exclusion rule (Spec §4) ──
+    for sym in list(exposure_map.keys()):
+        if sym in EXCLUDED_SYMBOLS:
+            exposure_map.pop(sym)
+
+    # ── Ownership precedence rule (Spec §5) ──
+    # All owned tickers come from live positions — watchlist fills the rest
+    owned_tickers    = set(exposure_map.keys())
+    watchlist_tickers = set(ALL_TICKERS) - EXCLUDED_SYMBOLS - set(GROUPED_TICKERS.keys())
+    all_allocation_tickers = owned_tickers | watchlist_tickers
+    print(f"   📋 Allocation: {len(owned_tickers)} owned, {len(watchlist_tickers)} watchlist, {len(EXCLUDED_SYMBOLS)} excluded")
+    print(f"   📋 Owned positions: {sorted(owned_tickers)}")
+    if "IBIT" not in owned_tickers:
+        # Show raw ibkr keys to debug IBIT
+        ibit_keys = [k for k in ibkr if "IBIT" in k.upper()]
+        print(f"   ⚠️ IBIT not in exposure_map. ibkr keys containing IBIT: {ibit_keys}")
+
+    def canonical_action(pos_status: str, price_opp: str) -> str:
+        """
+        Spec §10: Strict mapping — no contradictory signals.
+        Below target + Pullback  → BUY
+        Below target + Neutral   → ADD
+        Below target + Near High → HOLD
+        On target + Pullback     → ADD
+        On target + Neutral      → HOLD
+        On target + Near High    → TRIM
+        Above target + any       → TRIM
+        """
+        if pos_status == "Overweight":
+            return "TRIM"
+        elif pos_status == "On Target":
+            if price_opp == "Pullback":   return "ADD"
+            elif price_opp == "Neutral":  return "HOLD"
+            else:                         return "TRIM"   # Near High
+        else:  # Underweight
+            if price_opp == "Pullback":   return "BUY"
+            elif price_opp == "Neutral":  return "ADD"
+            else:                         return "HOLD"   # Near High — never BUY
 
     pos_list = []
     for ticker in all_allocation_tickers:
+        # Skip explicitly excluded symbols (Spec §4)
+        if ticker in EXCLUDED_SYMBOLS: continue
+        # Skip duplicate alias symbols (Spec §6)
+        if ticker in GROUPED_TICKERS:  continue
+
         tier = ("Core" if ticker in CORE_STOCKS else
                 "Growth" if ticker in GROWTH_STOCKS else
                 "Cyclical" if ticker in CYCLICAL_STOCKS else "Opportunistic")
 
         target_low, target_high = TARGET_RANGES.get(tier, (1.0, 3.0))
         exposure = exposure_map.get(ticker, 0.0)
+
+        # Ownership precedence (Spec §5): any exposure > 0 = Owned
         status = "Owned" if exposure > 0 else "Watchlist"
         pos_status = tier_position_status(tier, exposure)
 
-        # Price opportunity from market data
+        # Price opportunity
         md_t = mkt.get(ticker, {})
         price_t = md_t.get("price", 0)
-        w52h_t = md_t.get("week52_high", price_t * 1.3)
+        w52h_t  = md_t.get("week52_high", price_t * 1.3)
         pullback_t = pullback_from_high(price_t, w52h_t) if price_t > 0 else 0
-        above_ma200 = md_t.get("above_ma200", True)
+        if pullback_t > 0.20:    price_opp = "Pullback"
+        elif pullback_t > 0.08:  price_opp = "Neutral"
+        else:                    price_opp = "Near High"
 
-        if pullback_t > 0.20:       price_opp = "Pullback"
-        elif pullback_t > 0.08:     price_opp = "Neutral"
-        else:                       price_opp = "Near High"
+        # Single canonical decision (spec: one output only)
+        action = canonical_action(pos_status, price_opp)
 
+        # Score for sorting
         pos_row = {"tier": tier, "pos_status": pos_status,
                    "price_opp": price_opp, "above_ma200": md_t.get("above_ma200", True)}
         score = score_allocation(pos_row)
-        action = score_to_action(score)
 
-        # Use position_decision for pure sizing-based signal
-        sizing_action = position_decision(exposure, tier)
         pos_list.append({
-            "ticker":         ticker,
-            "tier":           tier,
-            "status":         status,
-            "exposure_pct":   exposure,
-            "target_range":   f"{target_low:.0f}–{target_high:.0f}%",
-            "pos_status":     pos_status,
-            "price_opp":      price_opp,
-            "action":         action,          # conviction-based (preferred)
-            "sizing_action":  sizing_action,   # pure sizing signal
-            "score":          score,
-            "pullback_pct":   round(pullback_t * 100, 1),
-            "above_ma200":    md_t.get("above_ma200", True),
+            "ticker":       ticker,
+            "tier":         tier,
+            "status":       status,
+            "exposure_pct": exposure,
+            "target_range": f"{target_low:.0f}–{target_high:.0f}%",
+            "pos_status":   pos_status,
+            "price_opp":    price_opp,
+            "action":       action,   # single canonical decision — no separate sizing
+            "score":        score,
+            "pullback_pct": round(pullback_t * 100, 1),
+            "above_ma200":  md_t.get("above_ma200", True),
         })
 
-    # Sort by score descending — BUY at top, REDUCE at bottom
+    # Sort by score descending — BUY at top, TRIM at bottom
     pos_list.sort(key=lambda x: x["score"], reverse=True)
+    # Validate: no row may have sizing_action different from action
+    for _p in pos_list:
+        assert "sizing_action" not in _p, f"FATAL: sizing_action found in {_p['ticker']} — dual signal violation"
+    print(f"   ✅ Decision system: single action field only, no dual signals")
     print(f"   📋 Positions tab: {len(pos_list)} rows ({sum(1 for p in pos_list if p['status']=='Owned')} owned, {sum(1 for p in pos_list if p['status']=='Watchlist')} watchlist)")
 
     # Add spike and drop opps to dashboard
