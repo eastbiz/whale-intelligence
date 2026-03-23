@@ -3091,7 +3091,458 @@ def run_scanner():
                                      "warnings":[]})})
                 print(f"  {ticker}: 📊 BCS ROR {bcs['ror']}% | debit ${bcs['debit']}")
 
-    # ── Sort & top 3 each ─────────────────────────────────
+    # ── Dashboard-only scan — ALL candidates, relaxed filters ──
+    dashboard_csps  = []
+    dashboard_ccs   = []
+    dashboard_leaps = []
+    dashboard_bcss  = []
+
+    for ticker in all_tickers:
+        if ticker in CORE_STOCKS:        tier = "Core"
+        elif ticker in GROWTH_STOCKS:    tier = "Growth"
+        elif ticker in CYCLICAL_STOCKS:  tier = "Cyclical"
+        else:                            tier = "Opportunistic"
+
+        md    = mkt.get(ticker, {})
+        price = md.get("price", 0)
+        if price <= 0: continue
+
+        contracts_d  = contracts_cache.get(ticker, [])
+        if not contracts_d: continue
+
+        ivp_d = schwab_ivp_cache.get(ticker, 50)
+        qty_d = qty_cache.get(ticker, 0)
+        avg_d = avg_cache.get(ticker, 0)
+        earn_date_d = get_earnings_date(ticker)
+        if earn_date_d:
+            try:
+                days_earn = (earn_date_d - datetime.now()).days
+                if days_earn < 7: continue  # only skip very close earnings
+            except: pass
+
+        # ── CSP: very relaxed ────────────────────────────────
+        puts_30_60 = [c for c in contracts_d
+                      if c.get("option_type") == "P"
+                      and 20 <= (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days <= 60
+                      and float(c.get("strike",0) or 0) < price]
+        best_csp = None; best_csp_score = 0
+        for c in puts_30_60:
+            try:
+                strike = float(c["strike"])
+                dte = (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days
+                bid = float(c.get("nbbo_bid",0) or 0)
+                ask = float(c.get("nbbo_ask",0) or 0)
+                mid = (bid+ask)/2
+                if mid < 0.05: continue
+                delta = abs(float(c.get("delta",0) or 0))
+                if delta == 0: delta = abs(estimate_delta(price,strike,dte,0.30,"P") or 0)
+                # Target income CSP delta: 0.20-0.35 preferred, allow 0.15-0.40
+                if not (0.15 <= delta <= 0.40): continue
+                # Must be at least 3% OTM
+                otm = (price - strike) / price * 100
+                if otm < 3: continue
+                if int(c.get("open_interest",0) or 0) < 50: continue
+                ann = (mid/strike)*(365/dte)*100
+                if ann < 3 or ann > 300: continue
+                # Canonical CSP score — no premium/day bias
+                _s = {"tier": tier, "delta": delta, "ivp": ivp_d,
+                      "annualized_return": ann,
+                      "pullback_pct": round(pullback_t * 100, 1) if "pullback_t" in dir() else 0,
+                      "warnings": []}
+                score = score_csp(_s)
+                if score > best_csp_score:
+                    best_csp_score = score
+                    best_csp = {"strike":strike,"expiry":c["expiry"],"dte":dte,
+                                "bid":round(bid,2),"ask":round(ask,2),"premium":round(mid,2),
+                                "delta":round(delta,2),"annualized_return":round(ann,1),
+                                "below_min":ann<CSP_MIN_ANNUALIZED,"ivp":ivp_d}
+            except: continue
+        if best_csp:
+            w52h = md.get("week52_high",price); w52l = md.get("week52_low",price)
+            pullback = round(pullback_from_high(price,w52h)*100,1)
+            near_high = price >= w52h*0.92
+            below_ma200 = price < md.get("ma200",0)*0.97 if md.get("ma200",0) > 0 else False
+            warnings = []
+            if near_high: warnings.append("Near 52w high")
+            if below_ma200: warnings.append("Below 200MA")
+            if md.get("pct_above_ma50",0)*100 > 8: warnings.append(">8% above MA50")
+            # Risk level: based on tier and warnings
+            if tier == "Core" and not warnings:          risk_level = "Low"
+            elif tier in ("Core","Growth") and warnings: risk_level = "Medium"
+            elif tier == "Opportunistic":                risk_level = "Elevated"
+            else:                                        risk_level = "Medium"
+            # Breakeven = strike (for CSP, breakeven = strike - premium)
+            breakeven = round(best_csp["strike"] - best_csp["premium"], 2)
+            ppd = round(best_csp["premium"] / max(1, best_csp["dte"]), 2)
+            csp_entry = {
+                "ticker":ticker,"tier":tier,"price":price,"ivp":ivp_d,"mode":"CSP",
+                "strike":best_csp["strike"],"expiry":best_csp["expiry"],"dte":best_csp["dte"],
+                "premium":best_csp["premium"],"annualized_return":best_csp["annualized_return"],
+                "delta":best_csp["delta"],"below_min":best_csp["below_min"],
+                "warnings":warnings,"passes_quality":not bool(warnings),
+                "risk_level":risk_level,"breakeven":breakeven,"premium_per_day":ppd,
+                "pullback_pct":pullback,"above_ma200": not below_ma200,
+                "signal":f"{pullback:.0f}% off highs",  # IVP shown in header
+                "risk_note":", ".join(warnings) if warnings else None,
+            }
+            csp_entry["score"]          = score_csp(csp_entry)
+            csp_entry["normalized"]     = normalized_score(csp_entry["score"], "CSP")
+            csp_entry["quality_label"]  = quality_label(csp_entry["score"], SCORE_MAX["CSP"])
+            csp_entry["candidate_type"] = "execution" if not csp_entry.get("warnings") and csp_entry["score"]/SCORE_MAX["CSP"] >= 0.5 else "review"
+            dashboard_csps.append(csp_entry)
+
+        # ── CC: owned positions only ─────────────────────────
+        # Delta rules per framework doc:
+        #   Normal income:    target 0.20-0.30, hard max 0.35
+        #   Overweight pos:   allow up to 0.50 (happy to be called away)
+        # Strike: must be above cost basis
+        if qty_d >= 100:
+            # Determine if overweight to set delta range
+            global_pct_d = (qty_d * price / PORTFOLIO_SIZE * 100) if PORTFOLIO_SIZE > 0 else 0
+            tier_max = {"Core":10,"Growth":6,"Cyclical":5,"Opportunistic":3}.get(tier,3)
+            is_overweight = global_pct_d > tier_max
+            d_min = 0.20; d_max = 0.50 if is_overweight else 0.35  # overweight: closer strikes ok
+            d_target = 0.40 if is_overweight else 0.25  # scoring target
+
+            calls_30_60 = [c for c in contracts_d
+                           if c.get("option_type") == "C"
+                           and 20 <= (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days <= 60
+                           and float(c.get("strike",0) or 0) > price*0.99]
+            best_cc = None; best_cc_score = 0
+            for c in calls_30_60:
+                try:
+                    strike = float(c["strike"])
+                    # Must be above cost basis (never sell below breakeven)
+                    if avg_d > 0 and strike < avg_d: continue
+                    dte = (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days
+                    bid = float(c.get("nbbo_bid",0) or 0)
+                    ask = float(c.get("nbbo_ask",0) or 0)
+                    mid = (bid+ask)/2
+                    if mid < 0.05: continue
+                    delta = abs(float(c.get("delta",0) or 0))
+                    if delta == 0: delta = abs(estimate_delta(price,strike,dte,0.30,"C") or 0)
+                    # Delta is a FILTER not optimization target — hard max enforced
+                    if not (d_min <= delta <= d_max): continue
+                    if int(c.get("open_interest",0) or 0) < 50: continue
+                    ann = (mid/strike)*(365/dte)*100
+                    if ann < 3 or ann > 300: continue
+                    ppd = mid / dte
+                    # Canonical CC score — consistent with main scan
+                    _opp = {"tier": tier, "delta": delta, "ivp": ivp_d,
+                            "annualized_return": ann, "strike": strike,
+                            "breakeven": avg_d}
+                    score = score_cc(_opp)
+                    if score > best_cc_score:
+                        best_cc_score = score
+                        best_cc = {"strike":strike,"expiry":c["expiry"],"dte":dte,
+                                   "bid":round(bid,2),"ask":round(ask,2),"premium":round(mid,2),
+                                   "delta":round(delta,2),"annualized_return":round(ann,1),
+                                   "avg_cost":round(avg_d,2),"below_min":ann<CC_MIN_ANNUALIZED,"ivp":ivp_d}
+                except: continue
+            if best_cc:
+                pnl_pct_cc = (price - avg_d)/avg_d*100 if avg_d > 0 else 0
+                pos_status = "Profit" if pnl_pct_cc>5 else "Loss" if pnl_pct_cc<-5 else "Break-even"
+                ppd_cc = round(best_cc["premium"] / max(1, best_cc["dte"]), 2)
+                ow_warn = ["Overweight — higher delta allowed"] if is_overweight else []
+                cc_entry = {
+                    "ticker":ticker,"tier":tier,"price":price,"ivp":ivp_d,"mode":"CC",
+                    "strike":best_cc["strike"],"expiry":best_cc["expiry"],"dte":best_cc["dte"],
+                    "premium":best_cc["premium"],"annualized_return":best_cc["annualized_return"],
+                    "delta":best_cc["delta"],"below_min":best_cc["below_min"],
+                    "warnings":ow_warn,"passes_quality":not is_overweight,
+                    "risk_level":"Medium" if is_overweight else "Low",
+                    "breakeven":round(avg_d,2) if avg_d > 0 else None,
+                    "premium_per_day":ppd_cc,"position_status":pos_status,
+                    "signal":f"{pos_status} | {'⚠️ Overweight — reduce via CC' if is_overweight else 'Income'} | IVP {ivp_d:.0f}%",
+                    "risk_note":"Overweight position — delta up to 0.50 allowed" if is_overweight else None,
+                }
+                cc_entry["score"]          = score_cc(cc_entry)
+                cc_entry["normalized"]     = normalized_score(cc_entry["score"], "CC")
+                cc_entry["quality_label"]  = quality_label(cc_entry["score"], SCORE_MAX["CC"])
+                cc_entry["candidate_type"] = "execution" if not cc_entry.get("warnings") and cc_entry["score"]/SCORE_MAX["CC"] >= 0.5 else "review"
+                dashboard_ccs.append(cc_entry)
+
+            # ── PIO: position income ─────────────────────────
+            if avg_d > 0:
+                pnl_pct = (price - avg_d)/avg_d*100
+                # PIO delta per framework doc:
+                # profit → 0.30-0.40 (more aggressive, happy to reduce)
+                # breakeven → 0.20-0.25 (protect position)
+                # loss → 0.10-0.15 (very conservative, protect recovery)
+                if pnl_pct > 5:      d_min,d_max = 0.25,0.35; pnl_lbl = "📈 Profit"  # in profit — slightly aggressive
+                elif pnl_pct > -5:   d_min,d_max = 0.20,0.30; pnl_lbl = "➡️ Break-even"  # protect position
+                else:                d_min,d_max = 0.15,0.20; pnl_lbl = "📉 Loss"  # very conservative
+                best_pio = None; best_pio_score = 0
+                for c in calls_30_60:
+                    try:
+                        strike = float(c["strike"])
+                        if strike <= avg_d: continue
+                        dte = (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days
+                        bid = float(c.get("nbbo_bid",0) or 0)
+                        ask = float(c.get("nbbo_ask",0) or 0)
+                        mid = (bid+ask)/2
+                        if mid < 0.10: continue
+                        delta = abs(float(c.get("delta",0) or 0))
+                        if delta == 0: delta = abs(estimate_delta(price,strike,dte,0.30,"C") or 0)
+                        if not (d_min <= delta <= d_max): continue
+                        ann = (mid/strike)*(365/dte)*100
+                        if ann < 3: continue
+                        _s = {"tier": tier, "delta": delta, "ivp": ivp_d,
+                              "annualized_return": ann, "strike": strike,
+                              "breakeven": avg_d}
+                        score = score_cc(_s)
+                        if score > best_pio_score:
+                            best_pio_score = score
+                            best_pio = {"strike":strike,"expiry":c["expiry"],"dte":dte,
+                                        "premium":round(mid,2),"delta":round(delta,2),
+                                        "annualized_return":round(ann,1),"avg_cost":round(avg_d,2)}
+                    except: continue
+                if best_pio:
+                    dashboard_ccs.append({
+                        "ticker":ticker,"tier":tier,"price":price,"ivp":ivp_d,"mode":"PIO",
+                        "strike":best_pio["strike"],"expiry":best_pio["expiry"],"dte":best_pio["dte"],
+                        "premium":best_pio["premium"],"annualized_return":best_pio["annualized_return"],
+                        "delta":best_pio["delta"],"below_min":best_pio["annualized_return"]<8,
+                        "warnings":[],"passes_quality":True,
+                        "signal":f"{pnl_lbl} | Above cost basis ${avg_d:.0f} | IVP {ivp_d:.0f}%",
+                        "risk_note":None,
+                    })
+
+        # ── LEAPS: all with decent timing ────────────────────
+        if ticker not in LEAPS_ONLY:
+            leaps_calls = [c for c in contracts_d
+                           if c.get("option_type") == "C"
+                           and (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days >= LEAPS_DTE_MIN]
+            best_leaps = None; best_leaps_score = 0
+            for c in leaps_calls:
+                try:
+                    strike = float(c["strike"])
+                    dte = (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days
+                    bid = float(c.get("nbbo_bid",0) or 0)
+                    ask = float(c.get("nbbo_ask",0) or 0)
+                    mid = (bid+ask)/2
+                    if mid < 5: continue
+                    itm_pct = (price-strike)/price*100
+                    if not (-5 <= itm_pct <= 40): continue
+                    delta = abs(float(c.get("delta",0) or 0))
+                    if delta == 0: delta = abs(estimate_delta(price,strike,dte,0.30,"C") or 0)
+                    if not (LEAPS_DELTA_MIN <= delta <= 0.98): continue
+                    intrinsic = max(0, price-strike)
+                    extrinsic = max(0, mid-intrinsic)
+                    ext_pct = (extrinsic/mid*100) if mid > 0 else 100
+                    if ext_pct > 35: continue  # very relaxed for dashboard
+                    if ext_pct < 10:   ext_lbl = f"🔥 Excellent ({ext_pct:.1f}%)"
+                    elif ext_pct < 15: ext_lbl = f"✅ Good ({ext_pct:.1f}%)"
+                    elif ext_pct < 20: ext_lbl = f"⚠️ Acceptable ({ext_pct:.1f}%)"
+                    elif ext_pct < 25: ext_lbl = f"🔶 Expensive ({ext_pct:.1f}%)"
+                    else:              ext_lbl = f"❌ Very expensive ({ext_pct:.1f}%)"
+                    score = delta * (30 - ext_pct) * (dte/365)
+                    if score > best_leaps_score:
+                        best_leaps_score = score
+                        best_leaps = {"strike":strike,"expiry":c["expiry"],"dte":dte,
+                                      "premium":round(mid,2),"delta":round(delta,2),
+                                      "extrinsic_pct":round(ext_pct,1),"ext_label":ext_lbl,
+                                      "itm_pct":round(itm_pct,1),"ivp":ivp_d}
+                except: continue
+            if best_leaps:
+                w52h = md.get("week52_high",price); w52l = md.get("week52_low",price)
+                pullback = round(pullback_from_high(price,w52h)*100,1)
+                ext_pct = best_leaps["extrinsic_pct"]
+                warnings = []
+                if ext_pct > 20: warnings.append(f"High extrinsic {ext_pct:.1f}%")
+                if ivp_d > 50:   warnings.append(f"IVP elevated {ivp_d:.0f}%")
+                leaps_entry = {
+                    "ticker":ticker,"tier":tier,"price":price,"ivp":ivp_d,"mode":"LEAPS",
+                    "strike":best_leaps["strike"],"expiry":best_leaps["expiry"],"dte":best_leaps["dte"],
+                    "premium":best_leaps["premium"],"annualized_return":0,
+                    "delta":best_leaps["delta"],"extrinsic_pct":ext_pct,
+                    "below_min":ext_pct>20,"warnings":warnings,
+                    "passes_quality":ext_pct<=20 and ivp_d<=50,
+                    "breakeven":round(best_leaps["strike"] + best_leaps["premium"], 2),
+                    "signal":f"{best_leaps['ext_label']} | {pullback:.0f}% off highs",  # IVP in header
+                    "risk_note":", ".join(warnings) if warnings else None,
+                }
+                leaps_entry["score"]          = score_leaps(leaps_entry)
+                leaps_entry["normalized"]     = normalized_score(leaps_entry["score"], "LEAPS")
+                leaps_entry["quality_label"]  = quality_label(leaps_entry["score"], SCORE_MAX["LEAPS"])
+                leaps_entry["candidate_type"] = "execution" if leaps_entry.get("extrinsic_pct", 99) <= 20 and not leaps_entry.get("warnings") else "review"
+                dashboard_leaps.append(leaps_entry)
+
+    # ── Dashboard uses SAME lists as Telegram ─────────────────
+    # csp_opps/cc_opps/leaps_opps/bcs_opps are already scored and sorted
+    # Dashboard shows ALL of them; Telegram shows top 3
+    # This guarantees identical ranking in both places
+
+    def opps_to_dashboard(opps: list, mode: str) -> list:
+        """Convert Telegram-format opps to dashboard card format."""
+        out = []
+        for o in opps:
+            ticker = o.get("ticker","")
+            tier   = o.get("tier","")
+            price  = o.get("price",0)
+            ivp    = round(o.get("ivp",0),1)
+            score  = o.get("score",0)
+
+            if mode == "CSP":
+                best = o.get("csp",{})
+                entry = {
+                    "ticker":tier and ticker,"tier":tier,"price":price,"ivp":ivp,"mode":"CSP",
+                    "strike":best.get("strike",0),"expiry":best.get("expiry",""),
+                    "dte":best.get("dte",0),"premium":best.get("premium",0),
+                    "annualized_return":best.get("annualized_return",0),
+                    "delta":best.get("delta",0),"breakeven":best.get("breakeven",0),
+                    "below_min":best.get("annualized_return",0)<CSP_MIN_ANNUALIZED,
+                    "warnings":o.get("warnings",[]),"passes_quality":not bool(o.get("warnings",[])),
+                    "score":score,"normalized":normalized_score(score,"CSP"),
+                    "quality_label":quality_label(score,SCORE_MAX["CSP"]),
+                    "candidate_type":"execution" if not o.get("warnings") and score/SCORE_MAX["CSP"]>=0.5 else "review",
+                    "pullback_pct":o.get("pullback_pct",0),
+                    "signal":f"{o.get('pullback_pct',0):.0f}% off highs",
+                }
+            elif mode == "CC":
+                best = o.get("cc",{})
+                entry = {
+                    "ticker":ticker,"tier":tier,"price":price,"ivp":ivp,"mode":"CC",
+                    "strike":best.get("strike",0),"expiry":best.get("expiry",""),
+                    "dte":best.get("dte",0),"premium":best.get("premium",0),
+                    "annualized_return":best.get("annualized_return",0),
+                    "delta":best.get("delta",0),
+                    "breakeven":best.get("breakeven",round(o.get("avg_cost",price),2)),
+                    "below_min":best.get("annualized_return",0)<CC_MIN_ANNUALIZED,
+                    "warnings":o.get("warnings",[]),"passes_quality":not bool(o.get("warnings",[])),
+                    "score":score,"normalized":normalized_score(score,"CC"),
+                    "quality_label":quality_label(score,SCORE_MAX["CC"]),
+                    "candidate_type":"execution" if not o.get("warnings") and score/SCORE_MAX["CC"]>=0.5 else "review",
+                    "position_status":o.get("position_status",""),
+                    "signal":f"{o.get('pullback_pct',0):.0f}% off highs",
+                }
+            elif mode == "LEAPS":
+                best = o.get("leaps",{})
+                ext  = best.get("extrinsic_pct", best.get("ext_pct",0))
+                entry = {
+                    "ticker":ticker,"tier":tier,"price":price,"ivp":ivp,"mode":"LEAPS",
+                    "strike":best.get("strike",0),"expiry":best.get("expiry",""),
+                    "dte":best.get("dte",0),"premium":best.get("premium",0),
+                    "annualized_return":0,"delta":best.get("delta",0),
+                    "extrinsic_pct":ext,
+                    "breakeven":round(best.get("strike",0)+best.get("premium",0),2),
+                    "below_min":ext>20,
+                    "warnings":o.get("warnings",[]),"passes_quality":ext<=20,
+                    "score":score,"normalized":normalized_score(score,"LEAPS"),
+                    "quality_label":quality_label(score,SCORE_MAX["LEAPS"]),
+                    "candidate_type":"execution" if ext<=20 and not o.get("warnings") else "review",
+                    "pullback_pct":o.get("pullback_pct",0),
+                    "signal":f"{best.get('ext_label','')} | {o.get('pullback_pct',0):.0f}% off highs",
+                }
+            elif mode == "BCS":
+                best = o.get("bcs",{})
+                entry = {
+                    "ticker":ticker,"tier":tier,"price":price,"ivp":ivp,"mode":"BCS",
+                    "strike":best.get("long_strike",0),
+                    "long_strike":best.get("long_strike",0),
+                    "short_strike":best.get("short_strike",0),
+                    "expiry":best.get("expiry",""),"dte":best.get("dte",0),
+                    "premium":best.get("debit",0),
+                    "annualized_return":best.get("ror",0),
+                    "delta":best.get("short_delta",0),
+                    "below_min":best.get("ror",0)<BCS_MIN_ROR*100,
+                    "warnings":[],"passes_quality":True,
+                    "score":score,"normalized":normalized_score(score,"BCS") if score else 0,
+                    "quality_label":quality_label(score,10),
+                    "candidate_type":"execution" if score and score>=6 else "review",
+                    "risk_note":f"Max profit: ${best.get('max_profit',0)} | BE: ${best.get('breakeven',0)}",
+                    "signal":best.get("timing",{}).get("signal","") or "",
+                }
+            else:
+                continue
+            out.append(entry)
+        return out
+
+    # Build dashboard lists from same source as Telegram
+    d_csps  = opps_to_dashboard(csp_opps,  "CSP")
+    d_ccs   = opps_to_dashboard(cc_opps,   "CC")
+    d_leaps = opps_to_dashboard(leaps_opps,"LEAPS")
+    d_bcss  = opps_to_dashboard(bcs_opps,  "BCS")
+
+    # Add PIO to CC tab (position income — shown in dashboard only)
+    d_pio = []
+    for o in top_pio:
+        best = o.get("pio",{})
+        if not best: continue
+        score_p = best.get("score", score_cc({
+            "tier":o.get("tier","Opportunistic"),"delta":best.get("delta",0.30),
+            "ivp":round(o.get("ivp",0),1),"annualized_return":best.get("annualized_return",0),
+            "strike":best.get("strike",0),"breakeven":o.get("avg_cost",0)
+        }))
+        d_pio.append({
+            "ticker":o.get("ticker",""),"tier":o.get("tier",""),
+            "price":o.get("price",0),"ivp":round(o.get("ivp",0),1),"mode":"PIO",
+            "strike":best.get("strike",0),"expiry":best.get("expiry",""),
+            "dte":best.get("dte",0),"premium":best.get("premium",0),
+            "annualized_return":best.get("annualized_return",0),
+            "delta":best.get("delta",0),
+            "breakeven":round(o.get("avg_cost",o.get("price",0)),2),
+            "below_min":best.get("annualized_return",0)<CC_MIN_ANNUALIZED,
+            "warnings":[],"passes_quality":True,
+            "score":score_p,"normalized":normalized_score(score_p,"CC"),
+            "quality_label":quality_label(score_p,SCORE_MAX["CC"]),
+            "candidate_type":"execution" if score_p/SCORE_MAX["CC"]>=0.5 else "review",
+            "position_status":o.get("position_status",""),
+            "signal":f"Position income | {o.get('position_status','')}",
+        })
+
+    # Spike and drop opps
+    d_spikes = []
+    for o in top_spikes:
+        s = o.get("spike_cc",{})
+        if not s: continue
+        d_spikes.append({
+            "ticker":o.get("ticker",""),"tier":o.get("tier",""),
+            "price":o.get("price",0),"ivp":round(o.get("ivp",0),1),"mode":"SPIKE_CC",
+            "strike":s.get("strike",0),"expiry":s.get("expiry",""),"dte":s.get("dte",0),
+            "premium":s.get("premium",0),"annualized_return":s.get("annualized_return",0),
+            "delta":s.get("delta",0),"warnings":[],"passes_quality":True,
+            "score":o.get("score",0),"candidate_type":"execution",
+            "signal":f"Spike CC | {o.get('today_change',0):+.1f}% move",
+        })
+    d_drops = []
+    for o in top_drops:
+        s = o.get("drop_csp",{})
+        if not s: continue
+        d_drops.append({
+            "ticker":o.get("ticker",""),"tier":o.get("tier",""),
+            "price":o.get("price",0),"ivp":round(o.get("ivp",0),1),"mode":"DROP_CSP",
+            "strike":s.get("strike",0),"expiry":s.get("expiry",""),"dte":s.get("dte",0),
+            "premium":s.get("premium",0),"annualized_return":s.get("annualized_return",0),
+            "delta":s.get("delta",0),"warnings":[],"passes_quality":True,
+            "breakeven":round(s.get("strike",0)-s.get("premium",0),2),
+            "score":o.get("score",0),"candidate_type":"execution",
+            "signal":"60% normal size | post-drop",
+        })
+
+    all_dashboard = d_csps + d_ccs + d_pio + d_leaps + d_bcss + d_spikes + d_drops
+    pio_count = len(d_pio); cc_count = len(d_ccs)
+    print(f"   📊 Dashboard (=Telegram source): {len(d_csps)} CSPs | {cc_count} CCs | {pio_count} PIOs | {len(d_leaps)} LEAPS | {len(d_bcss)} BCS")
+
+    # ── Re-rank Telegram top picks using dashboard scores ────
+    # Dashboard is the refined source. Top 3 Telegram picks come from dashboard order.
+    # Re-sort csp_opps/cc_opps/leaps_opps/bcs_opps by dashboard score order.
+    def rerank_by_dashboard(opps: list, d_list: list) -> list:
+        """Re-sort Telegram opps to match dashboard ranking for same tickers."""
+        d_order = {entry["ticker"]: entry.get("score", 0) for entry in d_list}
+        for o in opps:
+            # Use dashboard score if available for this ticker
+            if o["ticker"] in d_order:
+                o["score"] = d_order[o["ticker"]]
+        opps.sort(key=lambda x: x["score"], reverse=True)
+        return opps
+
+    csp_opps   = rerank_by_dashboard(csp_opps,   d_csps)
+    cc_opps    = rerank_by_dashboard(cc_opps,    d_ccs)
+    leaps_opps = rerank_by_dashboard(leaps_opps, d_leaps)
+    bcs_opps   = rerank_by_dashboard(bcs_opps,   d_bcss)
+
+        # ── Sort & top 3 each ─────────────────────────────────
     for lst in [csp_opps,cc_opps,leaps_opps,pmcc_opps,bcs_opps]:
         lst.sort(key=lambda x: x["score"], reverse=True)
 
@@ -3102,7 +3553,7 @@ def run_scanner():
     top_drops  = drop_opps[:3]
     top_pio    = pio_opps[:5]  # show up to 5 position income trades
 
-    total = sum(len(x) for x in [top_csps,top_ccs,top_leaps,top_pmccs,top_bcss,top_spikes,top_drops,top_pio])
+    total = sum(len(x) for x in [top_csps,top_ccs,top_leaps,top_pmccs,top_bcss,top_spikes,top_drops])
     print(f"\n🏆 {len(top_csps)} CSPs | {len(top_ccs)} CCs | {len(top_leaps)} LEAPS | "
           f"{len(top_pmccs)} PMCCs | {len(top_bcss)} Spreads")
 
@@ -3195,7 +3646,7 @@ def run_scanner():
 
     # ── Claude analysis ───────────────────────────────────
     print("\n🧠 Claude analysis...")
-    analysis = claude_analyze(top_csps,top_ccs,top_leaps,top_pmccs,top_bcss,discoveries,top_spikes,top_drops,top_pio)
+    analysis = claude_analyze(top_csps,top_ccs,top_leaps,top_pmccs,top_bcss,discoveries,top_spikes,top_drops,[])
     if analysis: print(f"\n{analysis}")
 
     # ── Telegram — ORDER: Summary → Trades ───────────────
@@ -3227,9 +3678,8 @@ def run_scanner():
             time.sleep(2)
 
     # 3. Individual trade alerts
-    if top_pio:
-        send_telegram("━━━ *💼 POSITION INCOME OPPORTUNITIES* ━━━"); time.sleep(1)
-        for o in top_pio: send_telegram(fmt_pio_cc(o)); time.sleep(2)
+    # Position Income removed from Telegram per user preference
+    # PIO trades still visible on dashboard under Position Income filter
     if top_drops:
         send_telegram("━━━ *🔻 POST-DROP CSP OPPORTUNITIES* ━━━"); time.sleep(1)
         for o in top_drops: send_telegram(fmt_drop_csp(o)); time.sleep(2)
@@ -3375,298 +3825,6 @@ def run_scanner():
 
     # Scoring functions now at module level — see score_cc, score_csp, score_leaps, quality_label
 
-    # ── Dashboard-only scan — ALL candidates, relaxed filters ──
-    dashboard_csps  = []
-    dashboard_ccs   = []
-    dashboard_leaps = []
-    dashboard_bcss  = []
-
-    for ticker in all_tickers:
-        if ticker in CORE_STOCKS:        tier = "Core"
-        elif ticker in GROWTH_STOCKS:    tier = "Growth"
-        elif ticker in CYCLICAL_STOCKS:  tier = "Cyclical"
-        else:                            tier = "Opportunistic"
-
-        md    = mkt.get(ticker, {})
-        price = md.get("price", 0)
-        if price <= 0: continue
-
-        contracts_d  = contracts_cache.get(ticker, [])
-        if not contracts_d: continue
-
-        ivp_d = schwab_ivp_cache.get(ticker, 50)
-        qty_d = qty_cache.get(ticker, 0)
-        avg_d = avg_cache.get(ticker, 0)
-        earn_date_d = get_earnings_date(ticker)
-        if earn_date_d:
-            try:
-                days_earn = (earn_date_d - datetime.now()).days
-                if days_earn < 7: continue  # only skip very close earnings
-            except: pass
-
-        # ── CSP: very relaxed ────────────────────────────────
-        puts_30_60 = [c for c in contracts_d
-                      if c.get("option_type") == "P"
-                      and 20 <= (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days <= 60
-                      and float(c.get("strike",0) or 0) < price]
-        best_csp = None; best_csp_score = 0
-        for c in puts_30_60:
-            try:
-                strike = float(c["strike"])
-                dte = (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days
-                bid = float(c.get("nbbo_bid",0) or 0)
-                ask = float(c.get("nbbo_ask",0) or 0)
-                mid = (bid+ask)/2
-                if mid < 0.05: continue
-                delta = abs(float(c.get("delta",0) or 0))
-                if delta == 0: delta = abs(estimate_delta(price,strike,dte,0.30,"P") or 0)
-                # Target income CSP delta: 0.20-0.35 preferred, allow 0.15-0.40
-                if not (0.15 <= delta <= 0.40): continue
-                # Must be at least 3% OTM
-                otm = (price - strike) / price * 100
-                if otm < 3: continue
-                if int(c.get("open_interest",0) or 0) < 50: continue
-                ann = (mid/strike)*(365/dte)*100
-                if ann < 3 or ann > 300: continue
-                # Canonical CSP score — no premium/day bias
-                _s = {"tier": tier, "delta": delta, "ivp": ivp_d,
-                      "annualized_return": ann,
-                      "pullback_pct": round(pullback_t * 100, 1) if "pullback_t" in dir() else 0,
-                      "warnings": []}
-                score = score_csp(_s)
-                if score > best_csp_score:
-                    best_csp_score = score
-                    best_csp = {"strike":strike,"expiry":c["expiry"],"dte":dte,
-                                "bid":round(bid,2),"ask":round(ask,2),"premium":round(mid,2),
-                                "delta":round(delta,2),"annualized_return":round(ann,1),
-                                "below_min":ann<CSP_MIN_ANNUALIZED,"ivp":ivp_d}
-            except: continue
-        if best_csp:
-            w52h = md.get("week52_high",price); w52l = md.get("week52_low",price)
-            pullback = round(pullback_from_high(price,w52h)*100,1)
-            near_high = price >= w52h*0.92
-            below_ma200 = price < md.get("ma200",0)*0.97 if md.get("ma200",0) > 0 else False
-            warnings = []
-            if near_high: warnings.append("Near 52w high")
-            if below_ma200: warnings.append("Below 200MA")
-            if md.get("pct_above_ma50",0)*100 > 8: warnings.append(">8% above MA50")
-            # Risk level: based on tier and warnings
-            if tier == "Core" and not warnings:          risk_level = "Low"
-            elif tier in ("Core","Growth") and warnings: risk_level = "Medium"
-            elif tier == "Opportunistic":                risk_level = "Elevated"
-            else:                                        risk_level = "Medium"
-            # Breakeven = strike (for CSP, breakeven = strike - premium)
-            breakeven = round(best_csp["strike"] - best_csp["premium"], 2)
-            ppd = round(best_csp["premium"] / max(1, best_csp["dte"]), 2)
-            csp_entry = {
-                "ticker":ticker,"tier":tier,"price":price,"ivp":ivp_d,"mode":"CSP",
-                "strike":best_csp["strike"],"expiry":best_csp["expiry"],"dte":best_csp["dte"],
-                "premium":best_csp["premium"],"annualized_return":best_csp["annualized_return"],
-                "delta":best_csp["delta"],"below_min":best_csp["below_min"],
-                "warnings":warnings,"passes_quality":not bool(warnings),
-                "risk_level":risk_level,"breakeven":breakeven,"premium_per_day":ppd,
-                "pullback_pct":pullback,"above_ma200": not below_ma200,
-                "signal":f"{pullback:.0f}% off highs",  # IVP shown in header
-                "risk_note":", ".join(warnings) if warnings else None,
-            }
-            csp_entry["score"] = score_csp(csp_entry)
-            csp_entry["normalized"] = normalized_score(csp_entry["score"], "CSP")
-            csp_entry["quality_label"] = quality_label(csp_entry["score"], SCORE_MAX["CSP"])
-            dashboard_csps.append(csp_entry)
-
-        # ── CC: owned positions only ─────────────────────────
-        # Delta rules per framework doc:
-        #   Normal income:    target 0.20-0.30, hard max 0.35
-        #   Overweight pos:   allow up to 0.50 (happy to be called away)
-        # Strike: must be above cost basis
-        if qty_d >= 100:
-            # Determine if overweight to set delta range
-            global_pct_d = (qty_d * price / PORTFOLIO_SIZE * 100) if PORTFOLIO_SIZE > 0 else 0
-            tier_max = {"Core":10,"Growth":6,"Cyclical":5,"Opportunistic":3}.get(tier,3)
-            is_overweight = global_pct_d > tier_max
-            d_min = 0.20; d_max = 0.50 if is_overweight else 0.35  # overweight: closer strikes ok
-            d_target = 0.40 if is_overweight else 0.25  # scoring target
-
-            calls_30_60 = [c for c in contracts_d
-                           if c.get("option_type") == "C"
-                           and 20 <= (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days <= 60
-                           and float(c.get("strike",0) or 0) > price*0.99]
-            best_cc = None; best_cc_score = 0
-            for c in calls_30_60:
-                try:
-                    strike = float(c["strike"])
-                    # Must be above cost basis (never sell below breakeven)
-                    if avg_d > 0 and strike < avg_d: continue
-                    dte = (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days
-                    bid = float(c.get("nbbo_bid",0) or 0)
-                    ask = float(c.get("nbbo_ask",0) or 0)
-                    mid = (bid+ask)/2
-                    if mid < 0.05: continue
-                    delta = abs(float(c.get("delta",0) or 0))
-                    if delta == 0: delta = abs(estimate_delta(price,strike,dte,0.30,"C") or 0)
-                    # Delta is a FILTER not optimization target — hard max enforced
-                    if not (d_min <= delta <= d_max): continue
-                    if int(c.get("open_interest",0) or 0) < 50: continue
-                    ann = (mid/strike)*(365/dte)*100
-                    if ann < 3 or ann > 300: continue
-                    ppd = mid / dte
-                    # Canonical CC score — consistent with main scan
-                    _opp = {"tier": tier, "delta": delta, "ivp": ivp_d,
-                            "annualized_return": ann, "strike": strike,
-                            "breakeven": avg_d}
-                    score = score_cc(_opp)
-                    if score > best_cc_score:
-                        best_cc_score = score
-                        best_cc = {"strike":strike,"expiry":c["expiry"],"dte":dte,
-                                   "bid":round(bid,2),"ask":round(ask,2),"premium":round(mid,2),
-                                   "delta":round(delta,2),"annualized_return":round(ann,1),
-                                   "avg_cost":round(avg_d,2),"below_min":ann<CC_MIN_ANNUALIZED,"ivp":ivp_d}
-                except: continue
-            if best_cc:
-                pnl_pct_cc = (price - avg_d)/avg_d*100 if avg_d > 0 else 0
-                pos_status = "Profit" if pnl_pct_cc>5 else "Loss" if pnl_pct_cc<-5 else "Break-even"
-                ppd_cc = round(best_cc["premium"] / max(1, best_cc["dte"]), 2)
-                ow_warn = ["Overweight — higher delta allowed"] if is_overweight else []
-                cc_entry = {
-                    "ticker":ticker,"tier":tier,"price":price,"ivp":ivp_d,"mode":"CC",
-                    "strike":best_cc["strike"],"expiry":best_cc["expiry"],"dte":best_cc["dte"],
-                    "premium":best_cc["premium"],"annualized_return":best_cc["annualized_return"],
-                    "delta":best_cc["delta"],"below_min":best_cc["below_min"],
-                    "warnings":ow_warn,"passes_quality":not is_overweight,
-                    "risk_level":"Medium" if is_overweight else "Low",
-                    "breakeven":round(avg_d,2) if avg_d > 0 else None,
-                    "premium_per_day":ppd_cc,"position_status":pos_status,
-                    "signal":f"{pos_status} | {'⚠️ Overweight — reduce via CC' if is_overweight else 'Income'} | IVP {ivp_d:.0f}%",
-                    "risk_note":"Overweight position — delta up to 0.50 allowed" if is_overweight else None,
-                }
-                cc_entry["score"] = score_cc(cc_entry)
-                cc_entry["normalized"] = normalized_score(cc_entry["score"], "CC")
-                cc_entry["quality_label"] = quality_label(cc_entry["score"], SCORE_MAX["CC"])
-                dashboard_ccs.append(cc_entry)
-
-            # ── PIO: position income ─────────────────────────
-            if avg_d > 0:
-                pnl_pct = (price - avg_d)/avg_d*100
-                # PIO delta per framework doc:
-                # profit → 0.30-0.40 (more aggressive, happy to reduce)
-                # breakeven → 0.20-0.25 (protect position)
-                # loss → 0.10-0.15 (very conservative, protect recovery)
-                if pnl_pct > 5:      d_min,d_max = 0.25,0.35; pnl_lbl = "📈 Profit"  # in profit — slightly aggressive
-                elif pnl_pct > -5:   d_min,d_max = 0.20,0.30; pnl_lbl = "➡️ Break-even"  # protect position
-                else:                d_min,d_max = 0.15,0.20; pnl_lbl = "📉 Loss"  # very conservative
-                best_pio = None; best_pio_score = 0
-                for c in calls_30_60:
-                    try:
-                        strike = float(c["strike"])
-                        if strike <= avg_d: continue
-                        dte = (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days
-                        bid = float(c.get("nbbo_bid",0) or 0)
-                        ask = float(c.get("nbbo_ask",0) or 0)
-                        mid = (bid+ask)/2
-                        if mid < 0.10: continue
-                        delta = abs(float(c.get("delta",0) or 0))
-                        if delta == 0: delta = abs(estimate_delta(price,strike,dte,0.30,"C") or 0)
-                        if not (d_min <= delta <= d_max): continue
-                        ann = (mid/strike)*(365/dte)*100
-                        if ann < 3: continue
-                        _s = {"tier": tier, "delta": delta, "ivp": ivp_d,
-                              "annualized_return": ann, "strike": strike,
-                              "breakeven": avg_d}
-                        score = score_cc(_s)
-                        if score > best_pio_score:
-                            best_pio_score = score
-                            best_pio = {"strike":strike,"expiry":c["expiry"],"dte":dte,
-                                        "premium":round(mid,2),"delta":round(delta,2),
-                                        "annualized_return":round(ann,1),"avg_cost":round(avg_d,2)}
-                    except: continue
-                if best_pio:
-                    dashboard_ccs.append({
-                        "ticker":ticker,"tier":tier,"price":price,"ivp":ivp_d,"mode":"PIO",
-                        "strike":best_pio["strike"],"expiry":best_pio["expiry"],"dte":best_pio["dte"],
-                        "premium":best_pio["premium"],"annualized_return":best_pio["annualized_return"],
-                        "delta":best_pio["delta"],"below_min":best_pio["annualized_return"]<8,
-                        "warnings":[],"passes_quality":True,
-                        "signal":f"{pnl_lbl} | Above cost basis ${avg_d:.0f} | IVP {ivp_d:.0f}%",
-                        "risk_note":None,
-                    })
-
-        # ── LEAPS: all with decent timing ────────────────────
-        if ticker not in LEAPS_ONLY:
-            leaps_calls = [c for c in contracts_d
-                           if c.get("option_type") == "C"
-                           and (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days >= LEAPS_DTE_MIN]
-            best_leaps = None; best_leaps_score = 0
-            for c in leaps_calls:
-                try:
-                    strike = float(c["strike"])
-                    dte = (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days
-                    bid = float(c.get("nbbo_bid",0) or 0)
-                    ask = float(c.get("nbbo_ask",0) or 0)
-                    mid = (bid+ask)/2
-                    if mid < 5: continue
-                    itm_pct = (price-strike)/price*100
-                    if not (-5 <= itm_pct <= 40): continue
-                    delta = abs(float(c.get("delta",0) or 0))
-                    if delta == 0: delta = abs(estimate_delta(price,strike,dte,0.30,"C") or 0)
-                    if not (LEAPS_DELTA_MIN <= delta <= 0.98): continue
-                    intrinsic = max(0, price-strike)
-                    extrinsic = max(0, mid-intrinsic)
-                    ext_pct = (extrinsic/mid*100) if mid > 0 else 100
-                    if ext_pct > 35: continue  # very relaxed for dashboard
-                    if ext_pct < 10:   ext_lbl = f"🔥 Excellent ({ext_pct:.1f}%)"
-                    elif ext_pct < 15: ext_lbl = f"✅ Good ({ext_pct:.1f}%)"
-                    elif ext_pct < 20: ext_lbl = f"⚠️ Acceptable ({ext_pct:.1f}%)"
-                    elif ext_pct < 25: ext_lbl = f"🔶 Expensive ({ext_pct:.1f}%)"
-                    else:              ext_lbl = f"❌ Very expensive ({ext_pct:.1f}%)"
-                    score = delta * (30 - ext_pct) * (dte/365)
-                    if score > best_leaps_score:
-                        best_leaps_score = score
-                        best_leaps = {"strike":strike,"expiry":c["expiry"],"dte":dte,
-                                      "premium":round(mid,2),"delta":round(delta,2),
-                                      "extrinsic_pct":round(ext_pct,1),"ext_label":ext_lbl,
-                                      "itm_pct":round(itm_pct,1),"ivp":ivp_d}
-                except: continue
-            if best_leaps:
-                w52h = md.get("week52_high",price); w52l = md.get("week52_low",price)
-                pullback = round(pullback_from_high(price,w52h)*100,1)
-                ext_pct = best_leaps["extrinsic_pct"]
-                warnings = []
-                if ext_pct > 20: warnings.append(f"High extrinsic {ext_pct:.1f}%")
-                if ivp_d > 50:   warnings.append(f"IVP elevated {ivp_d:.0f}%")
-                leaps_entry = {
-                    "ticker":ticker,"tier":tier,"price":price,"ivp":ivp_d,"mode":"LEAPS",
-                    "strike":best_leaps["strike"],"expiry":best_leaps["expiry"],"dte":best_leaps["dte"],
-                    "premium":best_leaps["premium"],"annualized_return":0,
-                    "delta":best_leaps["delta"],"extrinsic_pct":ext_pct,
-                    "below_min":ext_pct>20,"warnings":warnings,
-                    "passes_quality":ext_pct<=20 and ivp_d<=50,
-                    "breakeven":round(best_leaps["strike"] + best_leaps["premium"], 2),
-                    "signal":f"{best_leaps['ext_label']} | {pullback:.0f}% off highs",  # IVP in header
-                    "risk_note":", ".join(warnings) if warnings else None,
-                }
-                leaps_entry["score"] = score_leaps(leaps_entry)
-                leaps_entry["normalized"] = normalized_score(leaps_entry["score"], "LEAPS")
-                leaps_entry["quality_label"] = quality_label(leaps_entry["score"], SCORE_MAX["LEAPS"])
-                dashboard_leaps.append(leaps_entry)
-
-    # Apply unified score for cross-strategy normalization (patch 5)
-    for o in dashboard_csps:
-        o["unified_score"] = score_unified(o, "CSP")
-    for o in dashboard_ccs:
-        o["unified_score"] = score_unified(o, o.get("mode","CC"))
-    for o in dashboard_leaps:
-        o["unified_score"] = score_unified(o, "LEAPS")
-
-    # Sort by canonical score descending — never by annualized return
-    dashboard_csps.sort(key=lambda x: x.get("score", 0), reverse=True)
-    dashboard_ccs.sort(key=lambda x: x.get("score", 0), reverse=True)
-    dashboard_leaps.sort(key=lambda x: x.get("score", 0), reverse=True)
-    dashboard_bcss = []  # BCS uses main scan results only
-
-    pio_count = sum(1 for o in dashboard_ccs if o.get("mode") == "PIO")
-    cc_count  = sum(1 for o in dashboard_ccs if o.get("mode") == "CC")
-    print(f"   📊 Dashboard: {len(dashboard_csps)} CSPs | {cc_count} CCs | {pio_count} PIOs | {len(dashboard_leaps)} LEAPS | {len(dashboard_bcss)} BCS")
-
     all_opps = []
     for o in top_csps:   all_opps.append(opp_to_dict(o, "csp"))
     for o in top_ccs:    all_opps.append(opp_to_dict(o, "cc"))
@@ -3718,18 +3876,7 @@ def run_scanner():
             "signal": s.get("timing",{}).get("signal","") or "",
             "below_min": s.get("below_min", False), "risk_note": "60% normal size",
         })
-    for o in top_pio:
-        s = o.get("pio_cc", {})
-        all_opps.append({
-            "ticker": o.get("ticker",""), "tier": o.get("tier",""),
-            "price": o.get("price",0), "ivp": round(o.get("ivp",0),1),
-            "mode": "PIO", "strike": s.get("strike",0),
-            "expiry": s.get("expiry",""), "dte": s.get("dte",0),
-            "premium": s.get("premium",0),
-            "annualized_return": s.get("annualized_return",0),
-            "delta": s.get("delta",0), "signal": o.get("pnl_status",""),
-            "below_min": False, "risk_note": None,
-        })
+    # PIO removed from Telegram — position income handled separately
 
     # ── Build allocation dashboard (Positions tab) ─────────
     # Spec: strict rules for ownership, exclusions, grouping, action logic
@@ -3841,87 +3988,15 @@ def run_scanner():
     print(f"   ✅ Decision system: single action field only, no dual signals")
     print(f"   📋 Positions tab: {len(pos_list)} rows ({sum(1 for p in pos_list if p['status']=='Owned')} owned, {sum(1 for p in pos_list if p['status']=='Watchlist')} watchlist)")
 
-    # Add spike and drop opps to dashboard
-    dash_spikes = []
-    for o in top_spikes:
-        s = o.get("spike_cc", {})
-        if not s: continue
-        ppd = round(s.get("premium",0) / max(1, s.get("dte",1)), 2)
-        dash_spikes.append({
-            "ticker": o.get("ticker",""), "tier": o.get("tier",""),
-            "price": o.get("price",0), "ivp": round(o.get("ivp",0),1),
-            "mode": "SPIKE_CC",
-            "strike": s.get("strike",0), "expiry": s.get("expiry",""),
-            "dte": s.get("dte",0), "premium": s.get("premium",0),
-            "annualized_return": s.get("annualized_return",0),
-            "delta": s.get("delta",0),
-            "below_min": False, "warnings": [], "passes_quality": True,
-            "risk_level": "Medium",
-            "breakeven": None, "premium_per_day": ppd,
-            "signal": s.get("timing",{}).get("signal","") or f"IVP {o.get('ivp',0):.0f}% spike",
-            "risk_note": "⚠️ Exit at 50-70% profit. Close early if stock reverses.",
-        })
-
-    dash_drops = []
-    for o in top_drops:
-        s = o.get("drop_csp", {})
-        if not s: continue
-        ppd = round(s.get("premium",0) / max(1, s.get("dte",1)), 2)
-        breakeven = round(s.get("strike",0) - s.get("premium",0), 2)
-        dash_drops.append({
-            "ticker": o.get("ticker",""), "tier": o.get("tier",""),
-            "price": o.get("price",0), "ivp": round(o.get("ivp",0),1),
-            "mode": "DROP_CSP",
-            "strike": s.get("strike",0), "expiry": s.get("expiry",""),
-            "dte": s.get("dte",0), "premium": s.get("premium",0),
-            "annualized_return": s.get("annualized_return",0),
-            "delta": s.get("delta",0),
-            "below_min": False, "warnings": [], "passes_quality": True,
-            "risk_level": "Elevated",
-            "breakeven": breakeven, "premium_per_day": ppd,
-            "signal": s.get("timing",{}).get("signal","") or f"Post-drop | IVP {o.get('ivp',0):.0f}%",
-            "risk_note": "60% normal size — post-drop rules apply",
-        })
-
-    dash_pio = []
-    for o in top_pio:
-        s = o.get("pio_cc", {})
-        if not s: continue
-        ppd = round(s.get("premium",0) / max(1, s.get("dte",1)), 2)
-        dash_pio.append({
-            "ticker": o.get("ticker",""), "tier": o.get("tier",""),
-            "price": o.get("price",0), "ivp": round(o.get("ivp",0),1),
-            "mode": "PIO",
-            "strike": s.get("strike",0), "expiry": s.get("expiry",""),
-            "dte": s.get("dte",0), "premium": s.get("premium",0),
-            "annualized_return": s.get("annualized_return",0),
-            "delta": s.get("delta",0),
-            "below_min": False, "warnings": [], "passes_quality": True,
-            "risk_level": "Low",
-            "breakeven": s.get("breakeven", s.get("avg_cost",0)),
-            "premium_per_day": ppd,
-            "position_status": o.get("pnl_status","").capitalize(),
-            "signal": f"{o.get('pnl_status','').capitalize()} position | Above cost basis ${s.get('avg_cost',0):.0f}",
-            "risk_note": None,
-        })
-
-    # ── P5: Separate execution vs review candidates ──────────
-    # execution_candidates: passed ALL strict filters (Telegram-ready)
-    # review_candidates: relaxed filters, for dashboard human review
-    execution_candidates = all_opps  # already filtered by main scan strict rules
-
-    # review_candidates = full dashboard list with quality labels
-    review_candidates = []
-    for o in dashboard_csps + dashboard_ccs + dashboard_leaps + dashboard_bcss + dash_spikes + dash_drops + dash_pio:
-        o["candidate_type"] = "execution" if o.get("passes_quality") and not o.get("below_min") and not o.get("warnings") else "review"
-        review_candidates.append(o)
+    # ── Single source: dashboard = same lists as Telegram ────
+    # all_dashboard already built above by opps_to_dashboard()
+    # Each strategy group sorted by score descending
+    # Dashboard shows all; Telegram shows top 3
 
     results = {
         "scan_time":      now_et().strftime("%Y-%m-%d %H:%M ET"),
         "scan_date":      now_et().strftime("%Y-%m-%d"),
-        "execution_candidates": execution_candidates,   # strict — Telegram quality
-        "review_candidates":    review_candidates,      # relaxed — dashboard review
-        "dashboard_opportunities": review_candidates,   # alias for dashboard compat
+        "dashboard_opportunities": all_dashboard,   # same source as Telegram, full list
         "market": {
             "vix":        gng["vix"],
             "vix_label":  vix_data.get("label",""),
@@ -3930,7 +4005,7 @@ def run_scanner():
             "spy_above":  spy_regime.get("above_ma200",True),
             "verdict":    gng.get("quality",""),
         },
-        "opportunities":  all_opps,
+        "opportunities":  all_opps,   # strict Telegram trades
         "positions":      pos_list,
         "analysis":       analysis,
         "total_opps":     len(all_opps),
