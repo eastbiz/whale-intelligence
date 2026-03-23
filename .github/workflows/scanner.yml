@@ -2,12 +2,12 @@ name: Whale Intelligence Scanner
 
 on:
   schedule:
-    # 6:31 AM PT / 9:31 AM ET (13:31 UTC) — just after open settles
-    - cron: '31 13 * * 1-5'
-    # 9:30 AM PT / 12:30 PM ET (16:30 UTC) — midday flow
-    - cron: '30 16 * * 1-5'
-    # 11:45 AM PT / 2:45 PM ET (18:45 UTC) — 75 min before close
-    - cron: '45 18 * * 1-5'
+    # 6:43 AM PT / 9:43 AM ET (13:43 UTC) — past the open rush, quieter queue
+    - cron: '43 13 * * 1-5'
+    # 9:37 AM PT / 12:37 PM ET (16:37 UTC) — midday flow
+    - cron: '37 16 * * 1-5'
+    # 11:43 AM PT / 2:43 PM ET (18:43 UTC) — 75 min before close
+    - cron: '43 18 * * 1-5'
   workflow_dispatch:
 
 permissions:
