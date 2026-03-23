@@ -3466,7 +3466,7 @@ def run_scanner():
 
     # Add PIO to CC tab (position income — shown in dashboard only)
     d_pio = []
-    for o in top_pio:
+    for o in pio_opps[:5]:
         best = o.get("pio",{})
         if not best: continue
         score_p = best.get("score", score_cc({
@@ -3493,7 +3493,7 @@ def run_scanner():
 
     # Spike and drop opps
     d_spikes = []
-    for o in top_spikes:
+    for o in spike_opps[:3]:
         s = o.get("spike_cc",{})
         if not s: continue
         d_spikes.append({
@@ -3506,7 +3506,7 @@ def run_scanner():
             "signal":f"Spike CC | {o.get('today_change',0):+.1f}% move",
         })
     d_drops = []
-    for o in top_drops:
+    for o in drop_opps[:3]:
         s = o.get("drop_csp",{})
         if not s: continue
         d_drops.append({
@@ -3543,15 +3543,16 @@ def run_scanner():
     bcs_opps   = rerank_by_dashboard(bcs_opps,   d_bcss)
 
         # ── Sort & top 3 each ─────────────────────────────────
-    for lst in [csp_opps,cc_opps,leaps_opps,pmcc_opps,bcs_opps]:
-        lst.sort(key=lambda x: x["score"], reverse=True)
+    for lst in [csp_opps,cc_opps,leaps_opps,pmcc_opps,bcs_opps,spike_opps,drop_opps,pio_opps]:
+        lst.sort(key=lambda x: x.get("score",0), reverse=True)
 
-    top_csps  = csp_opps[:3];  top_ccs   = cc_opps[:3]
-    top_leaps = leaps_opps[:3];top_pmccs = pmcc_opps[:3]
-    top_bcss  = bcs_opps[:3]
+    # Assign top_* early — dashboard scan (below) references these
+    top_csps   = csp_opps[:3];   top_ccs    = cc_opps[:3]
+    top_leaps  = leaps_opps[:3]; top_pmccs  = pmcc_opps[:3]
+    top_bcss   = bcs_opps[:3]
     top_spikes = spike_opps[:3]
     top_drops  = drop_opps[:3]
-    top_pio    = pio_opps[:5]  # show up to 5 position income trades
+    top_pio    = pio_opps[:5]
 
     total = sum(len(x) for x in [top_csps,top_ccs,top_leaps,top_pmccs,top_bcss,top_spikes,top_drops])
     print(f"\n🏆 {len(top_csps)} CSPs | {len(top_ccs)} CCs | {len(top_leaps)} LEAPS | "
