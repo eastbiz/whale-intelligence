@@ -1,11 +1,11 @@
 {
-  "scan_time": "2026-03-23 13:57 ET",
+  "scan_time": "2026-03-23 14:44 ET",
   "scan_date": "2026-03-23",
   "dashboard_opportunities": [
     {
       "ticker": "NVDA",
       "tier": "Core",
-      "price": 175.54,
+      "price": 175.7,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 165.0,
@@ -22,13 +22,13 @@
       "normalized": 0.75,
       "quality_label": "Strong",
       "candidate_type": "execution",
-      "pullback_pct": 17.3,
+      "pullback_pct": 17.2,
       "signal": "17% off highs"
     },
     {
       "ticker": "PLTR",
       "tier": "Growth",
-      "price": 160.83,
+      "price": 160.63,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 150.0,
@@ -45,13 +45,13 @@
       "normalized": 0.583,
       "quality_label": "Acceptable",
       "candidate_type": "execution",
-      "pullback_pct": 22.5,
-      "signal": "22% off highs"
+      "pullback_pct": 22.6,
+      "signal": "23% off highs"
     },
     {
       "ticker": "TSLA",
       "tier": "Opportunistic",
-      "price": 381.15,
+      "price": 380.9501,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 350.0,
@@ -74,7 +74,7 @@
     {
       "ticker": "NVDA",
       "tier": "Core",
-      "price": 175.54,
+      "price": 175.7,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 185.0,
@@ -82,8 +82,8 @@
       "dte": 38,
       "premium": 4.42,
       "annualized_return": 24.2,
-      "delta": 0.3,
-      "breakeven": 175.54,
+      "delta": 0.31,
+      "breakeven": 175.7,
       "below_min": false,
       "warnings": [],
       "passes_quality": true,
@@ -97,7 +97,7 @@
     {
       "ticker": "TSLA",
       "tier": "Opportunistic",
-      "price": 381.15,
+      "price": 380.9501,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 400.0,
@@ -106,7 +106,7 @@
       "premium": 11.9,
       "annualized_return": 36.8,
       "delta": 0.3,
-      "breakeven": 381.15,
+      "breakeven": 380.95,
       "below_min": false,
       "warnings": [],
       "passes_quality": true,
@@ -120,17 +120,17 @@
     {
       "ticker": "NVO",
       "tier": "Core",
-      "price": 36.9,
+      "price": 36.96,
       "ivp": 68.7,
       "mode": "LEAPS",
       "strike": 25.0,
-      "expiry": "2027-12-17",
-      "dte": 633,
-      "premium": 14.6,
+      "expiry": "2028-01-21",
+      "dte": 668,
+      "premium": 14.93,
       "annualized_return": 0,
-      "delta": 0.89,
-      "extrinsic_pct": 18.5,
-      "breakeven": 39.6,
+      "delta": 0.88,
+      "extrinsic_pct": 19.9,
+      "breakeven": 39.93,
       "below_min": false,
       "warnings": [],
       "passes_quality": true,
@@ -138,37 +138,13 @@
       "normalized": 0.769,
       "quality_label": "Strong",
       "candidate_type": "execution",
-      "pullback_pct": 54.7,
-      "signal": "\u26a0\ufe0f Acceptable (18.5%) \u2014 moderate time value | 55% off highs"
-    },
-    {
-      "ticker": "DDOG",
-      "tier": "Growth",
-      "price": 129.23,
-      "ivp": 68.7,
-      "mode": "BCS",
-      "strike": 125.0,
-      "long_strike": 125.0,
-      "short_strike": 135.0,
-      "expiry": "2026-05-15",
-      "dte": 52,
-      "premium": 4.75,
-      "annualized_return": 110.5,
-      "delta": 0.37,
-      "below_min": false,
-      "warnings": [],
-      "passes_quality": true,
-      "score": 5,
-      "normalized": 0.417,
-      "quality_label": "Acceptable",
-      "candidate_type": "review",
-      "risk_note": "Max profit: $5.25 | BE: $129.75",
-      "signal": "\u2705 NEUTRAL \u2014 Mid-range entry, moderate setup"
+      "pullback_pct": 54.6,
+      "signal": "\u26a0\ufe0f Acceptable (19.9%) \u2014 moderate time value | 55% off highs"
     },
     {
       "ticker": "NFLX",
       "tier": "Growth",
-      "price": 93.57,
+      "price": 93.38,
       "ivp": 68.7,
       "mode": "BCS",
       "strike": 88.0,
@@ -178,14 +154,14 @@
       "dte": 52,
       "premium": 5.28,
       "annualized_return": 89.6,
-      "delta": 0.36,
+      "delta": 0.35,
       "below_min": false,
       "warnings": [],
       "passes_quality": true,
-      "score": 5,
-      "normalized": 0.417,
+      "score": 6,
+      "normalized": 0.5,
       "quality_label": "Acceptable",
-      "candidate_type": "review",
+      "candidate_type": "execution",
       "risk_note": "Max profit: $4.72 | BE: $93.28",
       "signal": "\u2705 NEUTRAL \u2014 Mid-range entry, moderate setup"
     }
@@ -202,7 +178,7 @@
     {
       "ticker": "NVDA",
       "tier": "Core",
-      "price": 175.54,
+      "price": 175.7,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 165.0,
@@ -218,7 +194,7 @@
     {
       "ticker": "PLTR",
       "tier": "Growth",
-      "price": 160.83,
+      "price": 160.63,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 150.0,
@@ -234,7 +210,7 @@
     {
       "ticker": "TSLA",
       "tier": "Opportunistic",
-      "price": 381.15,
+      "price": 380.9501,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 350.0,
@@ -250,7 +226,7 @@
     {
       "ticker": "NVDA",
       "tier": "Core",
-      "price": 175.54,
+      "price": 175.7,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 185.0,
@@ -258,7 +234,7 @@
       "dte": 38,
       "premium": 4.42,
       "annualized_return": 24.2,
-      "delta": 0.3,
+      "delta": 0.31,
       "signal": "\ud83d\udd25 EXCELLENT \u2014 Near highs + IVP 69%",
       "below_min": false,
       "risk_note": null
@@ -266,7 +242,7 @@
     {
       "ticker": "TSLA",
       "tier": "Opportunistic",
-      "price": 381.15,
+      "price": 380.9501,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 400.0,
@@ -282,43 +258,23 @@
     {
       "ticker": "NVO",
       "tier": "Core",
-      "price": 36.9,
+      "price": 36.96,
       "ivp": 68.7,
       "mode": "LEAPS",
       "strike": 25.0,
-      "expiry": "2027-12-17",
-      "dte": 633,
-      "premium": 14.6,
+      "expiry": "2028-01-21",
+      "dte": 668,
+      "premium": 14.93,
       "annualized_return": 0,
-      "delta": 0.89,
+      "delta": 0.88,
       "signal": "\u26a0\ufe0f MIXED \u2014 Near 52w low but IVP 69% makes options pricey",
       "below_min": false,
       "risk_note": null
     },
     {
-      "ticker": "DDOG",
-      "tier": "Growth",
-      "price": 129.23,
-      "ivp": 68.7,
-      "mode": "BCS",
-      "strike": 125.0,
-      "long_strike": 125.0,
-      "short_strike": 135.0,
-      "expiry": "2026-05-15",
-      "dte": 52,
-      "premium": 4.75,
-      "annualized_return": 110.5,
-      "delta": 0.37,
-      "signal": "\u2705 NEUTRAL \u2014 Mid-range entry, moderate setup",
-      "below_min": false,
-      "risk_note": "Max profit: $5.25 | Breakeven: $129.75",
-      "passes_quality": true,
-      "warnings": []
-    },
-    {
       "ticker": "NFLX",
       "tier": "Growth",
-      "price": 93.57,
+      "price": 93.38,
       "ivp": 68.7,
       "mode": "BCS",
       "strike": 88.0,
@@ -328,7 +284,7 @@
       "dte": 52,
       "premium": 5.28,
       "annualized_return": 89.6,
-      "delta": 0.36,
+      "delta": 0.35,
       "signal": "\u2705 NEUTRAL \u2014 Mid-range entry, moderate setup",
       "below_min": false,
       "risk_note": "Max profit: $4.72 | Breakeven: $93.28",
@@ -337,32 +293,6 @@
     }
   ],
   "positions": [
-    {
-      "ticker": "IBKR",
-      "tier": "Core",
-      "status": "Owned",
-      "exposure_pct": 0.1,
-      "target_range": "5\u201310%",
-      "pos_status": "Underweight",
-      "price_opp": "Neutral",
-      "action": "ADD",
-      "score": 9,
-      "pullback_pct": 14.3,
-      "above_ma200": true
-    },
-    {
-      "ticker": "CPRT",
-      "tier": "Core",
-      "status": "Watchlist",
-      "exposure_pct": 0.0,
-      "target_range": "5\u201310%",
-      "pos_status": "Underweight",
-      "price_opp": "Pullback",
-      "action": "BUY",
-      "score": 9,
-      "pullback_pct": 47.7,
-      "above_ma200": false
-    },
     {
       "ticker": "MSFT",
       "tier": "Core",
@@ -373,8 +303,34 @@
       "price_opp": "Pullback",
       "action": "BUY",
       "score": 9,
-      "pullback_pct": 31.0,
+      "pullback_pct": 31.1,
       "above_ma200": false
+    },
+    {
+      "ticker": "NVDA",
+      "tier": "Core",
+      "status": "Owned",
+      "exposure_pct": 1.2,
+      "target_range": "5\u201310%",
+      "pos_status": "Underweight",
+      "price_opp": "Neutral",
+      "action": "ADD",
+      "score": 9,
+      "pullback_pct": 17.2,
+      "above_ma200": true
+    },
+    {
+      "ticker": "IBKR",
+      "tier": "Core",
+      "status": "Owned",
+      "exposure_pct": 0.1,
+      "target_range": "5\u201310%",
+      "pos_status": "Underweight",
+      "price_opp": "Neutral",
+      "action": "ADD",
+      "score": 9,
+      "pullback_pct": 14.1,
+      "above_ma200": true
     },
     {
       "ticker": "MELI",
@@ -390,17 +346,17 @@
       "above_ma200": false
     },
     {
-      "ticker": "NVDA",
+      "ticker": "NVO",
       "tier": "Core",
       "status": "Owned",
-      "exposure_pct": 1.2,
+      "exposure_pct": 0.9,
       "target_range": "5\u201310%",
       "pos_status": "Underweight",
-      "price_opp": "Neutral",
-      "action": "ADD",
+      "price_opp": "Pullback",
+      "action": "BUY",
       "score": 9,
-      "pullback_pct": 17.3,
-      "above_ma200": true
+      "pullback_pct": 54.6,
+      "above_ma200": false
     },
     {
       "ticker": "BRK-B",
@@ -416,45 +372,6 @@
       "above_ma200": true
     },
     {
-      "ticker": "VRTX",
-      "tier": "Core",
-      "status": "Watchlist",
-      "exposure_pct": 0.0,
-      "target_range": "5\u201310%",
-      "pos_status": "Underweight",
-      "price_opp": "Neutral",
-      "action": "ADD",
-      "score": 9,
-      "pullback_pct": 12.3,
-      "above_ma200": true
-    },
-    {
-      "ticker": "NVO",
-      "tier": "Core",
-      "status": "Owned",
-      "exposure_pct": 0.9,
-      "target_range": "5\u201310%",
-      "pos_status": "Underweight",
-      "price_opp": "Pullback",
-      "action": "BUY",
-      "score": 9,
-      "pullback_pct": 54.7,
-      "above_ma200": false
-    },
-    {
-      "ticker": "ASML",
-      "tier": "Core",
-      "status": "Owned",
-      "exposure_pct": 0.8,
-      "target_range": "5\u201310%",
-      "pos_status": "Underweight",
-      "price_opp": "Neutral",
-      "action": "ADD",
-      "score": 9,
-      "pullback_pct": 11.3,
-      "above_ma200": true
-    },
-    {
       "ticker": "GOOGL",
       "tier": "Core",
       "status": "Owned",
@@ -464,7 +381,33 @@
       "price_opp": "Neutral",
       "action": "ADD",
       "score": 9,
-      "pullback_pct": 13.5,
+      "pullback_pct": 13.4,
+      "above_ma200": true
+    },
+    {
+      "ticker": "CPRT",
+      "tier": "Core",
+      "status": "Watchlist",
+      "exposure_pct": 0.0,
+      "target_range": "5\u201310%",
+      "pos_status": "Underweight",
+      "price_opp": "Pullback",
+      "action": "BUY",
+      "score": 9,
+      "pullback_pct": 47.8,
+      "above_ma200": false
+    },
+    {
+      "ticker": "VRTX",
+      "tier": "Core",
+      "status": "Watchlist",
+      "exposure_pct": 0.0,
+      "target_range": "5\u201310%",
+      "pos_status": "Underweight",
+      "price_opp": "Neutral",
+      "action": "ADD",
+      "score": 9,
+      "pullback_pct": 12.5,
       "above_ma200": true
     },
     {
@@ -477,7 +420,20 @@
       "price_opp": "Neutral",
       "action": "ADD",
       "score": 9,
-      "pullback_pct": 13.5,
+      "pullback_pct": 13.3,
+      "above_ma200": true
+    },
+    {
+      "ticker": "ASML",
+      "tier": "Core",
+      "status": "Owned",
+      "exposure_pct": 0.8,
+      "target_range": "5\u201310%",
+      "pos_status": "Underweight",
+      "price_opp": "Neutral",
+      "action": "ADD",
+      "score": 9,
+      "pullback_pct": 11.5,
       "above_ma200": true
     },
     {
@@ -494,6 +450,19 @@
       "above_ma200": false
     },
     {
+      "ticker": "DDOG",
+      "tier": "Growth",
+      "status": "Watchlist",
+      "exposure_pct": 0.0,
+      "target_range": "3\u20136%",
+      "pos_status": "Underweight",
+      "price_opp": "Pullback",
+      "action": "BUY",
+      "score": 7,
+      "pullback_pct": 36.5,
+      "above_ma200": false
+    },
+    {
       "ticker": "UBER",
       "tier": "Growth",
       "status": "Watchlist",
@@ -504,32 +473,6 @@
       "action": "BUY",
       "score": 7,
       "pullback_pct": 26.3,
-      "above_ma200": false
-    },
-    {
-      "ticker": "META",
-      "tier": "Growth",
-      "status": "Watchlist",
-      "exposure_pct": 0.0,
-      "target_range": "3\u20136%",
-      "pos_status": "Underweight",
-      "price_opp": "Pullback",
-      "action": "BUY",
-      "score": 7,
-      "pullback_pct": 24.0,
-      "above_ma200": false
-    },
-    {
-      "ticker": "DDOG",
-      "tier": "Growth",
-      "status": "Watchlist",
-      "exposure_pct": 0.0,
-      "target_range": "3\u20136%",
-      "pos_status": "Underweight",
-      "price_opp": "Pullback",
-      "action": "BUY",
-      "score": 7,
-      "pullback_pct": 35.9,
       "above_ma200": false
     },
     {
@@ -546,6 +489,19 @@
       "above_ma200": false
     },
     {
+      "ticker": "META",
+      "tier": "Growth",
+      "status": "Watchlist",
+      "exposure_pct": 0.0,
+      "target_range": "3\u20136%",
+      "pos_status": "Underweight",
+      "price_opp": "Pullback",
+      "action": "BUY",
+      "score": 7,
+      "pullback_pct": 24.1,
+      "above_ma200": false
+    },
+    {
       "ticker": "MU",
       "tier": "Cyclical",
       "status": "Owned",
@@ -559,16 +515,16 @@
       "above_ma200": true
     },
     {
-      "ticker": "PLTR",
-      "tier": "Growth",
+      "ticker": "POWL",
+      "tier": "Cyclical",
       "status": "Owned",
-      "exposure_pct": 4.9,
-      "target_range": "3\u20136%",
-      "pos_status": "On Target",
-      "price_opp": "Pullback",
+      "exposure_pct": 0.4,
+      "target_range": "2\u20135%",
+      "pos_status": "Underweight",
+      "price_opp": "Neutral",
       "action": "ADD",
       "score": 6,
-      "pullback_pct": 22.5,
+      "pullback_pct": 11.1,
       "above_ma200": true
     },
     {
@@ -585,43 +541,17 @@
       "above_ma200": true
     },
     {
-      "ticker": "POWL",
-      "tier": "Cyclical",
-      "status": "Owned",
-      "exposure_pct": 0.4,
-      "target_range": "2\u20135%",
-      "pos_status": "Underweight",
-      "price_opp": "Neutral",
-      "action": "ADD",
-      "score": 6,
-      "pullback_pct": 11.4,
-      "above_ma200": true
-    },
-    {
-      "ticker": "CRDO",
-      "tier": "Opportunistic",
-      "status": "Owned",
-      "exposure_pct": 0.5,
-      "target_range": "1\u20133%",
-      "pos_status": "Underweight",
-      "price_opp": "Pullback",
-      "action": "BUY",
-      "score": 5,
-      "pullback_pct": 50.9,
-      "above_ma200": false
-    },
-    {
-      "ticker": "NFLX",
+      "ticker": "PLTR",
       "tier": "Growth",
       "status": "Owned",
-      "exposure_pct": 4.7,
+      "exposure_pct": 4.9,
       "target_range": "3\u20136%",
       "pos_status": "On Target",
       "price_opp": "Pullback",
       "action": "ADD",
-      "score": 5,
-      "pullback_pct": 30.2,
-      "above_ma200": false
+      "score": 6,
+      "pullback_pct": 22.6,
+      "above_ma200": true
     },
     {
       "ticker": "LULU",
@@ -633,7 +563,33 @@
       "price_opp": "Pullback",
       "action": "BUY",
       "score": 5,
-      "pullback_pct": 52.8,
+      "pullback_pct": 52.6,
+      "above_ma200": false
+    },
+    {
+      "ticker": "NFLX",
+      "tier": "Growth",
+      "status": "Owned",
+      "exposure_pct": 4.6,
+      "target_range": "3\u20136%",
+      "pos_status": "On Target",
+      "price_opp": "Pullback",
+      "action": "ADD",
+      "score": 5,
+      "pullback_pct": 30.4,
+      "above_ma200": false
+    },
+    {
+      "ticker": "CRDO",
+      "tier": "Opportunistic",
+      "status": "Owned",
+      "exposure_pct": 0.5,
+      "target_range": "1\u20133%",
+      "pos_status": "Underweight",
+      "price_opp": "Pullback",
+      "action": "BUY",
+      "score": 5,
+      "pullback_pct": 51.1,
       "above_ma200": false
     },
     {
@@ -646,7 +602,7 @@
       "price_opp": "Pullback",
       "action": "BUY",
       "score": 5,
-      "pullback_pct": 34.6,
+      "pullback_pct": 34.7,
       "above_ma200": false
     },
     {
@@ -659,7 +615,20 @@
       "price_opp": "Pullback",
       "action": "ADD",
       "score": 4,
-      "pullback_pct": 21.2,
+      "pullback_pct": 21.6,
+      "above_ma200": true
+    },
+    {
+      "ticker": "NBIS",
+      "tier": "Opportunistic",
+      "status": "Owned",
+      "exposure_pct": 2.8,
+      "target_range": "1\u20133%",
+      "pos_status": "On Target",
+      "price_opp": "Neutral",
+      "action": "HOLD",
+      "score": 3,
+      "pullback_pct": 19.3,
       "above_ma200": true
     },
     {
@@ -676,42 +645,16 @@
       "above_ma200": false
     },
     {
-      "ticker": "NBIS",
+      "ticker": "PATH",
       "tier": "Opportunistic",
       "status": "Owned",
-      "exposure_pct": 2.8,
-      "target_range": "1\u20133%",
-      "pos_status": "On Target",
-      "price_opp": "Neutral",
-      "action": "HOLD",
-      "score": 3,
-      "pullback_pct": 19.2,
-      "above_ma200": true
-    },
-    {
-      "ticker": "OWL",
-      "tier": "Opportunistic",
-      "status": "Owned",
-      "exposure_pct": 0.6,
+      "exposure_pct": 0.1,
       "target_range": "1\u20133%",
       "pos_status": "Underweight",
       "price_opp": "Near High",
       "action": "HOLD",
       "score": 2,
       "pullback_pct": 0,
-      "above_ma200": true
-    },
-    {
-      "ticker": "FIX",
-      "tier": "Opportunistic",
-      "status": "Owned",
-      "exposure_pct": 0.8,
-      "target_range": "1\u20133%",
-      "pos_status": "Underweight",
-      "price_opp": "Near High",
-      "action": "HOLD",
-      "score": 2,
-      "pullback_pct": 6.1,
       "above_ma200": true
     },
     {
@@ -737,7 +680,33 @@
       "price_opp": "Near High",
       "action": "HOLD",
       "score": 2,
-      "pullback_pct": 7.2,
+      "pullback_pct": 7.3,
+      "above_ma200": true
+    },
+    {
+      "ticker": "AAPL",
+      "tier": "Core",
+      "status": "Owned",
+      "exposure_pct": 10.9,
+      "target_range": "5\u201310%",
+      "pos_status": "Overweight",
+      "price_opp": "Neutral",
+      "action": "TRIM",
+      "score": 2,
+      "pullback_pct": 12.8,
+      "above_ma200": true
+    },
+    {
+      "ticker": "FIX",
+      "tier": "Opportunistic",
+      "status": "Owned",
+      "exposure_pct": 0.8,
+      "target_range": "1\u20133%",
+      "pos_status": "Underweight",
+      "price_opp": "Near High",
+      "action": "HOLD",
+      "score": 2,
+      "pullback_pct": 6.1,
       "above_ma200": true
     },
     {
@@ -754,23 +723,10 @@
       "above_ma200": true
     },
     {
-      "ticker": "AAPL",
-      "tier": "Core",
-      "status": "Owned",
-      "exposure_pct": 10.9,
-      "target_range": "5\u201310%",
-      "pos_status": "Overweight",
-      "price_opp": "Neutral",
-      "action": "TRIM",
-      "score": 2,
-      "pullback_pct": 12.9,
-      "above_ma200": true
-    },
-    {
-      "ticker": "PATH",
+      "ticker": "OWL",
       "tier": "Opportunistic",
       "status": "Owned",
-      "exposure_pct": 0.1,
+      "exposure_pct": 0.6,
       "target_range": "1\u20133%",
       "pos_status": "Underweight",
       "price_opp": "Near High",
@@ -806,6 +762,6 @@
       "above_ma200": false
     }
   ],
-  "analysis": "## Trade Recommendations\n\n**Best CSP:** PLTR $150 strike, 2026-04-24, 31 DTE, $4.75/$4.90, 0.29 delta, 37.9% annualized return\n- Quality pullback with excellent premium, but position is NEAR_MAX\n\n**Best CC:** NVDA $185 strike, 2026-05-01, 38 DTE, $4.35/$4.50, 0.30 delta, 24.2% annualized return\n- Excellent timing with high IVP near recent highs\n\n**Best LEAPS:** NVO $25 strike, 2027-12-17, 633 DTE, $14.20/$15.00, 0.89 delta, 18.5% extrinsic\n- Near 52-week low but high IVP makes it pricey\n\n**Best Bull Call Spread:** DDOG $125/$135, 2026-05-15, $4.75 debit, $5.25 max profit, 110.5% ROR\n- Mid-range quality setup with good pullback\n\n**Peter Lynch:** None identified\n\n**IVP Environment:** 68.7% across all names - premium selling conditions excellent\n\n**Hard Pass:** Nothing fails quality checks, but watch position sizing limits on PLTR and NFLX",
-  "total_opps": 8
+  "analysis": "**BEST TRADES:**\n\n1. **Best CSP**: PLTR $150 strike, 2026-04-24 expiry, 31 DTE, $4.75/$4.90, delta 0.29, 37.9% annualized return\n\n2. **Best CC**: NVDA $185 strike, 2026-05-01 expiry, 38 DTE, $4.35/$4.50, delta 0.31, 24.2% annualized return\n\n3. **Best LEAPS**: NVO $25 strike, 2028-01-21 expiry, 668 DTE, $14.65/$15.20, delta 0.88, 2.5x leverage\n\n4. **Best Bull Call Spread**: NFLX $88/$98 strikes, 2026-05-15 expiry, $5.28 debit, $4.72 max profit, 89.6% ROR\n\n5. **Peter Lynch Discovery**: None\n\n6. **IVP Environment**: 68.7% IVP across all names - elevated volatility premium favors premium selling strategies\n\n**Hard passes**: None - all presented trades pass quality screens",
+  "total_opps": 7
 }
