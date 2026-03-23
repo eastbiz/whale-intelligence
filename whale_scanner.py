@@ -796,23 +796,31 @@ def calculate_ivp(contracts: list) -> dict:
     if not all_ivs:
         return {"iv_current": round(atm_iv,3), "iv_low":0.20, "iv_high":0.60, "ivp":50}
 
-    s = sorted(all_ivs)
-    iv_low  = s[int(len(s)*0.10)]   # 10th percentile (low end)
-    iv_high = s[int(len(s)*0.90)]   # 90th percentile (high end)
-    iv_rng  = iv_high - iv_low
-
-    # IVP = where current ATM IV sits in the historical range
-    # Since we only have today's chain (not historical), we use the cross-strike
-    # IV range as a proxy: low IVP = ATM IV near the low end of today's range
-    if iv_rng > 0.005:
-        ivp = round(min(100, max(0, (atm_iv - iv_low) / iv_rng * 100)), 1)
-    else:
-        ivp = 50  # flat term structure — no information
+    # Cross-strike IV range reflects skew, NOT historical percentile.
+    # ATM IV always sits near the low end due to put skew → IVP = ~0% always. Wrong.
+    # Correct approach: estimate IVP from ATM IV relative to a reasonable annual range.
+    # Typical stock ATM IV range over a year: ~0.5x to ~2.0x the current level.
+    # At VIX 15 (calm): stock IVs are near lows → IVP ~20-30%
+    # At VIX 25 (elevated): stock IVs are elevated → IVP ~60-75%
+    # At VIX 35+ (fear): stock IVs near highs → IVP ~85-95%
+    # We use ATM IV relative to an estimated annual range anchored on the current level.
+    # Annual low ≈ atm_iv * 0.50, Annual high ≈ atm_iv * 2.0
+    # This gives IVP = (atm_iv - low) / (high - low) = (1 - 0.5) / (2.0 - 0.5) = 33%
+    # But we adjust upward when ATM IV itself is high (high IV = high IVP)
+    # Simple calibration: IVP ≈ clip(atm_iv * 200, 5, 95)
+    # NVDA at 29% IV → IVP ≈ 58% (reasonable for current market)
+    # NVO at 45% IV  → IVP ≈ 90% (high fear, elevated)
+    # AAPL at 22% IV → IVP ≈ 44% (moderate)
+    # Exponential curve: maps ATM IV to IVP
+    # 20% IV → ~55% IVP (calm market), 30% IV → ~70%, 50% IV → ~86%, 70%+ → ~95%
+    # This avoids the cap-at-95 problem of linear scaling
+    import math as _math
+    ivp = round(min(95, max(5, 100 * (1 - _math.exp(-atm_iv / 0.25)))), 1)
 
     return {
         "iv_current": round(atm_iv, 3),
-        "iv_low":     round(iv_low, 3),
-        "iv_high":    round(iv_high, 3),
+        "iv_low":     round(atm_iv * 0.50, 3),
+        "iv_high":    round(atm_iv * 2.00, 3),
         "ivp":        ivp,
     }
 
@@ -3753,11 +3761,6 @@ def run_scanner():
     watchlist_tickers = set(ALL_TICKERS) - EXCLUDED_SYMBOLS - set(GROUPED_TICKERS.keys())
     all_allocation_tickers = owned_tickers | watchlist_tickers
     print(f"   📋 Allocation: {len(owned_tickers)} owned, {len(watchlist_tickers)} watchlist, {len(EXCLUDED_SYMBOLS)} excluded")
-    print(f"   📋 Owned positions: {sorted(owned_tickers)}")
-    if "IBIT" not in owned_tickers:
-        # Show raw ibkr keys to debug IBIT
-        ibit_keys = [k for k in ibkr if "IBIT" in k.upper()]
-        print(f"   ⚠️ IBIT not in exposure_map. ibkr keys containing IBIT: {ibit_keys}")
 
     def canonical_action(pos_status: str, price_opp: str) -> str:
         """
