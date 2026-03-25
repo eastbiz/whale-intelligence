@@ -35,6 +35,15 @@ PORTFOLIO_SIZE = 7_000_000  # fallback — overridden at runtime by live account
 MAX_CSP_ALLOCATION_PCT = 0.25   # max 25% of portfolio in CSP obligations
 MAX_CC_COVERAGE_PCT    = 0.50   # max 50% of owned shares covered by calls
 
+# ── Schwab account number → label mapping ────────────────────
+# Format: last 4 digits or full number (dashes optional)
+# Update CRT number once confirmed
+SCHWAB_ACCOUNT_LABELS = {
+    "17860185": "IRA",       # Schwab IRA      1786-0185
+    "52644501": "CRT",       # Schwab CRT      5264-4501
+    "62969383": "Personal",  # Schwab Personal 6296-9383
+}
+
 # ── Canonical tier target ranges (used everywhere) ───────────
 # Single source of truth — do not duplicate below
 TARGET_RANGES = {
@@ -4026,6 +4035,15 @@ def run_scanner():
     watchlist_tickers = set(ALL_TICKERS) - EXCLUDED_SYMBOLS - set(GROUPED_TICKERS.keys())
     all_allocation_tickers = owned_tickers | watchlist_tickers
     print(f"   📋 Allocation: {len(owned_tickers)} owned, {len(watchlist_tickers)} watchlist, {len(EXCLUDED_SYMBOLS)} excluded")
+    # Debug account labels
+    _acct_debug = {}
+    for _t, _p in ibkr.items():
+        if _p.get("asset_class") == "STK":
+            _raw = _p.get("account_type", _p.get("account", "")) or ""
+            _key = _raw.replace("-","").replace(" ","")
+            _lbl = SCHWAB_ACCOUNT_LABELS.get(_key) or SCHWAB_ACCOUNT_LABELS.get(_key[-8:] if len(_key)>=8 else _key) or ("IBKR" if not _raw or _raw.startswith("U") else _raw)
+            _acct_debug[_lbl] = _acct_debug.get(_lbl, 0) + 1
+    print(f"   📋 Account breakdown: {_acct_debug}")
 
     def canonical_action(pos_status: str, price_opp: str) -> str:
         """
@@ -4098,7 +4116,14 @@ def run_scanner():
         _csp_contracts = sum(p["contracts"] for p in portfolio_exposure.get("csp_positions", []) if p["ticker"] == ticker)
         _csp_obligation= sum(p["cso"]       for p in portfolio_exposure.get("csp_positions", []) if p["ticker"] == ticker)
         # Account source
-        _account       = _stk_pos.get("account_type", _stk_pos.get("account", "IBKR")) or "IBKR"
+        # Resolve account label from Schwab account number or IBKR
+        _raw_acct = _stk_pos.get("account_type", _stk_pos.get("account", "")) or ""
+        # Normalise: strip dashes, take last 8 chars to match both formats
+        _acct_key = _raw_acct.replace("-","").replace(" ","")
+        # Try full key then last 8 digits
+        _account = (SCHWAB_ACCOUNT_LABELS.get(_acct_key)
+                 or SCHWAB_ACCOUNT_LABELS.get(_acct_key[-8:] if len(_acct_key) >= 8 else _acct_key)
+                 or ("IBKR" if not _raw_acct or _raw_acct.startswith("U") else _raw_acct))
         # Status label
         _has_stock = _shares_owned > 0
         _has_cc    = _cc_contracts > 0
