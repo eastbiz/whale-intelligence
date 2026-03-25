@@ -741,23 +741,30 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
             # Long calls — LEAPS (DTE >= 400) or BCS long leg
             try:
                 from datetime import datetime as _dt
-                _exp_dt = _dt.strptime(expiry, "%Y%m%d") if len(expiry) == 8 else _dt.strptime(expiry, "%Y-%m-%d")
+                _exp_raw = str(expiry).strip()
+                if len(_exp_raw) == 8 and _exp_raw.isdigit():
+                    _exp_dt = _dt.strptime(_exp_raw, "%Y%m%d")
+                elif len(_exp_raw) >= 10:
+                    _exp_dt = _dt.strptime(_exp_raw[:10], "%Y-%m-%d")
+                else:
+                    _exp_dt = _dt.now()
                 _dte = (_exp_dt - _dt.now()).days
-            except:
+            except Exception as _e:
+                print(f"     LEAPS expiry parse error: {expiry!r} — {_e}")
                 _dte = 0
             if _dte >= 400:
                 avg_cost  = float(pos.get("avg_cost", 0) or 0)
-                breakeven = round(strike + avg_cost, 2) if avg_cost > 0 else None
-                # Format expiry nicely: YYYYMMDD -> "Jan 2027"
+                _strike_f = float(strike) if strike else 0
+                breakeven = round(_strike_f + avg_cost, 2) if avg_cost > 0 and _strike_f > 0 else None
                 try:
-                    _exp_str = _dt.strptime(expiry, "%Y%m%d").strftime("%b %Y") if len(expiry)==8 else expiry[:7]
+                    _exp_str = _exp_dt.strftime("%b %Y")
                 except:
-                    _exp_str = expiry
+                    _exp_str = str(expiry)[:7]
                 leaps_positions.append({
                     "ticker":    underlying,
-                    "strike":    strike,
+                    "strike":    _strike_f,
                     "contracts": int(qty),
-                    "expiry":    expiry,
+                    "expiry":    str(expiry),
                     "expiry_fmt":_exp_str,
                     "dte":       _dte,
                     "avg_cost":  avg_cost,
@@ -785,6 +792,10 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
     ibkr_calls   = len(cc_positions)  - schwab_calls
     print(f"   Exposure: {len(csp_positions)} short puts (IBKR:{ibkr_puts} Schwab:{schwab_puts}) | "
           f"{len(cc_positions)} short calls (IBKR:{ibkr_calls} Schwab:{schwab_calls})")
+    print(f"   LEAPS found: {len(leaps_positions)} | BCS legs: {len(bcs_positions)}")
+    if leaps_positions:
+        for lp in leaps_positions[:3]:
+            print(f"     LEAPS: {lp['ticker']} ${lp['strike']} {lp['expiry']} DTE={lp['dte']} BE={lp['breakeven']}")
     print(f"   CSP Obligation: ${total_cso:,.0f} ({csp_pct:.1f}%) | Remaining: ${remaining_csp:,.0f}")
 
     return {
