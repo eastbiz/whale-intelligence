@@ -667,10 +667,12 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
     Both sources are already merged into the ibkr dict by run_scanner().
     Returns exposure dict written to results.json under 'exposure' key.
     """
-    csp_positions = []
-    cc_positions  = []
-    cc_shares     = {}   # shares already covered per ticker — used for CC sizing
-    seen          = set()
+    csp_positions  = []
+    cc_positions   = []
+    leaps_positions= []  # long calls with DTE >= 500
+    bcs_positions  = []  # long calls that are part of bull call spreads (DTE >= 500)
+    cc_shares      = {}  # shares already covered per ticker — used for CC sizing
+    seen           = set()
 
     for sym, pos in ibkr.items():
         if pos.get("asset_class") != "OPT": continue
@@ -703,18 +705,65 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
                 "source":    source,
             })
         elif side == "Short" and put_call == "C":
-            nva = round(strike * 100 * qty, 0)
-            shares_covered = int(qty * 100)
-            cc_positions.append({
-                "ticker":         underlying,
-                "strike":         strike,
-                "contracts":      int(qty),
-                "nva":            nva,
-                "shares_covered": shares_covered,
-                "expiry":         expiry,
-                "source":         source,
-            })
-            cc_shares[underlying] = cc_shares.get(underlying, 0) + shares_covered
+            # BCS short leg: DTE >= 400 days — exclude from CC coverage
+            try:
+                from datetime import datetime as _dt
+                _exp_dt = _dt.strptime(expiry, "%Y%m%d") if len(expiry) == 8 else _dt.strptime(expiry, "%Y-%m-%d")
+                _dte = (_exp_dt - _dt.now()).days
+            except:
+                _dte = 0
+            if _dte >= 400:
+                # BCS short leg — record but don't count as CC coverage
+                bcs_positions.append({
+                    "ticker":    underlying,
+                    "strike":    strike,
+                    "contracts": int(qty),
+                    "expiry":    expiry,
+                    "dte":       _dte,
+                    "leg":       "short",
+                    "source":    source,
+                })
+            else:
+                # Standard covered call
+                nva = round(strike * 100 * qty, 0)
+                shares_covered = int(qty * 100)
+                cc_positions.append({
+                    "ticker":         underlying,
+                    "strike":         strike,
+                    "contracts":      int(qty),
+                    "nva":            nva,
+                    "shares_covered": shares_covered,
+                    "expiry":         expiry,
+                    "source":         source,
+                })
+                cc_shares[underlying] = cc_shares.get(underlying, 0) + shares_covered
+        elif side == "Long" and put_call == "C":
+            # Long calls — LEAPS (DTE >= 400) or BCS long leg
+            try:
+                from datetime import datetime as _dt
+                _exp_dt = _dt.strptime(expiry, "%Y%m%d") if len(expiry) == 8 else _dt.strptime(expiry, "%Y-%m-%d")
+                _dte = (_exp_dt - _dt.now()).days
+            except:
+                _dte = 0
+            if _dte >= 400:
+                avg_cost  = float(pos.get("avg_cost", 0) or 0)
+                breakeven = round(strike + avg_cost, 2) if avg_cost > 0 else None
+                # Format expiry nicely: YYYYMMDD -> "Jan 2027"
+                try:
+                    _exp_str = _dt.strptime(expiry, "%Y%m%d").strftime("%b %Y") if len(expiry)==8 else expiry[:7]
+                except:
+                    _exp_str = expiry
+                leaps_positions.append({
+                    "ticker":    underlying,
+                    "strike":    strike,
+                    "contracts": int(qty),
+                    "expiry":    expiry,
+                    "expiry_fmt":_exp_str,
+                    "dte":       _dte,
+                    "avg_cost":  avg_cost,
+                    "breakeven": breakeven,
+                    "source":    source,
+                })
 
     total_cso     = sum(p["cso"] for p in csp_positions)
     total_nva     = sum(p["nva"] for p in cc_positions)
@@ -756,6 +805,9 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
         # Risk summary (spec §4)
         "max_assignment_exposure": round(total_cso, 0),
         "max_shares_called_away":  sum(cc_shares.values()),
+        # LEAPS and BCS positions for Positions tab
+        "leaps_positions":         leaps_positions,
+        "bcs_positions":           bcs_positions,
     }
 
 
@@ -4165,6 +4217,10 @@ def run_scanner():
             "csp_obligation":  _csp_obligation,
             "exp_status":      _exp_status,
             "account":         _account,
+            # LEAPS positions for this ticker
+            "leaps":           [p for p in portfolio_exposure.get("leaps_positions",[]) if p["ticker"]==ticker],
+            # BCS positions for this ticker (long legs only for display)
+            "bcs":             [p for p in portfolio_exposure.get("bcs_positions",[]) if p["ticker"]==ticker],
         })
 
     # Sort by score descending — BUY at top, TRIM at bottom
