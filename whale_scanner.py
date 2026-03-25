@@ -383,7 +383,15 @@ def schwab_parse_positions(accounts: list) -> dict:
     """
     holdings = {}
     for acc in accounts:
-        acc_type = acc.get("account_type", "")
+        acc_type   = acc.get("account_type", "")
+        acc_id_raw = acc.get("account_id", "")
+        # Resolve human label: strip dashes, look up in SCHWAB_ACCOUNT_LABELS
+        acc_id_key = acc_id_raw.replace("-","").replace(" ","")
+        acc_label  = (SCHWAB_ACCOUNT_LABELS.get(acc_id_key)
+                   or SCHWAB_ACCOUNT_LABELS.get(acc_id_key[-8:] if len(acc_id_key)>=8 else acc_id_key)
+                   or acc_type  # fallback to MARGIN/CASH if not in map
+                   or "Schwab")
+        print(f"   Schwab account: id={acc_id_raw} type={acc_type} -> label={acc_label}")
         for pos in acc.get("positions", []):
             inst  = pos.get("instrument", {})
             asset = inst.get("assetType", "")
@@ -404,7 +412,7 @@ def schwab_parse_positions(accounts: list) -> dict:
                         "quantity":     qty,
                         "avg_cost":     avg,
                         "market_value": mval,
-                        "account_type": acc_type,
+                        "account_type": acc_label,
                         "asset_class":  "STK",
                     }
 
@@ -442,7 +450,7 @@ def schwab_parse_positions(accounts: list) -> dict:
                     "avg_cost":      avg,
                     "market_value":  mval,
                     "side":          side,
-                    "account_type":  acc_type,
+                    "account_type":  acc_label,
                     "asset_class":   "OPT",
                     "source":        "schwab",
                 }
@@ -4116,14 +4124,10 @@ def run_scanner():
         _csp_contracts = sum(p["contracts"] for p in portfolio_exposure.get("csp_positions", []) if p["ticker"] == ticker)
         _csp_obligation= sum(p["cso"]       for p in portfolio_exposure.get("csp_positions", []) if p["ticker"] == ticker)
         # Account source
-        # Resolve account label from Schwab account number or IBKR
-        _raw_acct = _stk_pos.get("account_type", _stk_pos.get("account", "")) or ""
-        # Normalise: strip dashes, take last 8 chars to match both formats
-        _acct_key = _raw_acct.replace("-","").replace(" ","")
-        # Try full key then last 8 digits
-        _account = (SCHWAB_ACCOUNT_LABELS.get(_acct_key)
-                 or SCHWAB_ACCOUNT_LABELS.get(_acct_key[-8:] if len(_acct_key) >= 8 else _acct_key)
-                 or ("IBKR" if not _raw_acct or _raw_acct.startswith("U") else _raw_acct))
+        # account_type is already resolved to a human label by schwab_parse_positions
+        # IBKR positions have no account_type — default to "IBKR"
+        _raw_acct = _stk_pos.get("account_type", "") or ""
+        _account  = _raw_acct if _raw_acct else "IBKR"
         # Status label
         _has_stock = _shares_owned > 0
         _has_cc    = _cc_contracts > 0
