@@ -366,36 +366,87 @@ def schwab_get_ivp(ticker: str) -> float:
 
 def schwab_parse_positions(accounts: list) -> dict:
     """
-    Parse Schwab accounts into a flat dict of stock holdings.
-    Returns {ticker: {quantity, avg_cost, market_value, account_type}}
-    Aggregates across ALL accounts so cross-account exposure is visible.
+    Parse Schwab accounts into stock AND option holdings.
+    Stock:  {ticker: {quantity, avg_cost, market_value, asset_class="STK"}}
+    Option: {opt_key: {underlying, put_call, strike, expiry, quantity,
+                       side, avg_cost, market_value, asset_class="OPT", source="schwab"}}
+    Aggregates across all Schwab accounts (IRA, CRT, Personal).
     """
     holdings = {}
     for acc in accounts:
         acc_type = acc.get("account_type", "")
         for pos in acc.get("positions", []):
-            inst = pos.get("instrument", {})
-            # Include EQUITY and ETF (e.g. IBIT is an ETF, not EQUITY)
-            if inst.get("assetType") not in ("EQUITY", "ETF", "COLLECTIVE_INVESTMENT"):
-                continue
-            ticker = inst.get("symbol", "").replace("/", "-")
-            qty    = float(pos.get("longQuantity",  0) or 0)
-            if qty <= 0:
-                continue
-            avg    = float(pos.get("averagePrice",   0) or 0)
-            mval   = float(pos.get("marketValue",    0) or 0)
-            if ticker in holdings:
-                # Aggregate across accounts
-                holdings[ticker]["quantity"]     += qty
-                holdings[ticker]["market_value"] += mval
-            else:
-                holdings[ticker] = {
-                    "quantity":     qty,
-                    "avg_cost":     avg,
-                    "market_value": mval,
-                    "account_type": acc_type,
-                    "asset_class":  "STK",
+            inst  = pos.get("instrument", {})
+            asset = inst.get("assetType", "")
+
+            # ── Stocks / ETFs ──────────────────────────────────
+            if asset in ("EQUITY", "ETF", "COLLECTIVE_INVESTMENT"):
+                ticker = inst.get("symbol", "").replace("/", "-")
+                qty    = float(pos.get("longQuantity", 0) or 0)
+                if qty <= 0:
+                    continue
+                avg  = float(pos.get("averagePrice", 0) or 0)
+                mval = float(pos.get("marketValue",  0) or 0)
+                if ticker in holdings:
+                    holdings[ticker]["quantity"]     += qty
+                    holdings[ticker]["market_value"] += mval
+                else:
+                    holdings[ticker] = {
+                        "quantity":     qty,
+                        "avg_cost":     avg,
+                        "market_value": mval,
+                        "account_type": acc_type,
+                        "asset_class":  "STK",
+                    }
+
+            # ── Options (short puts = CSP, short calls = CC) ───
+            elif asset == "OPTION":
+                opt_sym    = inst.get("symbol", "")
+                underlying = (inst.get("underlyingSymbol", "")
+                              .replace("/", "-").replace("BRK B", "BRK-B").strip())
+                put_call   = inst.get("putCall", "").upper()       # "PUT" or "CALL"
+                strike     = float(inst.get("strikePrice", 0) or 0)
+                expiry_raw = inst.get("expirationDate", "")        # "2025-04-17"
+
+                # shortQuantity > 0 means we sold this option (CSP or CC)
+                short_qty = float(pos.get("shortQuantity", 0) or 0)
+                long_qty  = float(pos.get("longQuantity",  0) or 0)
+                qty = short_qty if short_qty > 0 else long_qty
+                if qty <= 0 or not underlying or strike == 0:
+                    continue
+
+                side    = "Short" if short_qty > 0 else "Long"
+                avg     = float(pos.get("averagePrice", 0) or 0)
+                mval    = float(pos.get("marketValue",  0) or 0)
+                # Normalise to single char P/C to match IBKR convention
+                pc_norm = "P" if "PUT" in put_call else "C" if "CALL" in put_call else put_call[:1]
+                # YYYYMMDD format to match IBKR
+                expiry_fmt = expiry_raw.replace("-", "") if expiry_raw else ""
+
+                key = opt_sym or f"{underlying}_{pc_norm}_{strike}_{expiry_fmt}"
+                holdings[key] = {
+                    "underlying":    underlying,
+                    "put_call":      pc_norm,
+                    "strike":        strike,
+                    "expiry":        expiry_fmt,
+                    "quantity":      qty,
+                    "avg_cost":      avg,
+                    "market_value":  mval,
+                    "side":          side,
+                    "account_type":  acc_type,
+                    "asset_class":   "OPT",
+                    "source":        "schwab",
                 }
+
+    short_puts  = sum(1 for v in holdings.values()
+                      if v.get("asset_class") == "OPT"
+                      and v.get("side") == "Short" and v.get("put_call") == "P")
+    short_calls = sum(1 for v in holdings.values()
+                      if v.get("asset_class") == "OPT"
+                      and v.get("side") == "Short" and v.get("put_call") == "C")
+    stk_count   = sum(1 for v in holdings.values() if v.get("asset_class") == "STK")
+    if short_puts + short_calls > 0:
+        print(f"   Schwab options parsed: {short_puts} short puts (CSP), {short_calls} short calls (CC)")
     return holdings
 
 
@@ -595,34 +646,46 @@ def get_ibkr_positions() -> dict:
 def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
     """
     Compute real-time CSP and CC exposure from open broker positions.
-    Uses IBKR Flex positions (asset_class=OPT, put_call, side, strike, quantity).
+    Merges IBKR Flex (asset_class=OPT) + Schwab option positions (source="schwab").
+    Both sources are already merged into the ibkr dict by run_scanner().
     Returns exposure dict written to results.json under 'exposure' key.
     """
-    csp_positions = []   # open short puts (CSP obligations)
-    cc_positions  = []   # open short calls (covered calls)
-    cc_shares     = {}   # shares covered per ticker
+    csp_positions = []
+    cc_positions  = []
+    cc_shares     = {}   # shares already covered per ticker — used for CC sizing
+    seen          = set()
 
     for sym, pos in ibkr.items():
         if pos.get("asset_class") != "OPT": continue
         side      = pos.get("side", "Long")
-        put_call  = pos.get("put_call", "").upper()
+        put_call  = pos.get("put_call", "").upper()[:1]  # normalise to P / C
         qty       = abs(float(pos.get("quantity", 0) or 0))
         strike    = float(pos.get("strike", 0) or 0)
-        underlying = pos.get("underlying", sym).upper().replace("BRK B", "BRK-B").strip()
+        expiry    = pos.get("expiry", "")
+        source    = pos.get("source", "ibkr")
+        underlying = (
+            pos.get("underlying", sym)
+            .upper().replace("BRK B","BRK-B").replace("BRK/B","BRK-B").strip()
+        )
         if qty == 0 or strike == 0: continue
 
+        # Deduplicate — same position sometimes in both IBKR and Schwab feeds
+        dedup_key = (underlying, put_call, strike, expiry, side)
+        if dedup_key in seen:
+            continue
+        seen.add(dedup_key)
+
         if side == "Short" and put_call == "P":
-            # Open short put = CSP obligation
             cso = round(strike * 100 * qty, 0)
             csp_positions.append({
                 "ticker":    underlying,
                 "strike":    strike,
                 "contracts": int(qty),
                 "cso":       cso,
-                "expiry":    pos.get("expiry", ""),
+                "expiry":    expiry,
+                "source":    source,
             })
         elif side == "Short" and put_call == "C":
-            # Open short call = covered call
             nva = round(strike * 100 * qty, 0)
             shares_covered = int(qty * 100)
             cc_positions.append({
@@ -631,7 +694,8 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
                 "contracts":      int(qty),
                 "nva":            nva,
                 "shares_covered": shares_covered,
-                "expiry":         pos.get("expiry", ""),
+                "expiry":         expiry,
+                "source":         source,
             })
             cc_shares[underlying] = cc_shares.get(underlying, 0) + shares_covered
 
@@ -641,8 +705,21 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
     remaining_csp = max(0.0, max_cso - total_cso)
     csp_pct       = round(total_cso / portfolio_size * 100, 1) if portfolio_size > 0 else 0
 
-    print(f"   💼 CSP Obligation: ${total_cso:,.0f} ({csp_pct}% of portfolio) | Remaining: ${remaining_csp:,.0f}")
-    print(f"   💼 CC Notional:    ${total_nva:,.0f} | {len(cc_positions)} positions covering {sum(cc_shares.values())} shares")
+    # Per-ticker CC coverage stats (for spec §4 CC Exposure)
+    cc_coverage_pct = {}
+    for ticker, covered in cc_shares.items():
+        stk = ibkr.get(ticker, {})
+        total_shares = float(stk.get("quantity", 0) or stk.get("qty", 0) or 0)
+        if total_shares > 0:
+            cc_coverage_pct[ticker] = round(covered / total_shares * 100, 1)
+
+    schwab_puts  = sum(1 for p in csp_positions if p.get("source") == "schwab")
+    schwab_calls = sum(1 for p in cc_positions  if p.get("source") == "schwab")
+    ibkr_puts    = len(csp_positions) - schwab_puts
+    ibkr_calls   = len(cc_positions)  - schwab_calls
+    print(f"   Exposure: {len(csp_positions)} short puts (IBKR:{ibkr_puts} Schwab:{schwab_puts}) | "
+          f"{len(cc_positions)} short calls (IBKR:{ibkr_calls} Schwab:{schwab_calls})")
+    print(f"   CSP Obligation: ${total_cso:,.0f} ({csp_pct:.1f}%) | Remaining: ${remaining_csp:,.0f}")
 
     return {
         "portfolio_size":          round(portfolio_size, 0),
@@ -654,11 +731,14 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
         "csp_positions":           csp_positions,
         "total_cc_notional":       round(total_nva, 0),
         "cc_shares_covered":       cc_shares,
+        "cc_coverage_pct":         cc_coverage_pct,
         "cc_positions":            cc_positions,
-        # Premium totals populated later by scanner
         "total_premium_csp":       0,
         "total_premium_cc":        0,
         "total_premium_all":       0,
+        # Risk summary (spec §4)
+        "max_assignment_exposure": round(total_cso, 0),
+        "max_shares_called_away":  sum(cc_shares.values()),
     }
 
 
@@ -1461,7 +1541,7 @@ def get_pnl_status(avg_cost: float, current_price: float) -> str:
 
 
 def find_position_income_cc(ticker, price, qty, avg_cost, contracts,
-                             ivdata, position_status, pnl_status) -> tuple:
+                             ivdata, position_status, pnl_status, already_covered=0) -> tuple:
     """
     Position Income Optimization — Mode 4.
     Sell calls on existing holdings to generate income.
@@ -1531,7 +1611,9 @@ def find_position_income_cc(ticker, price, qty, avg_cost, contracts,
             if spread > MAX_BID_ASK_SPREAD: continue
 
             annualized    = (mid / price) * (365 / dte) * 100
-            max_contracts = max(1, int(qty / 100))
+            uncovered     = max(0, qty - already_covered)
+            max_contracts = max(0, int(uncovered / 100))
+            if max_contracts == 0: continue
             prem_pct      = round(mid / strike * 100, 2)
 
             score = delta * mid * (ivdata["ivp"] / 50)
@@ -1906,7 +1988,7 @@ def get_max_alloc(ticker: str) -> float:
     else:                            return 0.025
 
 
-def find_best_csp(ticker, price, contracts, ivdata, pir, quality) -> tuple:
+def find_best_csp(ticker, price, contracts, ivdata, pir, quality, sizing=None) -> tuple:
     """
     Find best cash-secured put opportunity.
     Returns (csp_dict, timing_dict) or (None, {})
@@ -1963,7 +2045,11 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality) -> tuple:
             if annualized < 5: continue  # reject truly garbage premiums
 
             otm_pct       = round((price - strike) / price * 100, 1)
-            max_contracts = max(1, int(PORTFOLIO_SIZE * get_max_alloc(ticker) / (strike * 100)))
+            # Use room_usd from live position data — never suggest more than remaining budget
+            if sizing and sizing.get("room_usd", 0) > 0:
+                max_contracts = max(0, int(sizing["room_usd"] / (strike * 100)))
+            else:
+                max_contracts = max(1, int(PORTFOLIO_SIZE * get_max_alloc(ticker) / (strike * 100)))
             collateral    = strike * 100 * max_contracts
             prem_pct      = round(mid / strike * 100, 2)
 
@@ -2007,14 +2093,16 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality) -> tuple:
     return best, best["timing"]
 
 
-def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir):
+def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir, already_covered=0):
     timing = timing_score("CC", pir, ivdata["ivp"])
     if not contracts or price <= 0 or qty < 100: return None, timing
     # Note: timing["recommend"] is advisory only — dashboard shows all
 
     atm_iv        = ivdata["iv_current"]
     today         = datetime.now()
-    max_contracts = int(qty / 100)
+    uncovered_shares = max(0, qty - already_covered)
+    max_contracts    = max(0, int(uncovered_shares / 100))
+    if max_contracts == 0: return None, timing  # all shares already covered
     best          = None; best_score = 0
 
     for c in contracts:
@@ -2221,7 +2309,7 @@ def find_pmcc_short_call(ticker, price, existing_leaps, contracts, ivdata, pir):
 def find_bull_call_spread(ticker, price, contracts, ivdata, pir, quality):
     """
     Bull Call Spread — Final Rules:
-    - DTE: 45-120 days (min 45, preferred 60-120)
+    - DTE: 500-800 days (2-year LEAPS spreads only)
     - IVP: 20-80 (reject <20 or >80)
     - Short call delta: 0.25-0.40
     - Spread width: min $10 or 1-2% of stock price
@@ -2255,7 +2343,7 @@ def find_bull_call_spread(ticker, price, contracts, ivdata, pir, quality):
             expiry = datetime.strptime(c["expiry"], "%Y-%m-%d")
             dte = (expiry - today).days
         except Exception: continue
-        if not (45 <= dte <= 120): continue  # min 45, preferred 60-120
+        if not (LEAPS_DTE_MIN <= dte <= LEAPS_DTE_MIN + 300): continue  # LEAPS BCS: 500-800 DTE
         bid = float(c.get("nbbo_bid",0) or 0)
         ask = float(c.get("nbbo_ask",0) or 0)
         mid = (bid + ask) / 2
@@ -2300,7 +2388,6 @@ def find_bull_call_spread(ticker, price, contracts, ivdata, pir, quality):
 
             # ROR: min 80%, reject if inflated by very short DTE
             if ror < BCS_MIN_ROR: continue
-            if ror > 2.0 and dte < 60: continue  # >200% ROR on short DTE = lottery trap
 
             # Quality tier label
             if ror >= 1.5 and dte >= 90 and 30 <= ivdata["ivp"] <= 70:
@@ -2864,7 +2951,7 @@ def run_scanner():
     else:
         print(f"   💼 Portfolio size: ${PORTFOLIO_SIZE:,.0f} (fallback — live data unavailable)")
 
-    # ── Compute real-time portfolio exposure from open option positions ──
+    # ── Compute real-time portfolio exposure (CSP + CC from all brokers) ──
     portfolio_exposure = compute_portfolio_exposure(ibkr, PORTFOLIO_SIZE)
 
     ok  = sum(1 for v in mkt.values() if v["price"]>0)
@@ -3026,7 +3113,7 @@ def run_scanner():
             q_adjusted = dict(quality)
             if gng.get("spy_warning"):
                 q_adjusted["quality_score"] = max(0, quality["quality_score"] - 1)
-            csp, _ = find_best_csp(ticker, price, contracts, ivdata, pir, q_adjusted)
+            csp, _ = find_best_csp(ticker, price, contracts, ivdata, pir, q_adjusted, sizing=sizing)
             if csp:
                 # below_min trades still shown but scored lower
                 score_mult = 0.5 if csp.get("below_min") else 1.0
@@ -3050,7 +3137,8 @@ def run_scanner():
             # Always run PIO — different delta rules than standard CC
             # PIO adjusts delta by P&L status, ignores quality filters
             pio_cc, _ = find_position_income_cc(
-                ticker, price, qty, avg, contracts, ivdata, pos_status, pnl_status)
+                ticker, price, qty, avg, contracts, ivdata, pos_status, pnl_status,
+                already_covered=portfolio_exposure.get("cc_shares_covered",{}).get(ticker, 0))
             if pio_cc:
                 _s = {"tier": base.get("tier","Opportunistic"),
                       "delta": pio_cc.get("delta",0),
@@ -3114,7 +3202,8 @@ def run_scanner():
                 and qty >= 100
                 and not quality["hard_stop"]
                 and ticker not in LEAPS_ONLY):
-            cc, _ = find_best_cc(ticker, price, qty, avg, contracts, ivdata, pir)
+            cc, _ = find_best_cc(ticker, price, qty, avg, contracts, ivdata, pir,
+                               already_covered=portfolio_exposure.get("cc_shares_covered",{}).get(ticker, 0))
             if cc:
                 cc_opps.append({**base,"cc":cc,
                     "score":score_cc({"tier":base.get("tier","Opportunistic"),
@@ -3333,15 +3422,14 @@ def run_scanner():
     # ── Save results.json for dashboard ─────────────────────
     def opp_to_dict(o, strategy_key):
         """Convert opportunity to clean dict for JSON — includes sizing spec fields."""
-        s = o.get(strategy_key, {})
+        s          = o.get(strategy_key, {})
         mode       = strategy_key.upper()
         strike     = s.get("strike", 0)
         contracts  = s.get("max_contracts", 1)
         premium    = s.get("premium", 0)
         ticker     = o.get("ticker", "")
 
-        # ── Action label (spec §6) ────────────────────────────
-        # Determine if this ticker already has an open position of this type
+        # Action label — SELL CSP / SCALE CSP / SELL CC / INCREASE COVERAGE
         _has_csp = any(p["ticker"] == ticker for p in portfolio_exposure.get("csp_positions", []))
         _has_cc  = any(p["ticker"] == ticker for p in portfolio_exposure.get("cc_positions", []))
         if mode == "CSP":
@@ -3351,39 +3439,33 @@ def run_scanner():
         else:
             action_label = mode
 
-        # ── Sizing fields (spec §5, §6) ───────────────────────
+        # Sizing block per spec §5, §6
         if mode == "CSP":
-            cso              = round(strike * 100 * contracts, 0)
-            capital_required = cso
-            premium_total    = round(premium * 100 * contracts, 2)
-            current_cso      = portfolio_exposure.get("total_csp_obligation", 0)
-            resulting_cso    = current_cso + cso
-            remaining_after  = max(0, portfolio_exposure.get("remaining_csp_capacity", 0) - cso)
-            within_limit     = resulting_cso <= portfolio_exposure.get("max_csp_allocation_usd", float("inf"))
-            sizing = {
-                "suggested_contracts":    contracts,
-                "capital_required":       capital_required,
-                "premium_received":       premium_total,
-                "cso":                    cso,
-                "action_label":           action_label,
-                "current_obligation":     round(current_cso, 0),
-                "resulting_obligation":   round(resulting_cso, 0),
-                "resulting_pct":          round(resulting_cso / PORTFOLIO_SIZE * 100, 1) if PORTFOLIO_SIZE > 0 else 0,
-                "remaining_after":        round(remaining_after, 0),
-                "within_limit":           within_limit,
-            }
-        elif mode in ("CC", "PIO", "SPIKE_CC"):
-            nva              = round(strike * 100 * contracts, 0)
-            capital_required = 0  # CC requires shares, not cash
-            premium_total    = round(premium * 100 * contracts, 2)
-            shares_covered   = contracts * 100
+            cso             = round(strike * 100 * contracts, 0)
+            current_cso     = portfolio_exposure.get("total_csp_obligation", 0)
+            max_cso         = portfolio_exposure.get("max_csp_allocation_usd", PORTFOLIO_SIZE * MAX_CSP_ALLOCATION_PCT)
+            resulting_cso   = current_cso + cso
+            remaining_after = max(0, portfolio_exposure.get("remaining_csp_capacity", 0) - cso)
             sizing = {
                 "suggested_contracts":  contracts,
-                "capital_required":     capital_required,
-                "premium_received":     premium_total,
-                "nva":                  nva,
-                "shares_covered":       shares_covered,
+                "capital_required":     cso,
+                "premium_received":     round(premium * 100 * contracts, 2),
+                "cso":                  cso,
                 "action_label":         action_label,
+                "current_obligation":   round(current_cso, 0),
+                "resulting_obligation": round(resulting_cso, 0),
+                "resulting_pct":        round(resulting_cso / PORTFOLIO_SIZE * 100, 1) if PORTFOLIO_SIZE > 0 else 0,
+                "remaining_after":      round(remaining_after, 0),
+                "within_limit":         resulting_cso <= max_cso,
+            }
+        elif mode in ("CC", "PIO", "SPIKE_CC"):
+            sizing = {
+                "suggested_contracts": contracts,
+                "capital_required":    0,
+                "premium_received":    round(premium * 100 * contracts, 2),
+                "nva":                 round(strike * 100 * contracts, 0),
+                "shares_covered":      contracts * 100,
+                "action_label":        action_label,
             }
         else:
             sizing = {
@@ -3611,27 +3693,6 @@ def run_scanner():
             csp_entry["score"] = score_csp(csp_entry)
             csp_entry["normalized"] = normalized_score(csp_entry["score"], "CSP")
             csp_entry["quality_label"] = quality_label(csp_entry["score"], SCORE_MAX["CSP"])
-            # ── Sizing fields (spec §5, §6) ───────────────────
-            _strike    = best_csp["strike"]
-            _contracts = max(0, int(portfolio_exposure.get("remaining_csp_capacity", 0) / (_strike * 100))) if _strike > 0 else 0
-            _cso       = round(_strike * 100 * _contracts, 0)
-            _prem_tot  = round(best_csp["premium"] * 100 * _contracts, 2)
-            _curr_cso  = portfolio_exposure.get("total_csp_obligation", 0)
-            _max_cso   = portfolio_exposure.get("max_csp_allocation_usd", PORTFOLIO_SIZE * MAX_CSP_ALLOCATION_PCT)
-            _has_open  = any(p["ticker"] == ticker for p in portfolio_exposure.get("csp_positions", []))
-            csp_entry["action_label"] = "SCALE CSP" if _has_open else "SELL CSP"
-            csp_entry["sizing"] = {
-                "suggested_contracts":  _contracts,
-                "capital_required":     _cso,
-                "premium_received":     _prem_tot,
-                "cso":                  _cso,
-                "action_label":         csp_entry["action_label"],
-                "current_obligation":   round(_curr_cso, 0),
-                "resulting_obligation": round(_curr_cso + _cso, 0),
-                "resulting_pct":        round((_curr_cso + _cso) / PORTFOLIO_SIZE * 100, 1) if PORTFOLIO_SIZE > 0 else 0,
-                "remaining_after":      round(max(0, portfolio_exposure.get("remaining_csp_capacity", 0) - _cso), 0),
-                "within_limit":         (_curr_cso + _cso) <= _max_cso,
-            }
             dashboard_csps.append(csp_entry)
 
         # ── CC: owned positions only ─────────────────────────
@@ -3647,6 +3708,10 @@ def run_scanner():
             d_min = 0.20; d_max = 0.50 if is_overweight else 0.35  # overweight: closer strikes ok
             d_target = 0.40 if is_overweight else 0.25  # scoring target
 
+            _already_cc  = portfolio_exposure.get("cc_shares_covered",{}).get(ticker, 0)
+            _uncovered   = max(0, qty_d - _already_cc)
+            if _uncovered < 100:
+                pass  # no uncovered shares — skip CC (still show PIO below)
             calls_30_60 = [c for c in contracts_d
                            if c.get("option_type") == "C"
                            and 20 <= (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days <= 60
@@ -3702,8 +3767,8 @@ def run_scanner():
                 cc_entry["score"] = score_cc(cc_entry)
                 cc_entry["normalized"] = normalized_score(cc_entry["score"], "CC")
                 cc_entry["quality_label"] = quality_label(cc_entry["score"], SCORE_MAX["CC"])
-                # ── CC sizing fields (spec §5) ────────────────
-                _cc_contracts = max(1, int(qty_d / 100))
+                # Sizing — spec §5: only uncovered shares count
+                _cc_contracts = max(0, int(_uncovered / 100))
                 _cc_strike    = best_cc["strike"]
                 _nva          = round(_cc_strike * 100 * _cc_contracts, 0)
                 _has_cc_open  = any(p["ticker"] == ticker for p in portfolio_exposure.get("cc_positions", []))
@@ -3714,6 +3779,8 @@ def run_scanner():
                     "premium_received":    round(best_cc["premium"] * 100 * _cc_contracts, 2),
                     "nva":                 _nva,
                     "shares_covered":      _cc_contracts * 100,
+                    "already_covered":     int(_already_cc),
+                    "total_shares":        int(qty_d),
                     "action_label":        cc_entry["action_label"],
                 }
                 dashboard_ccs.append(cc_entry)
@@ -3835,7 +3902,31 @@ def run_scanner():
     dashboard_csps.sort(key=lambda x: x.get("score", 0), reverse=True)
     dashboard_ccs.sort(key=lambda x: x.get("score", 0), reverse=True)
     dashboard_leaps.sort(key=lambda x: x.get("score", 0), reverse=True)
-    dashboard_bcss = []  # BCS uses main scan results only
+    # Build dashboard BCS list from ALL bcs_opps (not just top 3)
+    dashboard_bcss = []
+    for o in bcs_opps:
+        b = o.get("bcs", {})
+        if not b: continue
+        ppd = round(b.get("debit", 0) / max(1, b.get("dte", 1)), 2)
+        dashboard_bcss.append({
+            "ticker": o.get("ticker",""), "tier": o.get("tier",""),
+            "price": o.get("price",0), "ivp": round(o.get("ivp",0),1),
+            "mode": "BCS", "strike": b.get("long_strike",0),
+            "long_strike": b.get("long_strike",0), "short_strike": b.get("short_strike",0),
+            "expiry": b.get("expiry",""), "dte": b.get("dte",0),
+            "premium": b.get("debit",0), "annualized_return": b.get("ror",0),
+            "delta": b.get("short_delta",0), "breakeven": b.get("breakeven",0),
+            "premium_per_day": ppd,
+            "signal": b.get("timing",{}).get("signal","") or f"LEAPS spread | {b.get('tier_label','')} | ROR {b.get('ror',0):.0f}%",
+            "below_min": b.get("ror",0) < BCS_MIN_ROR * 100,
+            "risk_note": f"Max profit: ${b.get('max_profit',0):.0f} | Max risk: ${b.get('max_risk',0):.0f}",
+            "risk_level": "Medium" if b.get("tier_label","C") in ("A","B") else "Elevated",
+            "passes_quality": b.get("tier_label","D") in ("A","B"),
+            "warnings": [] if b.get("tier_label","D") in ("A","B") else [f"Tier {b.get('tier_label','C')} quality"],
+            "score": o.get("score",0),
+            "quality_label": "Strong" if b.get("tier_label")=="A" else "Acceptable" if b.get("tier_label")=="B" else "Review",
+        })
+    dashboard_bcss.sort(key=lambda x: x.get("score",0), reverse=True)
 
     pio_count = sum(1 for o in dashboard_ccs if o.get("mode") == "PIO")
     cc_count  = sum(1 for o in dashboard_ccs if o.get("mode") == "CC")
@@ -3868,7 +3959,7 @@ def run_scanner():
             "passes_quality":    True,
             "warnings":          [],
         })
-    for o in top_spikes:
+    for o in spike_opps:
         s = o.get("spike_cc", {})
         all_opps.append({
             "ticker": o.get("ticker",""), "tier": o.get("tier",""),
@@ -3879,7 +3970,7 @@ def run_scanner():
             "annualized_return": s.get("annualized_return",0),
             "delta": s.get("delta",0), "signal": "", "below_min": False, "risk_note": None,
         })
-    for o in top_drops:
+    for o in drop_opps:
         s = o.get("drop_csp", {})
         all_opps.append({
             "ticker": o.get("ticker",""), "tier": o.get("tier",""),
@@ -3892,7 +3983,7 @@ def run_scanner():
             "signal": s.get("timing",{}).get("signal","") or "",
             "below_min": s.get("below_min", False), "risk_note": "60% normal size",
         })
-    for o in top_pio:
+    for o in pio_opps:
         s = o.get("pio_cc", {})
         all_opps.append({
             "ticker": o.get("ticker",""), "tier": o.get("tier",""),
@@ -4090,17 +4181,11 @@ def run_scanner():
         o["candidate_type"] = "execution" if o.get("passes_quality") and not o.get("below_min") and not o.get("warnings") else "review"
         review_candidates.append(o)
 
-    # ── Aggregate premium totals into exposure block ─────────
-    _prem_csp = sum(
-        o.get("sizing", {}).get("premium_received", 0)
-        for o in all_opps if o.get("mode") in ("CSP", "DROP_CSP")
-    )
-    _prem_cc  = sum(
-        o.get("sizing", {}).get("premium_received", 0)
-        for o in all_opps if o.get("mode") in ("CC", "PIO", "SPIKE_CC")
-    )
+    # Aggregate premium totals into exposure block
+    _prem_csp = sum(o.get("sizing",{}).get("premium_received",0) for o in all_opps if o.get("mode") in ("CSP","DROP_CSP"))
+    _prem_cc  = sum(o.get("sizing",{}).get("premium_received",0) for o in all_opps if o.get("mode") in ("CC","PIO","SPIKE_CC"))
     portfolio_exposure["total_premium_csp"] = round(_prem_csp, 2)
-    portfolio_exposure["total_premium_cc"]  = round(_prem_cc, 2)
+    portfolio_exposure["total_premium_cc"]  = round(_prem_cc,  2)
     portfolio_exposure["total_premium_all"] = round(_prem_csp + _prem_cc, 2)
 
     results = {
@@ -4117,6 +4202,7 @@ def run_scanner():
             "spy_above":  spy_regime.get("above_ma200",True),
             "verdict":    gng.get("quality",""),
         },
+        "exposure":       portfolio_exposure,
         "exposure":       portfolio_exposure,
         "opportunities":  all_opps,
         "positions":      pos_list,
