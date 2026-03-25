@@ -4084,18 +4084,58 @@ def run_scanner():
                    "price_opp": price_opp, "above_ma200": md_t.get("above_ma200", True)}
         score = score_allocation(pos_row)
 
+        # ── CC/CSP exposure for this ticker from portfolio_exposure ──
+        _stk_pos       = ibkr.get(ticker, {})
+        _shares_owned  = int(float(_stk_pos.get("quantity", 0) or _stk_pos.get("qty", 0) or 0))
+        _price_t       = md_t.get("price", 0)
+        # CC data
+        _cc_covered    = portfolio_exposure.get("cc_shares_covered", {}).get(ticker, 0)
+        _cc_contracts  = sum(p["contracts"] for p in portfolio_exposure.get("cc_positions", []) if p["ticker"] == ticker)
+        _uncovered     = max(0, _shares_owned - _cc_covered)
+        _cov_pct       = round(_cc_covered / _shares_owned * 100, 1) if _shares_owned > 0 else 0
+        _add_cc        = int(_uncovered / 100)
+        # CSP data
+        _csp_contracts = sum(p["contracts"] for p in portfolio_exposure.get("csp_positions", []) if p["ticker"] == ticker)
+        _csp_obligation= sum(p["cso"]       for p in portfolio_exposure.get("csp_positions", []) if p["ticker"] == ticker)
+        # Account source
+        _account       = _stk_pos.get("account_type", _stk_pos.get("account", "IBKR")) or "IBKR"
+        # Status label
+        _has_stock = _shares_owned > 0
+        _has_cc    = _cc_contracts > 0
+        _has_csp   = _csp_contracts > 0
+        if _has_stock and _has_cc and _has_csp:   _exp_status = "Stock + CC + CSP"
+        elif _has_stock and _has_cc:
+            if _cov_pct >= 100:                   _exp_status = "Fully Covered"
+            elif _cov_pct >= 50:                  _exp_status = f"{round(_cov_pct/25)*25}% Covered"
+            else:                                 _exp_status = f"{int(_cov_pct)}% Covered"
+        elif _has_stock and _has_csp:             _exp_status = "Stock + CSP"
+        elif _has_stock:                          _exp_status = "Stock Only"
+        elif _has_csp:                            _exp_status = "CSP Only"
+        else:                                     _exp_status = "Watchlist"
+
         pos_list.append({
-            "ticker":       ticker,
-            "tier":         tier,
-            "status":       status,
-            "exposure_pct": exposure,
-            "target_range": f"{target_low:.0f}–{target_high:.0f}%",
-            "pos_status":   pos_status,
-            "price_opp":    price_opp,
-            "action":       action,   # single canonical decision — no separate sizing
-            "score":        score,
-            "pullback_pct": round(pullback_t * 100, 1),
-            "above_ma200":  md_t.get("above_ma200", True),
+            "ticker":          ticker,
+            "tier":            tier,
+            "status":          status,
+            "exposure_pct":    exposure,
+            "target_range":    f"{target_low:.0f}–{target_high:.0f}%",
+            "pos_status":      pos_status,
+            "price_opp":       price_opp,
+            "action":          action,
+            "score":           score,
+            "pullback_pct":    round(pullback_t * 100, 1),
+            "above_ma200":     md_t.get("above_ma200", True),
+            # Exposure fields (spec §3, §4)
+            "shares_owned":    _shares_owned,
+            "cc_contracts":    _cc_contracts,
+            "shares_covered":  _cc_covered,
+            "coverage_pct":    _cov_pct,
+            "uncovered_shares":_uncovered,
+            "add_cc_contracts":_add_cc,
+            "csp_contracts":   _csp_contracts,
+            "csp_obligation":  _csp_obligation,
+            "exp_status":      _exp_status,
+            "account":         _account,
         })
 
     # Sort by score descending — BUY at top, TRIM at bottom
