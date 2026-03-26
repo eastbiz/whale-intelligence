@@ -3058,6 +3058,7 @@ def run_scanner():
             _lbl = _pos.get("account_type", "") or ""
             _mv  = float(_pos.get("market_value", 0) or 0)
             _t   = _sym.replace("BRK B","BRK-B").strip()
+            print(f"     Schwab STK: {_t} acct={_lbl!r} mv=${_mv:,.0f}")
             if _lbl:
                 schwab_mv_by_acct.setdefault(_t, {})
                 schwab_mv_by_acct[_t][_lbl] = schwab_mv_by_acct[_t].get(_lbl, 0) + _mv
@@ -3536,10 +3537,7 @@ def run_scanner():
             send_telegram(fmt_opp_cc(o))
             time.sleep(2)
 
-    # 3. Individual trade alerts
-    if top_pio:
-        send_telegram("━━━ *💼 POSITION INCOME OPPORTUNITIES* ━━━"); time.sleep(1)
-        for o in top_pio: send_telegram(fmt_pio_cc(o)); time.sleep(2)
+    # 3. Individual trade alerts — PIO excluded from Telegram (too many, use dashboard)
     if top_drops:
         send_telegram("━━━ *🔻 POST-DROP CSP OPPORTUNITIES* ━━━"); time.sleep(1)
         for o in top_drops: send_telegram(fmt_drop_csp(o)); time.sleep(2)
@@ -4200,6 +4198,10 @@ def run_scanner():
     option_only_tickers = set(account_map.keys()) - owned_tickers - EXCLUDED_SYMBOLS
     all_allocation_tickers = owned_tickers | watchlist_tickers | option_only_tickers
     print(f"   📋 Allocation: {len(owned_tickers)} owned, {len(watchlist_tickers)} watchlist, {len(EXCLUDED_SYMBOLS)} excluded")
+    # Debug specific tickers
+    for _dbg in ["TSLA","MSTR","IBIT","OWL","NLCP"]:
+        _dbg_pos = ibkr.get(_dbg, {})
+        print(f"   DEBUG {_dbg}: asset={_dbg_pos.get('asset_class','NOT IN IBKR')} mv={_dbg_pos.get('market_value',0):.0f} acct={_dbg_pos.get('account_type','')} in_exposure={_dbg in exposure_map} in_account_map={_dbg in account_map}")
     # Account breakdown from account_map (authoritative)
     _acct_debug = {}
     for _lbl in account_map.values():
