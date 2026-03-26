@@ -714,11 +714,16 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
                 _dte = 0
             if _dte >= 400:
                 # BCS short leg — record but don't count as CC coverage
+                try:
+                    _bcs_exp_str = _exp_dt.strftime("%b %Y")
+                except:
+                    _bcs_exp_str = str(expiry)[:7]
                 bcs_positions.append({
                     "ticker":    underlying,
-                    "strike":    strike,
+                    "strike":    float(strike) if strike else 0,
                     "contracts": int(qty),
-                    "expiry":    expiry,
+                    "expiry":    str(expiry),
+                    "expiry_fmt":_bcs_exp_str,
                     "dte":       _dte,
                     "leg":       "short",
                     "source":    source,
