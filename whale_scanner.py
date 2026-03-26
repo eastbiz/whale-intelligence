@@ -3053,19 +3053,27 @@ def run_scanner():
         print(f"   Schwab positions: {_sp_stk} stocks, {_sp_opt} options parsed")
 
         # Build account maps from Schwab positions BEFORE merging
+        # Use mv_by_account (built during parsing) to capture ALL accounts per ticker
         for _sym, _pos in schwab_positions.items():
             if _pos.get("asset_class") != "STK": continue
+            _t   = _sym.replace("BRK B","BRK-B").strip()
+            _by  = _pos.get("mv_by_account", {})
             _lbl = _pos.get("account_type", "") or ""
             _mv  = float(_pos.get("market_value", 0) or 0)
-            _t   = _sym.replace("BRK B","BRK-B").strip()
-            print(f"     Schwab STK: {_t} acct={_lbl!r} mv=${_mv:,.0f}")
-            if _lbl:
-                schwab_mv_by_acct.setdefault(_t, {})
-                schwab_mv_by_acct[_t][_lbl] = schwab_mv_by_acct[_t].get(_lbl, 0) + _mv
-                schwab_account_map[_t] = max(schwab_mv_by_acct[_t], key=schwab_mv_by_acct[_t].get)
+            print(f"     Schwab STK: {_t} acct={_lbl!r} mv=${_mv:,.0f} by_acct={_by}")
+            if _by:
+                # Use the full per-account breakdown
+                schwab_mv_by_acct[_t] = dict(_by)
+                schwab_account_map[_t] = max(_by, key=_by.get)
+            elif _lbl:
+                # Fallback: single account
+                schwab_mv_by_acct[_t] = {_lbl: _mv}
+                schwab_account_map[_t] = _lbl
         print(f"   Schwab account map: "
               + str({v: sum(1 for x in schwab_account_map.values() if x==v)
                      for v in sorted(set(schwab_account_map.values()))}))
+        print(f"   Multi-account tickers: "
+              + str({t: list(v.keys()) for t,v in schwab_mv_by_acct.items() if len(v) > 1}))
 
         # Merge into ibkr dict
         schwab_stk_added = 0; schwab_opt_added = 0
@@ -4167,12 +4175,18 @@ def run_scanner():
 
     # -- Build account_map: IBKR first, then Schwab overrides --
     # IBKR stocks default to "IBKR". schwab_account_map overrides with IRA/CRT/Personal.
-    account_map = {}
+    account_map      = {}  # ticker -> primary account label
+    account_map_all  = {}  # ticker -> list of ALL accounts (for multi-account filtering)
     for _t in ibkr:
         if ibkr[_t].get("asset_class") == "STK":
-            account_map[_t.replace("BRK B","BRK-B").strip()] = "IBKR"
-    # Schwab labels override -- authoritative for all Schwab-held stocks
+            _tk = _t.replace("BRK B","BRK-B").strip()
+            account_map[_tk]     = "IBKR"
+            account_map_all[_tk] = ["IBKR"]
+    # Schwab overrides — primary label is largest holding account
     account_map.update(schwab_account_map)
+    # All accounts per ticker from Schwab
+    for _t, _by in schwab_mv_by_acct.items():
+        account_map_all[_t] = list(_by.keys())
     # Option-only tickers (e.g. MSFT puts in IRA but no MSFT shares)
     for _optpos in (portfolio_exposure.get("csp_positions", []) +
                     portfolio_exposure.get("cc_positions", []) +
@@ -4284,7 +4298,7 @@ def run_scanner():
         _raw_acct = _stk_pos.get("account_type", "") or ""
         # All accounts this ticker appears in (for multi-account filtering)
         _acct_primary = account_map.get(ticker, _raw_acct if _raw_acct else "IBKR")
-        _acct_all     = list(mv_map_acct.get(ticker, {_acct_primary: 1}).keys())
+        _acct_all     = account_map_all.get(ticker, [_acct_primary])
         _account      = _acct_primary
         # Status label
         _has_stock = _shares_owned > 0
