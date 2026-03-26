@@ -444,7 +444,9 @@ def schwab_parse_positions(accounts: list) -> dict:
                 short_qty = float(pos.get("shortQuantity", 0) or 0)
                 long_qty  = float(pos.get("longQuantity",  0) or 0)
                 qty = short_qty if short_qty > 0 else long_qty
+                print(f"     OPT raw: sym={opt_sym!r} und={underlying!r} pc={put_call!r} strike={strike} exp={expiry_raw!r} short={short_qty} long={long_qty}")
                 if qty <= 0 or not underlying or strike == 0:
+                    print(f"     OPT SKIP: qty={qty} underlying={underlying!r} strike={strike}")
                     continue
 
                 side    = "Short" if short_qty > 0 else "Long"
