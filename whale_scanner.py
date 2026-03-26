@@ -4107,24 +4107,18 @@ def run_scanner():
     # ── Build allocation dashboard (Positions tab) ─────────
     # Spec: strict rules for ownership, exclusions, grouping, action logic
 
-    # ── Build exposure map: combined IBKR + Schwab (Spec §3) ──
+    # -- Build exposure map: combined IBKR + Schwab --
     exposure_map  = {}
-    mv_map_total  = {}  # total market value per ticker across all accounts
-    mv_map_acct   = {}  # market value per ticker per account {ticker: {acct: mv}}
+    mv_map_total  = {}
+    mv_map_acct   = {}
     for ticker, pos in ibkr.items():
         if pos.get("asset_class") == "STK":
-            mv   = float(pos.get("market_value", 0) or 0)
-            acct = pos.get("account_type", "") or "IBKR"
+            mv = float(pos.get("market_value", 0) or 0)
             if mv > 0 and PORTFOLIO_SIZE > 0:
                 t = ticker.replace("BRK B","BRK-B").strip()
                 exposure_map[t] = round(mv / PORTFOLIO_SIZE * 100, 1)
-                mv_map_total[t] = mv_map_total.get(t, 0) + mv
-                # Use pre-built per-account breakdown if available, else use single account
-                by_acct = pos.get("mv_by_account", {acct: mv})
-                if t not in mv_map_acct:
-                    mv_map_acct[t] = {}
-                for _a, _mv in by_acct.items():
-                    mv_map_acct[t][_a] = mv_map_acct[t].get(_a, 0) + _mv
+                mv_map_total[t] = mv
+                mv_map_acct[t]  = dict(schwab_mv_by_acct[t]) if t in schwab_mv_by_acct else {"IBKR": mv}
 
     # ── Apply grouped ticker rule (Spec §6) ──
     # GOOG + GOOGL → combined exposure under GOOGL
@@ -4138,21 +4132,20 @@ def run_scanner():
         if sym in EXCLUDED_SYMBOLS:
             exposure_map.pop(sym)
 
-    # ── Build account_map: ticker -> account label ──────────────
+    # -- Build account_map: IBKR first, then Schwab overrides --
+    # IBKR stocks default to "IBKR". schwab_account_map overrides with IRA/CRT/Personal.
     account_map = {}
-    for _t, _p in ibkr.items():
-        if _p.get("asset_class") == "STK":
-            _acct = _p.get("account_type", "") or "IBKR"
-            _tk   = _t.replace("BRK B","BRK-B").strip()
-            if _tk not in account_map:
-                account_map[_tk] = _acct
-    # Also pick up account for tickers held via options only (no stock)
+    for _t in ibkr:
+        if ibkr[_t].get("asset_class") == "STK":
+            account_map[_t.replace("BRK B","BRK-B").strip()] = "IBKR"
+    # Schwab labels override -- authoritative for all Schwab-held stocks
+    account_map.update(schwab_account_map)
+    # Option-only tickers (e.g. MSFT puts in IRA but no MSFT shares)
     for _optpos in (portfolio_exposure.get("csp_positions", []) +
                     portfolio_exposure.get("cc_positions", []) +
                     portfolio_exposure.get("leaps_positions", [])):
         _tk = _optpos.get("ticker", "")
         if _tk and _tk not in account_map:
-            # Find account from the option position in ibkr dict
             for _sym, _ipos in ibkr.items():
                 if (_ipos.get("asset_class") == "OPT" and
                         _ipos.get("underlying","").upper() == _tk.upper()):
@@ -4163,6 +4156,7 @@ def run_scanner():
             if _tk not in account_map:
                 account_map[_tk] = "IBKR"
 
+
     # ── Ownership precedence rule (Spec §5) ──
     # owned_tickers includes ALL stocks with market value (universe + non-universe)
     owned_tickers    = set(exposure_map.keys())
@@ -4171,15 +4165,11 @@ def run_scanner():
     option_only_tickers = set(account_map.keys()) - owned_tickers - EXCLUDED_SYMBOLS
     all_allocation_tickers = owned_tickers | watchlist_tickers | option_only_tickers
     print(f"   📋 Allocation: {len(owned_tickers)} owned, {len(watchlist_tickers)} watchlist, {len(EXCLUDED_SYMBOLS)} excluded")
-    # Debug account labels
+    # Account breakdown from account_map (authoritative)
     _acct_debug = {}
-    for _t, _p in ibkr.items():
-        if _p.get("asset_class") == "STK":
-            _raw = _p.get("account_type", _p.get("account", "")) or ""
-            _key = _raw.replace("-","").replace(" ","")
-            _lbl = SCHWAB_ACCOUNT_LABELS.get(_key) or SCHWAB_ACCOUNT_LABELS.get(_key[-8:] if len(_key)>=8 else _key) or ("IBKR" if not _raw or _raw.startswith("U") else _raw)
-            _acct_debug[_lbl] = _acct_debug.get(_lbl, 0) + 1
-    print(f"   📋 Account breakdown: {_acct_debug}")
+    for _lbl in account_map.values():
+        _acct_debug[_lbl] = _acct_debug.get(_lbl, 0) + 1
+    print(f"   Account breakdown: {_acct_debug}")
 
     def canonical_action(pos_status: str, price_opp: str) -> str:
         """
