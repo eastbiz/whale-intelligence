@@ -2268,6 +2268,125 @@ def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir, already_c
     return best, timing
 
 
+
+def leaps_trend_state(ticker: str, price: float) -> dict:
+    """
+    Classify recent price behavior to determine LEAPS entry timing.
+    Returns state, action label, and signal text.
+
+    States: FALLING | FAKE_BOUNCE | STABILIZING | REAL_BOUNCE
+    """
+    try:
+        r = requests.get(
+            f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}",
+            headers={"User-Agent": "Mozilla/5.0"},
+            params={"interval": "1d", "range": "15d"},
+            timeout=8
+        )
+        data   = r.json()["chart"]["result"][0]
+        closes = data["indicators"]["quote"][0].get("close", [])
+        closes = [c for c in closes if c is not None]
+        if len(closes) < 6:
+            return {"state": "UNKNOWN", "action": "WATCH", "signal": "Insufficient history"}
+
+        today        = closes[-1]
+        p1d          = closes[-2]
+        p3d          = closes[-4]  if len(closes) >= 4  else closes[0]
+        p5d          = closes[-6]  if len(closes) >= 6  else closes[0]
+        p10d         = closes[-11] if len(closes) >= 11 else closes[0]
+        recent_low   = min(closes[-5:])
+
+        r1           = (today - p1d)  / p1d
+        r3           = (today - p3d)  / p3d
+        r5           = (today - p5d)  / p5d
+        off_low_5d   = (today - recent_low) / recent_low if recent_low > 0 else 0
+
+        # Classify
+        if r3 <= -0.05 or r5 <= -0.08:
+            state  = "FALLING"
+        elif r1 > 0 and r3 < 0 and off_low_5d < 0.03:
+            state  = "FAKE_BOUNCE"
+        elif abs(r1) < 0.01 and r3 > -0.03 and off_low_5d >= 0.02:
+            state  = "STABILIZING"
+        elif r1 > 0.01 and r3 >= 0 and off_low_5d >= 0.04:
+            state  = "REAL_BOUNCE"
+        else:
+            state  = "STABILIZING"  # default — unclear, watch
+
+        return {
+            "state":      state,
+            "r1":         round(r1 * 100, 1),
+            "r3":         round(r3 * 100, 1),
+            "r5":         round(r5 * 100, 1),
+            "off_low_5d": round(off_low_5d * 100, 1),
+            "p10d":       round(p10d, 2),
+        }
+    except Exception as e:
+        return {"state": "UNKNOWN", "action": "WATCH", "signal": f"History error: {e}"}
+
+
+def leaps_trend_action(trend: dict, ivp: float, price: float, week52_high: float) -> dict:
+    """
+    Map trend state + IVP + price context to a LEAPS action recommendation.
+    Returns action label and signal string.
+    """
+    state       = trend.get("state", "UNKNOWN")
+    off_high    = (week52_high - price) / week52_high if week52_high > 0 else 0
+    r1          = trend.get("r1", 0)
+    r3          = trend.get("r3", 0)
+    off_low     = trend.get("off_low_5d", 0)
+
+    if state == "FALLING":
+        return {
+            "action":  "WAIT",
+            "label":   "WAIT — STILL FALLING",
+            "signal":  f"Down {abs(r3):.1f}% / 3d — wait for base",
+            "recommend": False,
+        }
+    elif state == "FAKE_BOUNCE":
+        return {
+            "action":  "WAIT",
+            "label":   "WAIT — FAKE BOUNCE",
+            "signal":  f"+{r1:.1f}% today but still down {abs(r3):.1f}% / 3d, only {off_low:.1f}% off low",
+            "recommend": False,
+        }
+    elif state == "STABILIZING":
+        return {
+            "action":  "WATCH",
+            "label":   "WATCH — BASE FORMING",
+            "signal":  f"Price settling — {off_low:.1f}% off 5d low, wait for confirmation",
+            "recommend": False,
+        }
+    elif state == "REAL_BOUNCE":
+        if off_high < 0.10:
+            return {
+                "action":  "WAIT",
+                "label":   "WAIT — NEAR HIGHS",
+                "signal":  f"Bounce confirmed but only {off_high*100:.1f}% off highs — premium too high",
+                "recommend": False,
+            }
+        elif ivp > 60:
+            return {
+                "action":  "WAIT",
+                "label":   "WAIT — IV HIGH",
+                "signal":  f"Bounce confirmed, {off_high*100:.1f}% off highs but IVP {ivp:.0f}% — wait for IV to drop",
+                "recommend": False,
+            }
+        else:
+            return {
+                "action":  "BUY",
+                "label":   "BUY — STABILIZED",
+                "signal":  f"Bounce confirmed, {off_high*100:.1f}% off highs, IVP {ivp:.0f}% acceptable",
+                "recommend": True,
+            }
+    else:
+        return {
+            "action":  "WATCH",
+            "label":   "WATCH",
+            "signal":  "Unclear trend — monitor",
+            "recommend": False,
+        }
+
 def find_best_leaps(ticker, price, contracts, ivdata, pir):
     """Deep ITM LEAPS — delta 0.80-0.90, minimize extrinsic."""
     is_spec = ticker in SPECULATIVE
@@ -3381,7 +3500,16 @@ def run_scanner():
         # LEAPS use leaps_hard_stop (more lenient) — 200MA not blocking for Core
         leaps_blocked = quality.get("leaps_hard_stop", quality["hard_stop"])
         if gng["buy_leaps"] and not leaps_blocked:
+            # Trend classifier — determines entry timing quality
+            _trend  = leaps_trend_state(ticker, price)
+            _w52h   = mkt.get(ticker, {}).get("week52_high", price * 1.3)
+            _ta     = leaps_trend_action(_trend, ivdata["ivp"], price, _w52h)
             leaps, leaps_timing = find_best_leaps(ticker, price, contracts, ivdata, pir)
+            if leaps:
+                leaps["trend"]        = _trend
+                leaps["trend_action"] = _ta
+                leaps["trend_label"]  = _ta["label"]
+                leaps["trend_signal"] = _ta["signal"]
             if leaps is None and ivdata["ivp"] > 0:
                 print(f"  [{tier}] {ticker}: LEAPS rejected — IVP {ivdata['ivp']:.0f}% timing: {leaps_timing.get('signal','')[:50]}")
         else:
@@ -3390,12 +3518,19 @@ def run_scanner():
             if leaps_blocked and tier in ("Core","Growth"):
                 print(f"  [{tier}] {ticker}: LEAPS hard stop (earnings/price)")
         if leaps:
-            leaps_opps.append({**base,"leaps":leaps,
-                "score":score_leaps({"tier":base.get("tier","Opportunistic"),
-                                      "delta":leaps.get("delta",0),"ivp":base.get("ivp",100),
-                                      "extrinsic_pct":leaps.get("extrinsic_pct",100),
-                                      "dte":leaps.get("dte",0)})})
-            print(f"  {ticker}: 🚀 LEAPS ${leaps['strike']} δ{leaps['delta']} ext{leaps['extrinsic_pct']}% IVP{ivdata['ivp']:.0f}%")
+            _tl = leaps.get("trend_label", "")
+            _ts = leaps.get("trend_signal", "")
+            _ta_action = leaps.get("trend_action", {}).get("action", "WATCH")
+            leaps_opps.append({**base, "leaps": leaps,
+                "trend_label":  _tl,
+                "trend_signal": _ts,
+                "trend_action": _ta_action,
+                "score": score_leaps({"tier": base.get("tier","Opportunistic"),
+                                      "delta": leaps.get("delta",0), "ivp": base.get("ivp",100),
+                                      "extrinsic_pct": leaps.get("extrinsic_pct",100),
+                                      "dte": leaps.get("dte",0)})})
+            print(f"  {ticker}: LEAPS ${leaps['strike']} d{leaps['delta']} ext{leaps['extrinsic_pct']}% IVP{ivdata['ivp']:.0f}% | {_tl}")
+
 
         # ── PMCC ─────────────────────────────────────────
         existing_leaps = find_existing_leaps(ticker, ibkr)
