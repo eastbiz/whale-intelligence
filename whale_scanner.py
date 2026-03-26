@@ -3020,10 +3020,27 @@ def run_scanner():
     schwab_positions = schwab_parse_positions(schwab_accounts) if schwab_accounts else {}
     if schwab_positions:
         print(f"   Schwab positions: {len(schwab_positions)} holdings parsed")
-    # Merge Schwab positions into IBKR dict (Schwab takes priority if both have ticker)
+    # Merge Schwab positions into ibkr dict
+    # STK: aggregate across brokers (some stocks held in both IBKR and Schwab)
+    # OPT: add directly (keyed by option symbol, no collision)
+    schwab_stk_added = 0; schwab_opt_added = 0
     for ticker, pos in schwab_positions.items():
-        if ticker not in ibkr or ibkr[ticker].get("market_value", 0) == 0:
+        if pos.get("asset_class") == "OPT":
+            # Options keyed by symbol — just add
             ibkr[ticker] = pos
+            schwab_opt_added += 1
+        else:
+            # Stock — aggregate if already in IBKR, otherwise add
+            if ticker in ibkr and ibkr[ticker].get("asset_class") == "STK" and ibkr[ticker].get("market_value", 0) > 0:
+                ibkr[ticker]["market_value"] = ibkr[ticker].get("market_value", 0) + pos.get("market_value", 0)
+                ibkr[ticker]["quantity"]     = ibkr[ticker].get("quantity", 0) + pos.get("quantity", 0)
+                # Keep account label from whichever has more value
+                if pos.get("market_value", 0) > ibkr[ticker].get("market_value", 0) / 2:
+                    ibkr[ticker]["account_type"] = pos.get("account_type", ibkr[ticker].get("account_type",""))
+            else:
+                ibkr[ticker] = pos
+                schwab_stk_added += 1
+    print(f"   Schwab merge: {schwab_stk_added} stocks added, {schwab_opt_added} options added")
 
     # ── Calculate real portfolio size from live account data ──
     schwab_total = sum(a.get("net_liquidation", 0) for a in schwab_accounts)
