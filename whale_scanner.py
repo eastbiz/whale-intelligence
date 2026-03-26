@@ -3024,29 +3024,46 @@ def run_scanner():
     # Fetch Schwab accounts for position awareness
     schwab_accounts  = schwab_get_accounts() if SCHWAB_APP_KEY else []
     schwab_positions = schwab_parse_positions(schwab_accounts) if schwab_accounts else {}
+
+    # Always initialize these — used later in exposure map building
+    schwab_account_map = {}   # ticker -> "IRA" / "CRT" / "Personal"
+    schwab_mv_by_acct  = {}   # ticker -> {acct: market_value}
+
     if schwab_positions:
-        print(f"   Schwab positions: {len(schwab_positions)} holdings parsed")
-    # Merge Schwab positions into ibkr dict
-    # STK: aggregate across brokers (some stocks held in both IBKR and Schwab)
-    # OPT: add directly (keyed by option symbol, no collision)
-    schwab_stk_added = 0; schwab_opt_added = 0
-    for ticker, pos in schwab_positions.items():
-        if pos.get("asset_class") == "OPT":
-            # Options keyed by symbol — just add
-            ibkr[ticker] = pos
-            schwab_opt_added += 1
-        else:
-            # Stock — aggregate if already in IBKR, otherwise add
-            if ticker in ibkr and ibkr[ticker].get("asset_class") == "STK" and ibkr[ticker].get("market_value", 0) > 0:
-                ibkr[ticker]["market_value"] = ibkr[ticker].get("market_value", 0) + pos.get("market_value", 0)
-                ibkr[ticker]["quantity"]     = ibkr[ticker].get("quantity", 0) + pos.get("quantity", 0)
-                # Keep account label from whichever has more value
-                if pos.get("market_value", 0) > ibkr[ticker].get("market_value", 0) / 2:
-                    ibkr[ticker]["account_type"] = pos.get("account_type", ibkr[ticker].get("account_type",""))
-            else:
+        _sp_stk = sum(1 for p in schwab_positions.values() if p.get("asset_class")=="STK")
+        _sp_opt = sum(1 for p in schwab_positions.values() if p.get("asset_class")=="OPT")
+        print(f"   Schwab positions: {_sp_stk} stocks, {_sp_opt} options parsed")
+
+        # Build account maps from Schwab positions BEFORE merging
+        for _sym, _pos in schwab_positions.items():
+            if _pos.get("asset_class") != "STK": continue
+            _lbl = _pos.get("account_type", "") or ""
+            _mv  = float(_pos.get("market_value", 0) or 0)
+            _t   = _sym.replace("BRK B","BRK-B").strip()
+            if _lbl:
+                schwab_mv_by_acct.setdefault(_t, {})
+                schwab_mv_by_acct[_t][_lbl] = schwab_mv_by_acct[_t].get(_lbl, 0) + _mv
+                schwab_account_map[_t] = max(schwab_mv_by_acct[_t], key=schwab_mv_by_acct[_t].get)
+        print(f"   Schwab account map: "
+              + str({v: sum(1 for x in schwab_account_map.values() if x==v)
+                     for v in sorted(set(schwab_account_map.values()))}))
+
+        # Merge into ibkr dict
+        schwab_stk_added = 0; schwab_opt_added = 0
+        for ticker, pos in schwab_positions.items():
+            if pos.get("asset_class") == "OPT":
                 ibkr[ticker] = pos
-                schwab_stk_added += 1
-    print(f"   Schwab merge: {schwab_stk_added} stocks added, {schwab_opt_added} options added")
+                schwab_opt_added += 1
+            else:
+                if ticker in ibkr and ibkr[ticker].get("asset_class") == "STK":
+                    ibkr[ticker]["market_value"] = (ibkr[ticker].get("market_value", 0)
+                                                    + pos.get("market_value", 0))
+                    ibkr[ticker]["quantity"]     = (ibkr[ticker].get("quantity", 0)
+                                                    + pos.get("quantity", 0))
+                else:
+                    ibkr[ticker] = pos
+                    schwab_stk_added += 1
+        print(f"   Schwab merge: {schwab_stk_added} new stocks, {schwab_opt_added} options added")
 
     # ── Calculate real portfolio size from live account data ──
     schwab_total = sum(a.get("net_liquidation", 0) for a in schwab_accounts)
