@@ -4280,7 +4280,10 @@ def run_scanner():
         # Account source
         # Use account_map which covers both stock and option-only positions
         _raw_acct = _stk_pos.get("account_type", "") or ""
-        _account  = account_map.get(ticker, _raw_acct if _raw_acct else "IBKR")
+        # All accounts this ticker appears in (for multi-account filtering)
+        _acct_primary = account_map.get(ticker, _raw_acct if _raw_acct else "IBKR")
+        _acct_all     = list(mv_map_acct.get(ticker, {_acct_primary: 1}).keys())
+        _account      = _acct_primary
         # Status label
         _has_stock = _shares_owned > 0
         _has_cc    = _cc_contracts > 0
@@ -4318,6 +4321,7 @@ def run_scanner():
             "csp_obligation":  _csp_obligation,
             "exp_status":      _exp_status,
             "account":         _account,
+            "accounts_all":    _acct_all,
             # Market value: total and per-account
             "market_value":    round(mv_map_total.get(ticker, 0), 0),
             "mv_by_account":   mv_map_acct.get(ticker, {}),
