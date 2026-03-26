@@ -433,20 +433,30 @@ def schwab_parse_positions(accounts: list) -> dict:
 
             # ── Options (short puts = CSP, short calls = CC) ───
             elif asset == "OPTION":
+                import re as _re
                 opt_sym    = inst.get("symbol", "")
                 underlying = (inst.get("underlyingSymbol", "")
                               .replace("/", "-").replace("BRK B", "BRK-B").strip())
-                put_call   = inst.get("putCall", "").upper()       # "PUT" or "CALL"
+                put_call   = inst.get("putCall", "").upper()
                 strike     = float(inst.get("strikePrice", 0) or 0)
-                expiry_raw = inst.get("expirationDate", "")        # "2025-04-17"
+                expiry_raw = inst.get("expirationDate", "")
+
+                # Schwab often leaves strikePrice=0 and expirationDate='' — parse from OCC symbol
+                if (strike == 0 or not expiry_raw) and opt_sym:
+                    _occ = opt_sym.replace(" ", "")
+                    _m = _re.match(r'^([A-Z]+)(\d{6})([CP])(\d{8})$', _occ)
+                    if _m:
+                        _und, _date6, _pc, _strike8 = _m.groups()
+                        if not underlying: underlying = _und
+                        if not put_call:   put_call   = "PUT" if _pc == "P" else "CALL"
+                        if strike == 0:    strike     = float(_strike8) / 1000.0
+                        if not expiry_raw: expiry_raw = "20" + _date6  # YYYYMMDD
 
                 # shortQuantity > 0 means we sold this option (CSP or CC)
                 short_qty = float(pos.get("shortQuantity", 0) or 0)
                 long_qty  = float(pos.get("longQuantity",  0) or 0)
                 qty = short_qty if short_qty > 0 else long_qty
-                print(f"     OPT raw: sym={opt_sym!r} und={underlying!r} pc={put_call!r} strike={strike} exp={expiry_raw!r} short={short_qty} long={long_qty}")
                 if qty <= 0 or not underlying or strike == 0:
-                    print(f"     OPT SKIP: qty={qty} underlying={underlying!r} strike={strike}")
                     continue
 
                 side    = "Short" if short_qty > 0 else "Long"
