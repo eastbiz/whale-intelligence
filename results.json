@@ -1,11 +1,11 @@
 {
-  "scan_time": "2026-03-26 13:24 ET",
+  "scan_time": "2026-03-26 13:35 ET",
   "scan_date": "2026-03-26",
   "execution_candidates": [
     {
       "ticker": "NVDA",
       "tier": "Core",
-      "price": 172.3994,
+      "price": 172.36,
       "ivp": 68.7,
       "mode": "CSP",
       "action_label": "SCALE CSP",
@@ -24,9 +24,9 @@
         "premium_received": 24681.0,
         "cso": 912000.0,
         "action_label": "SCALE CSP",
-        "current_obligation": 2591000.0,
-        "resulting_obligation": 3503000.0,
-        "resulting_pct": 25.0,
+        "current_obligation": 2675000.0,
+        "resulting_obligation": 3587000.0,
+        "resulting_pct": 25.6,
         "remaining_after": 0,
         "within_limit": false
       }
@@ -34,7 +34,7 @@
     {
       "ticker": "NVDA",
       "tier": "Core",
-      "price": 172.3994,
+      "price": 172.36,
       "ivp": 68.7,
       "mode": "CC",
       "action_label": "SELL CC",
@@ -59,7 +59,7 @@
     {
       "ticker": "TSLA",
       "tier": "Opportunistic",
-      "price": 374.73,
+      "price": 374.7012,
       "ivp": 68.7,
       "mode": "CC",
       "action_label": "SELL CC",
@@ -84,7 +84,7 @@
     {
       "ticker": "NVO",
       "tier": "Core",
-      "price": 36.46,
+      "price": 36.6,
       "ivp": 68.7,
       "mode": "LEAPS",
       "action_label": "LEAPS",
@@ -107,14 +107,14 @@
     {
       "ticker": "AAPL",
       "tier": "Core",
-      "price": 254.48,
+      "price": 252.89,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 265.0,
       "expiry": "2026-05-15",
       "dte": 49,
       "premium": 6.12,
-      "annualized_return": 17.9,
+      "annualized_return": 18.0,
       "delta": 0.35,
       "signal": "profit",
       "below_min": false,
@@ -123,7 +123,7 @@
     {
       "ticker": "AMZN",
       "tier": "Core",
-      "price": 207.99,
+      "price": 208.21,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 235.0,
@@ -139,14 +139,14 @@
     {
       "ticker": "GOOGL",
       "tier": "Core",
-      "price": 281.75,
+      "price": 281.99,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 295.0,
       "expiry": "2026-05-15",
       "dte": 49,
       "premium": 9.98,
-      "annualized_return": 26.4,
+      "annualized_return": 26.3,
       "delta": 0.39,
       "signal": "profit",
       "below_min": false,
@@ -155,7 +155,7 @@
     {
       "ticker": "NVDA",
       "tier": "Core",
-      "price": 172.3994,
+      "price": 172.36,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 180.0,
@@ -171,14 +171,14 @@
     {
       "ticker": "NFLX",
       "tier": "Growth",
-      "price": 93.8,
+      "price": 93.32,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 99.0,
       "expiry": "2026-05-15",
       "dte": 49,
       "premium": 3.42,
-      "annualized_return": 27.2,
+      "annualized_return": 27.3,
       "delta": 0.38,
       "signal": "profit",
       "below_min": false,
@@ -187,7 +187,7 @@
     {
       "ticker": "PLTR",
       "tier": "Growth",
-      "price": 148.35,
+      "price": 148.46,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 165.0,
@@ -203,7 +203,7 @@
     {
       "ticker": "TSLA",
       "tier": "Opportunistic",
-      "price": 374.73,
+      "price": 374.7012,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 395.0,
@@ -221,7 +221,7 @@
     {
       "ticker": "GOOGL",
       "tier": "Core",
-      "price": 281.75,
+      "price": 281.99,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 260.0,
@@ -236,7 +236,7 @@
       "risk_level": "Low",
       "breakeven": 257.0,
       "premium_per_day": 0.14,
-      "pullback_pct": 19.3,
+      "pullback_pct": 19.2,
       "above_ma200": true,
       "signal": "19% off highs",
       "risk_note": null,
@@ -249,7 +249,7 @@
     {
       "ticker": "TSM",
       "tier": "Core",
-      "price": 328.74,
+      "price": 328.7888,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 290.0,
@@ -264,7 +264,7 @@
       "risk_level": "Low",
       "breakeven": 285.5,
       "premium_per_day": 0.21,
-      "pullback_pct": 15.8,
+      "pullback_pct": 15.7,
       "above_ma200": true,
       "signal": "16% off highs",
       "risk_note": null,
@@ -277,7 +277,7 @@
     {
       "ticker": "IBKR",
       "tier": "Core",
-      "price": 66.2,
+      "price": 66.6,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 60.0,
@@ -292,7 +292,7 @@
       "risk_level": "Low",
       "breakeven": 58.8,
       "premium_per_day": 0.06,
-      "pullback_pct": 16.4,
+      "pullback_pct": 15.9,
       "above_ma200": true,
       "signal": "16% off highs",
       "risk_note": null,
@@ -305,7 +305,7 @@
     {
       "ticker": "AAPL",
       "tier": "Core",
-      "price": 254.48,
+      "price": 252.89,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 235.0,
@@ -320,20 +320,20 @@
       "risk_level": "Low",
       "breakeven": 232.84,
       "premium_per_day": 0.1,
-      "pullback_pct": 11.8,
+      "pullback_pct": 12.4,
       "above_ma200": true,
       "signal": "12% off highs",
       "risk_note": null,
       "score": 8,
       "normalized": 0.667,
       "quality_label": "Acceptable",
-      "unified_score": 7.62,
+      "unified_score": 8.38,
       "candidate_type": "review"
     },
     {
       "ticker": "AMZN",
       "tier": "Core",
-      "price": 207.99,
+      "price": 208.21,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 187.5,
@@ -350,7 +350,7 @@
       "risk_level": "Medium",
       "breakeven": 185.74,
       "premium_per_day": 0.08,
-      "pullback_pct": 19.6,
+      "pullback_pct": 19.5,
       "above_ma200": false,
       "signal": "20% off highs",
       "risk_note": "Below 200MA",
@@ -363,7 +363,7 @@
     {
       "ticker": "MSFT",
       "tier": "Core",
-      "price": 366.5,
+      "price": 366.35,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 340.0,
@@ -393,7 +393,7 @@
     {
       "ticker": "NVDA",
       "tier": "Core",
-      "price": 172.3994,
+      "price": 172.36,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 155.0,
@@ -453,7 +453,7 @@
     {
       "ticker": "VRTX",
       "tier": "Core",
-      "price": 454.78,
+      "price": 452.2643,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 430.0,
@@ -468,9 +468,9 @@
       "risk_level": "Low",
       "breakeven": 424.0,
       "premium_per_day": 0.29,
-      "pullback_pct": 11.3,
+      "pullback_pct": 11.8,
       "above_ma200": true,
-      "signal": "11% off highs",
+      "signal": "12% off highs",
       "risk_note": null,
       "score": 8,
       "normalized": 0.667,
@@ -481,7 +481,7 @@
     {
       "ticker": "NVO",
       "tier": "Core",
-      "price": 36.46,
+      "price": 36.6,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 32.0,
@@ -498,7 +498,7 @@
       "risk_level": "Medium",
       "breakeven": 31.49,
       "premium_per_day": 0.02,
-      "pullback_pct": 55.2,
+      "pullback_pct": 55.1,
       "above_ma200": false,
       "signal": "55% off highs",
       "risk_note": "Below 200MA",
@@ -511,7 +511,7 @@
     {
       "ticker": "NOW",
       "tier": "Growth",
-      "price": 103.85,
+      "price": 104.3338,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 90.0,
@@ -528,7 +528,7 @@
       "risk_level": "Medium",
       "breakeven": 87.9,
       "premium_per_day": 0.07,
-      "pullback_pct": 50.9,
+      "pullback_pct": 50.7,
       "above_ma200": false,
       "signal": "51% off highs",
       "risk_note": "Below 200MA",
@@ -541,7 +541,7 @@
     {
       "ticker": "DDOG",
       "tier": "Growth",
-      "price": 125.11,
+      "price": 125.3,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 100.0,
@@ -558,7 +558,7 @@
       "risk_level": "Medium",
       "breakeven": 96.6,
       "premium_per_day": 0.07,
-      "pullback_pct": 38.0,
+      "pullback_pct": 37.9,
       "above_ma200": false,
       "signal": "38% off highs",
       "risk_note": "Below 200MA",
@@ -571,7 +571,7 @@
     {
       "ticker": "UBER",
       "tier": "Growth",
-      "price": 70.77,
+      "price": 70.8892,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 64.0,
@@ -588,9 +588,9 @@
       "risk_level": "Medium",
       "breakeven": 63.23,
       "premium_per_day": 0.04,
-      "pullback_pct": 30.6,
+      "pullback_pct": 30.5,
       "above_ma200": false,
-      "signal": "31% off highs",
+      "signal": "30% off highs",
       "risk_note": "Below 200MA",
       "score": 7,
       "normalized": 0.583,
@@ -601,7 +601,7 @@
     {
       "ticker": "NFLX",
       "tier": "Growth",
-      "price": 93.8,
+      "price": 93.32,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 84.0,
@@ -618,7 +618,7 @@
       "risk_level": "Medium",
       "breakeven": 82.77,
       "premium_per_day": 0.06,
-      "pullback_pct": 30.1,
+      "pullback_pct": 30.4,
       "above_ma200": false,
       "signal": "30% off highs",
       "risk_note": "Below 200MA",
@@ -631,7 +631,7 @@
     {
       "ticker": "PLTR",
       "tier": "Growth",
-      "price": 148.35,
+      "price": 148.46,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 130.0,
@@ -661,7 +661,7 @@
     {
       "ticker": "META",
       "tier": "Growth",
-      "price": 550.75,
+      "price": 549.85,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 500.0,
@@ -678,7 +678,7 @@
       "risk_level": "Medium",
       "breakeven": 493.28,
       "premium_per_day": 0.32,
-      "pullback_pct": 30.8,
+      "pullback_pct": 30.9,
       "above_ma200": false,
       "signal": "31% off highs",
       "risk_note": "Below 200MA",
@@ -691,7 +691,7 @@
     {
       "ticker": "MU",
       "tier": "Cyclical",
-      "price": 358.25,
+      "price": 358.18,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 300.0,
@@ -719,7 +719,7 @@
     {
       "ticker": "ASML",
       "tier": "Core",
-      "price": 1339.0,
+      "price": 1329.5,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 1260.0,
@@ -734,7 +734,7 @@
       "risk_level": "Low",
       "breakeven": 1211.5,
       "premium_per_day": 2.31,
-      "pullback_pct": 13.5,
+      "pullback_pct": 14.1,
       "above_ma200": true,
       "signal": "14% off highs",
       "risk_note": null,
@@ -747,7 +747,7 @@
     {
       "ticker": "MELI",
       "tier": "Core",
-      "price": 1637.99,
+      "price": 1637.1,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 1570.0,
@@ -805,7 +805,7 @@
     {
       "ticker": "POWL",
       "tier": "Cyclical",
-      "price": 526.25,
+      "price": 526.06,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 440.0,
@@ -833,7 +833,7 @@
     {
       "ticker": "CLS",
       "tier": "Opportunistic",
-      "price": 277.9,
+      "price": 273.38,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 210.0,
@@ -848,9 +848,9 @@
       "risk_level": "Elevated",
       "breakeven": 200.85,
       "premium_per_day": 0.19,
-      "pullback_pct": 23.5,
+      "pullback_pct": 24.8,
       "above_ma200": true,
-      "signal": "24% off highs",
+      "signal": "25% off highs",
       "risk_note": null,
       "score": 6,
       "normalized": 0.5,
@@ -861,7 +861,7 @@
     {
       "ticker": "LULU",
       "tier": "Opportunistic",
-      "price": 152.09,
+      "price": 151.39,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 135.0,
@@ -878,9 +878,9 @@
       "risk_level": "Elevated",
       "breakeven": 133.5,
       "premium_per_day": 0.07,
-      "pullback_pct": 56.4,
+      "pullback_pct": 56.6,
       "above_ma200": false,
-      "signal": "56% off highs",
+      "signal": "57% off highs",
       "risk_note": "Below 200MA",
       "score": 5,
       "normalized": 0.417,
@@ -891,7 +891,7 @@
     {
       "ticker": "TSLA",
       "tier": "Opportunistic",
-      "price": 374.73,
+      "price": 374.7012,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 330.0,
@@ -921,7 +921,7 @@
     {
       "ticker": "BABA",
       "tier": "Opportunistic",
-      "price": 125.7,
+      "price": 125.78,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 119.0,
@@ -938,7 +938,7 @@
       "risk_level": "Elevated",
       "breakeven": 116.7,
       "premium_per_day": 0.11,
-      "pullback_pct": 34.8,
+      "pullback_pct": 34.7,
       "above_ma200": false,
       "signal": "35% off highs",
       "risk_note": "Below 200MA",
@@ -951,7 +951,7 @@
     {
       "ticker": "IBIT",
       "tier": "Opportunistic",
-      "price": 39.2,
+      "price": 39.23,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 34.0,
@@ -981,7 +981,7 @@
     {
       "ticker": "NBIS",
       "tier": "Opportunistic",
-      "price": 107.0505,
+      "price": 107.0,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 90.0,
@@ -996,7 +996,7 @@
       "risk_level": "Elevated",
       "breakeven": 87.06,
       "premium_per_day": 0.14,
-      "pullback_pct": 24.1,
+      "pullback_pct": 24.2,
       "above_ma200": true,
       "signal": "24% off highs",
       "risk_note": null,
@@ -1009,7 +1009,7 @@
     {
       "ticker": "CRDO",
       "tier": "Opportunistic",
-      "price": 97.6635,
+      "price": 97.4,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 80.0,
@@ -1026,7 +1026,7 @@
       "risk_level": "Elevated",
       "breakeven": 77.9,
       "premium_per_day": 0.1,
-      "pullback_pct": 54.3,
+      "pullback_pct": 54.4,
       "above_ma200": false,
       "signal": "54% off highs",
       "risk_note": "Below 200MA",
@@ -1039,7 +1039,7 @@
     {
       "ticker": "FIX",
       "tier": "Opportunistic",
-      "price": 1375.0,
+      "price": 1370.0,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 1200.0,
@@ -1054,9 +1054,9 @@
       "risk_level": "Elevated",
       "breakeven": 1174.1,
       "premium_per_day": 1.23,
-      "pullback_pct": 8.3,
+      "pullback_pct": 8.7,
       "above_ma200": true,
-      "signal": "8% off highs",
+      "signal": "9% off highs",
       "risk_note": null,
       "score": 4,
       "normalized": 0.333,
@@ -1067,7 +1067,7 @@
     {
       "ticker": "VRT",
       "tier": "Opportunistic",
-      "price": 254.9491,
+      "price": 252.4,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 210.0,
@@ -1084,7 +1084,7 @@
       "risk_level": "Elevated",
       "breakeven": 205.28,
       "premium_per_day": 0.17,
-      "pullback_pct": 9.6,
+      "pullback_pct": 10.5,
       "above_ma200": true,
       "signal": "10% off highs",
       "risk_note": ">8% above MA50",
@@ -1097,7 +1097,7 @@
     {
       "ticker": "AAPL",
       "tier": "Core",
-      "price": 254.48,
+      "price": 252.89,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 260.0,
@@ -1135,7 +1135,7 @@
     {
       "ticker": "AMZN",
       "tier": "Core",
-      "price": 207.99,
+      "price": 208.21,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 217.5,
@@ -1173,7 +1173,7 @@
     {
       "ticker": "GOOGL",
       "tier": "Core",
-      "price": 281.75,
+      "price": 281.99,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 292.5,
@@ -1211,7 +1211,7 @@
     {
       "ticker": "NVDA",
       "tier": "Core",
-      "price": 172.3994,
+      "price": 172.36,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 180.0,
@@ -1249,7 +1249,7 @@
     {
       "ticker": "TSM",
       "tier": "Core",
-      "price": 328.74,
+      "price": 328.7888,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 347.5,
@@ -1287,7 +1287,7 @@
     {
       "ticker": "IBKR",
       "tier": "Core",
-      "price": 66.2,
+      "price": 66.6,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 71.0,
@@ -1325,7 +1325,7 @@
     {
       "ticker": "NFLX",
       "tier": "Growth",
-      "price": 93.8,
+      "price": 93.32,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 100.0,
@@ -1363,7 +1363,7 @@
     {
       "ticker": "PLTR",
       "tier": "Growth",
-      "price": 148.35,
+      "price": 148.46,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 160.0,
@@ -1439,7 +1439,7 @@
     {
       "ticker": "NOW",
       "tier": "Growth",
-      "price": 103.85,
+      "price": 104.3338,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 120.0,
@@ -1477,7 +1477,7 @@
     {
       "ticker": "CLS",
       "tier": "Opportunistic",
-      "price": 277.9,
+      "price": 273.38,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 320.0,
@@ -1515,7 +1515,7 @@
     {
       "ticker": "CRDO",
       "tier": "Opportunistic",
-      "price": 97.6635,
+      "price": 97.4,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 120.0,
@@ -1553,7 +1553,7 @@
     {
       "ticker": "TSLA",
       "tier": "Opportunistic",
-      "price": 374.73,
+      "price": 374.7012,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 392.5,
@@ -1593,7 +1593,7 @@
     {
       "ticker": "BABA",
       "tier": "Opportunistic",
-      "price": 125.7,
+      "price": 125.78,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 132.0,
@@ -1631,7 +1631,7 @@
     {
       "ticker": "NBIS",
       "tier": "Opportunistic",
-      "price": 107.0505,
+      "price": 107.0,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 135.0,
@@ -1669,7 +1669,7 @@
     {
       "ticker": "LULU",
       "tier": "Opportunistic",
-      "price": 152.09,
+      "price": 151.39,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 165.0,
@@ -1707,7 +1707,7 @@
     {
       "ticker": "AAPL",
       "tier": "Core",
-      "price": 254.48,
+      "price": 252.89,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 260.0,
@@ -1727,7 +1727,7 @@
     {
       "ticker": "AMZN",
       "tier": "Core",
-      "price": 207.99,
+      "price": 208.21,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 217.5,
@@ -1747,7 +1747,7 @@
     {
       "ticker": "GOOGL",
       "tier": "Core",
-      "price": 281.75,
+      "price": 281.99,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 292.5,
@@ -1767,7 +1767,7 @@
     {
       "ticker": "NVDA",
       "tier": "Core",
-      "price": 172.3994,
+      "price": 172.36,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 180.0,
@@ -1787,7 +1787,7 @@
     {
       "ticker": "TSM",
       "tier": "Core",
-      "price": 328.74,
+      "price": 328.7888,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 347.5,
@@ -1807,7 +1807,7 @@
     {
       "ticker": "IBKR",
       "tier": "Core",
-      "price": 66.2,
+      "price": 66.6,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 71.0,
@@ -1827,7 +1827,7 @@
     {
       "ticker": "NOW",
       "tier": "Growth",
-      "price": 103.85,
+      "price": 104.3338,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 135.0,
@@ -1847,7 +1847,7 @@
     {
       "ticker": "NFLX",
       "tier": "Growth",
-      "price": 93.8,
+      "price": 93.32,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 100.0,
@@ -1867,7 +1867,7 @@
     {
       "ticker": "PLTR",
       "tier": "Growth",
-      "price": 148.35,
+      "price": 148.46,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 160.0,
@@ -1907,7 +1907,7 @@
     {
       "ticker": "CLS",
       "tier": "Opportunistic",
-      "price": 277.9,
+      "price": 273.38,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 340.0,
@@ -1927,7 +1927,7 @@
     {
       "ticker": "CRDO",
       "tier": "Opportunistic",
-      "price": 97.6635,
+      "price": 97.4,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 120.0,
@@ -1947,7 +1947,7 @@
     {
       "ticker": "LULU",
       "tier": "Opportunistic",
-      "price": 152.09,
+      "price": 151.39,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 185.0,
@@ -1967,7 +1967,7 @@
     {
       "ticker": "TSLA",
       "tier": "Opportunistic",
-      "price": 374.73,
+      "price": 374.7012,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 392.5,
@@ -1987,7 +1987,7 @@
     {
       "ticker": "BABA",
       "tier": "Opportunistic",
-      "price": 125.7,
+      "price": 125.78,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 132.0,
@@ -2007,7 +2007,7 @@
     {
       "ticker": "IBIT",
       "tier": "Opportunistic",
-      "price": 39.2,
+      "price": 39.23,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 48.0,
@@ -2027,7 +2027,7 @@
     {
       "ticker": "NBIS",
       "tier": "Opportunistic",
-      "price": 107.0505,
+      "price": 107.0,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 135.0,
@@ -2047,7 +2047,7 @@
     {
       "ticker": "NVO",
       "tier": "Core",
-      "price": 36.46,
+      "price": 36.6,
       "ivp": 68.7,
       "mode": "LEAPS",
       "strike": 22.5,
@@ -2056,14 +2056,14 @@
       "premium": 15.85,
       "annualized_return": 0,
       "delta": 0.84,
-      "extrinsic_pct": 11.9,
+      "extrinsic_pct": 11.0,
       "below_min": false,
       "warnings": [
         "IVP elevated 69%"
       ],
       "passes_quality": false,
       "breakeven": 38.35,
-      "signal": "\u2705 Good (11.9%) | 55% off highs",
+      "signal": "\u2705 Good (11.0%) | 55% off highs",
       "risk_note": "IVP elevated 69%",
       "score": 11,
       "normalized": 0.846,
@@ -2074,7 +2074,7 @@
     {
       "ticker": "IBKR",
       "tier": "Core",
-      "price": 66.2,
+      "price": 66.6,
       "ivp": 68.7,
       "mode": "LEAPS",
       "strike": 40.0,
@@ -2083,14 +2083,14 @@
       "premium": 31.95,
       "annualized_return": 0,
       "delta": 0.84,
-      "extrinsic_pct": 18.0,
+      "extrinsic_pct": 16.7,
       "below_min": false,
       "warnings": [
         "IVP elevated 69%"
       ],
       "passes_quality": false,
       "breakeven": 71.95,
-      "signal": "\u26a0\ufe0f Acceptable (18.0%) | 16% off highs",
+      "signal": "\u26a0\ufe0f Acceptable (16.7%) | 16% off highs",
       "risk_note": "IVP elevated 69%",
       "score": 10,
       "normalized": 0.769,
@@ -2128,7 +2128,7 @@
     {
       "ticker": "AAPL",
       "tier": "Core",
-      "price": 254.48,
+      "price": 252.89,
       "ivp": 68.7,
       "mode": "LEAPS",
       "strike": 180.0,
@@ -2137,47 +2137,20 @@
       "premium": 95.0,
       "annualized_return": 0,
       "delta": 0.83,
-      "extrinsic_pct": 21.6,
+      "extrinsic_pct": 23.3,
       "below_min": true,
       "warnings": [
-        "High extrinsic 21.6%",
+        "High extrinsic 23.3%",
         "IVP elevated 69%"
       ],
       "passes_quality": false,
       "breakeven": 275.0,
-      "signal": "\ud83d\udd36 Expensive (21.6%) | 12% off highs",
-      "risk_note": "High extrinsic 21.6%, IVP elevated 69%",
+      "signal": "\ud83d\udd36 Expensive (23.3%) | 12% off highs",
+      "risk_note": "High extrinsic 23.3%, IVP elevated 69%",
       "score": 9,
       "normalized": 0.692,
       "quality_label": "Acceptable",
       "unified_score": 6.27,
-      "candidate_type": "review"
-    },
-    {
-      "ticker": "UBER",
-      "tier": "Growth",
-      "price": 70.77,
-      "ivp": 68.7,
-      "mode": "LEAPS",
-      "strike": 42.5,
-      "expiry": "2028-01-21",
-      "dte": 665,
-      "premium": 34.72,
-      "annualized_return": 0,
-      "delta": 0.9,
-      "extrinsic_pct": 18.6,
-      "below_min": false,
-      "warnings": [
-        "IVP elevated 69%"
-      ],
-      "passes_quality": false,
-      "breakeven": 77.22,
-      "signal": "\u26a0\ufe0f Acceptable (18.6%) | 31% off highs",
-      "risk_note": "IVP elevated 69%",
-      "score": 9,
-      "normalized": 0.692,
-      "quality_label": "Acceptable",
-      "unified_score": 6.57,
       "candidate_type": "review"
     },
     {
@@ -2210,7 +2183,7 @@
     {
       "ticker": "MSFT",
       "tier": "Core",
-      "price": 366.5,
+      "price": 366.35,
       "ivp": 68.7,
       "mode": "LEAPS",
       "strike": 270.0,
@@ -2219,16 +2192,16 @@
       "premium": 129.03,
       "annualized_return": 0,
       "delta": 0.81,
-      "extrinsic_pct": 25.2,
+      "extrinsic_pct": 25.3,
       "below_min": true,
       "warnings": [
-        "High extrinsic 25.2%",
+        "High extrinsic 25.3%",
         "IVP elevated 69%"
       ],
       "passes_quality": false,
       "breakeven": 399.03,
-      "signal": "\u274c Very expensive (25.2%) | 34% off highs",
-      "risk_note": "High extrinsic 25.2%, IVP elevated 69%",
+      "signal": "\u274c Very expensive (25.3%) | 34% off highs",
+      "risk_note": "High extrinsic 25.3%, IVP elevated 69%",
       "score": 8,
       "normalized": 0.615,
       "quality_label": "Acceptable",
@@ -2236,9 +2209,37 @@
       "candidate_type": "review"
     },
     {
+      "ticker": "UBER",
+      "tier": "Growth",
+      "price": 70.8892,
+      "ivp": 68.7,
+      "mode": "LEAPS",
+      "strike": 45.0,
+      "expiry": "2028-01-21",
+      "dte": 665,
+      "premium": 32.9,
+      "annualized_return": 0,
+      "delta": 0.88,
+      "extrinsic_pct": 21.3,
+      "below_min": true,
+      "warnings": [
+        "High extrinsic 21.3%",
+        "IVP elevated 69%"
+      ],
+      "passes_quality": false,
+      "breakeven": 77.9,
+      "signal": "\ud83d\udd36 Expensive (21.3%) | 30% off highs",
+      "risk_note": "High extrinsic 21.3%, IVP elevated 69%",
+      "score": 8,
+      "normalized": 0.615,
+      "quality_label": "Acceptable",
+      "unified_score": 5.83,
+      "candidate_type": "review"
+    },
+    {
       "ticker": "NVDA",
       "tier": "Core",
-      "price": 172.3994,
+      "price": 172.36,
       "ivp": 68.7,
       "mode": "LEAPS",
       "strike": 125.0,
@@ -2247,16 +2248,16 @@
       "premium": 67.25,
       "annualized_return": 0,
       "delta": 0.81,
-      "extrinsic_pct": 29.5,
+      "extrinsic_pct": 29.6,
       "below_min": true,
       "warnings": [
-        "High extrinsic 29.5%",
+        "High extrinsic 29.6%",
         "IVP elevated 69%"
       ],
       "passes_quality": false,
       "breakeven": 192.25,
-      "signal": "\u274c Very expensive (29.5%) | 19% off highs",
-      "risk_note": "High extrinsic 29.5%, IVP elevated 69%",
+      "signal": "\u274c Very expensive (29.6%) | 19% off highs",
+      "risk_note": "High extrinsic 29.6%, IVP elevated 69%",
       "score": 7,
       "normalized": 0.538,
       "quality_label": "Acceptable",
@@ -2266,7 +2267,7 @@
     {
       "ticker": "DDOG",
       "tier": "Growth",
-      "price": 125.11,
+      "price": 125.3,
       "ivp": 68.7,
       "mode": "LEAPS",
       "strike": 80.0,
@@ -2275,16 +2276,16 @@
       "premium": 63.25,
       "annualized_return": 0,
       "delta": 0.83,
-      "extrinsic_pct": 28.7,
+      "extrinsic_pct": 28.4,
       "below_min": true,
       "warnings": [
-        "High extrinsic 28.7%",
+        "High extrinsic 28.4%",
         "IVP elevated 69%"
       ],
       "passes_quality": false,
       "breakeven": 143.25,
-      "signal": "\u274c Very expensive (28.7%) | 38% off highs",
-      "risk_note": "High extrinsic 28.7%, IVP elevated 69%",
+      "signal": "\u274c Very expensive (28.4%) | 38% off highs",
+      "risk_note": "High extrinsic 28.4%, IVP elevated 69%",
       "score": 7,
       "normalized": 0.538,
       "quality_label": "Acceptable",
@@ -2294,7 +2295,7 @@
     {
       "ticker": "LULU",
       "tier": "Opportunistic",
-      "price": 152.09,
+      "price": 151.39,
       "ivp": 68.7,
       "mode": "LEAPS",
       "strike": 105.0,
@@ -2303,16 +2304,16 @@
       "premium": 64.3,
       "annualized_return": 0,
       "delta": 0.84,
-      "extrinsic_pct": 26.8,
+      "extrinsic_pct": 27.9,
       "below_min": true,
       "warnings": [
-        "High extrinsic 26.8%",
+        "High extrinsic 27.9%",
         "IVP elevated 69%"
       ],
       "passes_quality": false,
       "breakeven": 169.3,
-      "signal": "\u274c Very expensive (26.8%) | 56% off highs",
-      "risk_note": "High extrinsic 26.8%, IVP elevated 69%",
+      "signal": "\u274c Very expensive (27.9%) | 57% off highs",
+      "risk_note": "High extrinsic 27.9%, IVP elevated 69%",
       "score": 4,
       "normalized": 0.308,
       "quality_label": "Weak",
@@ -2322,14 +2323,14 @@
     {
       "ticker": "AAPL",
       "tier": "Core",
-      "price": 254.48,
+      "price": 252.89,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 265.0,
       "expiry": "2026-05-15",
       "dte": 49,
       "premium": 6.12,
-      "annualized_return": 17.9,
+      "annualized_return": 18.0,
       "delta": 0.35,
       "below_min": false,
       "warnings": [],
@@ -2345,7 +2346,7 @@
     {
       "ticker": "AMZN",
       "tier": "Core",
-      "price": 207.99,
+      "price": 208.21,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 235.0,
@@ -2368,14 +2369,14 @@
     {
       "ticker": "GOOGL",
       "tier": "Core",
-      "price": 281.75,
+      "price": 281.99,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 295.0,
       "expiry": "2026-05-15",
       "dte": 49,
       "premium": 9.98,
-      "annualized_return": 26.4,
+      "annualized_return": 26.3,
       "delta": 0.39,
       "below_min": false,
       "warnings": [],
@@ -2391,7 +2392,7 @@
     {
       "ticker": "NVDA",
       "tier": "Core",
-      "price": 172.3994,
+      "price": 172.36,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 180.0,
@@ -2414,14 +2415,14 @@
     {
       "ticker": "NFLX",
       "tier": "Growth",
-      "price": 93.8,
+      "price": 93.32,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 99.0,
       "expiry": "2026-05-15",
       "dte": 49,
       "premium": 3.42,
-      "annualized_return": 27.2,
+      "annualized_return": 27.3,
       "delta": 0.38,
       "below_min": false,
       "warnings": [],
@@ -2439,7 +2440,7 @@
     {
       "ticker": "GOOGL",
       "tier": "Core",
-      "price": 281.75,
+      "price": 281.99,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 260.0,
@@ -2454,7 +2455,7 @@
       "risk_level": "Low",
       "breakeven": 257.0,
       "premium_per_day": 0.14,
-      "pullback_pct": 19.3,
+      "pullback_pct": 19.2,
       "above_ma200": true,
       "signal": "19% off highs",
       "risk_note": null,
@@ -2467,7 +2468,7 @@
     {
       "ticker": "TSM",
       "tier": "Core",
-      "price": 328.74,
+      "price": 328.7888,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 290.0,
@@ -2482,7 +2483,7 @@
       "risk_level": "Low",
       "breakeven": 285.5,
       "premium_per_day": 0.21,
-      "pullback_pct": 15.8,
+      "pullback_pct": 15.7,
       "above_ma200": true,
       "signal": "16% off highs",
       "risk_note": null,
@@ -2495,7 +2496,7 @@
     {
       "ticker": "IBKR",
       "tier": "Core",
-      "price": 66.2,
+      "price": 66.6,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 60.0,
@@ -2510,7 +2511,7 @@
       "risk_level": "Low",
       "breakeven": 58.8,
       "premium_per_day": 0.06,
-      "pullback_pct": 16.4,
+      "pullback_pct": 15.9,
       "above_ma200": true,
       "signal": "16% off highs",
       "risk_note": null,
@@ -2523,7 +2524,7 @@
     {
       "ticker": "AAPL",
       "tier": "Core",
-      "price": 254.48,
+      "price": 252.89,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 235.0,
@@ -2538,20 +2539,20 @@
       "risk_level": "Low",
       "breakeven": 232.84,
       "premium_per_day": 0.1,
-      "pullback_pct": 11.8,
+      "pullback_pct": 12.4,
       "above_ma200": true,
       "signal": "12% off highs",
       "risk_note": null,
       "score": 8,
       "normalized": 0.667,
       "quality_label": "Acceptable",
-      "unified_score": 7.62,
+      "unified_score": 8.38,
       "candidate_type": "review"
     },
     {
       "ticker": "AMZN",
       "tier": "Core",
-      "price": 207.99,
+      "price": 208.21,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 187.5,
@@ -2568,7 +2569,7 @@
       "risk_level": "Medium",
       "breakeven": 185.74,
       "premium_per_day": 0.08,
-      "pullback_pct": 19.6,
+      "pullback_pct": 19.5,
       "above_ma200": false,
       "signal": "20% off highs",
       "risk_note": "Below 200MA",
@@ -2581,7 +2582,7 @@
     {
       "ticker": "MSFT",
       "tier": "Core",
-      "price": 366.5,
+      "price": 366.35,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 340.0,
@@ -2611,7 +2612,7 @@
     {
       "ticker": "NVDA",
       "tier": "Core",
-      "price": 172.3994,
+      "price": 172.36,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 155.0,
@@ -2671,7 +2672,7 @@
     {
       "ticker": "VRTX",
       "tier": "Core",
-      "price": 454.78,
+      "price": 452.2643,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 430.0,
@@ -2686,9 +2687,9 @@
       "risk_level": "Low",
       "breakeven": 424.0,
       "premium_per_day": 0.29,
-      "pullback_pct": 11.3,
+      "pullback_pct": 11.8,
       "above_ma200": true,
-      "signal": "11% off highs",
+      "signal": "12% off highs",
       "risk_note": null,
       "score": 8,
       "normalized": 0.667,
@@ -2699,7 +2700,7 @@
     {
       "ticker": "NVO",
       "tier": "Core",
-      "price": 36.46,
+      "price": 36.6,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 32.0,
@@ -2716,7 +2717,7 @@
       "risk_level": "Medium",
       "breakeven": 31.49,
       "premium_per_day": 0.02,
-      "pullback_pct": 55.2,
+      "pullback_pct": 55.1,
       "above_ma200": false,
       "signal": "55% off highs",
       "risk_note": "Below 200MA",
@@ -2729,7 +2730,7 @@
     {
       "ticker": "NOW",
       "tier": "Growth",
-      "price": 103.85,
+      "price": 104.3338,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 90.0,
@@ -2746,7 +2747,7 @@
       "risk_level": "Medium",
       "breakeven": 87.9,
       "premium_per_day": 0.07,
-      "pullback_pct": 50.9,
+      "pullback_pct": 50.7,
       "above_ma200": false,
       "signal": "51% off highs",
       "risk_note": "Below 200MA",
@@ -2759,7 +2760,7 @@
     {
       "ticker": "DDOG",
       "tier": "Growth",
-      "price": 125.11,
+      "price": 125.3,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 100.0,
@@ -2776,7 +2777,7 @@
       "risk_level": "Medium",
       "breakeven": 96.6,
       "premium_per_day": 0.07,
-      "pullback_pct": 38.0,
+      "pullback_pct": 37.9,
       "above_ma200": false,
       "signal": "38% off highs",
       "risk_note": "Below 200MA",
@@ -2789,7 +2790,7 @@
     {
       "ticker": "UBER",
       "tier": "Growth",
-      "price": 70.77,
+      "price": 70.8892,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 64.0,
@@ -2806,9 +2807,9 @@
       "risk_level": "Medium",
       "breakeven": 63.23,
       "premium_per_day": 0.04,
-      "pullback_pct": 30.6,
+      "pullback_pct": 30.5,
       "above_ma200": false,
-      "signal": "31% off highs",
+      "signal": "30% off highs",
       "risk_note": "Below 200MA",
       "score": 7,
       "normalized": 0.583,
@@ -2819,7 +2820,7 @@
     {
       "ticker": "NFLX",
       "tier": "Growth",
-      "price": 93.8,
+      "price": 93.32,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 84.0,
@@ -2836,7 +2837,7 @@
       "risk_level": "Medium",
       "breakeven": 82.77,
       "premium_per_day": 0.06,
-      "pullback_pct": 30.1,
+      "pullback_pct": 30.4,
       "above_ma200": false,
       "signal": "30% off highs",
       "risk_note": "Below 200MA",
@@ -2849,7 +2850,7 @@
     {
       "ticker": "PLTR",
       "tier": "Growth",
-      "price": 148.35,
+      "price": 148.46,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 130.0,
@@ -2879,7 +2880,7 @@
     {
       "ticker": "META",
       "tier": "Growth",
-      "price": 550.75,
+      "price": 549.85,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 500.0,
@@ -2896,7 +2897,7 @@
       "risk_level": "Medium",
       "breakeven": 493.28,
       "premium_per_day": 0.32,
-      "pullback_pct": 30.8,
+      "pullback_pct": 30.9,
       "above_ma200": false,
       "signal": "31% off highs",
       "risk_note": "Below 200MA",
@@ -2909,7 +2910,7 @@
     {
       "ticker": "MU",
       "tier": "Cyclical",
-      "price": 358.25,
+      "price": 358.18,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 300.0,
@@ -2937,7 +2938,7 @@
     {
       "ticker": "ASML",
       "tier": "Core",
-      "price": 1339.0,
+      "price": 1329.5,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 1260.0,
@@ -2952,7 +2953,7 @@
       "risk_level": "Low",
       "breakeven": 1211.5,
       "premium_per_day": 2.31,
-      "pullback_pct": 13.5,
+      "pullback_pct": 14.1,
       "above_ma200": true,
       "signal": "14% off highs",
       "risk_note": null,
@@ -2965,7 +2966,7 @@
     {
       "ticker": "MELI",
       "tier": "Core",
-      "price": 1637.99,
+      "price": 1637.1,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 1570.0,
@@ -3023,7 +3024,7 @@
     {
       "ticker": "POWL",
       "tier": "Cyclical",
-      "price": 526.25,
+      "price": 526.06,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 440.0,
@@ -3051,7 +3052,7 @@
     {
       "ticker": "CLS",
       "tier": "Opportunistic",
-      "price": 277.9,
+      "price": 273.38,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 210.0,
@@ -3066,9 +3067,9 @@
       "risk_level": "Elevated",
       "breakeven": 200.85,
       "premium_per_day": 0.19,
-      "pullback_pct": 23.5,
+      "pullback_pct": 24.8,
       "above_ma200": true,
-      "signal": "24% off highs",
+      "signal": "25% off highs",
       "risk_note": null,
       "score": 6,
       "normalized": 0.5,
@@ -3079,7 +3080,7 @@
     {
       "ticker": "LULU",
       "tier": "Opportunistic",
-      "price": 152.09,
+      "price": 151.39,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 135.0,
@@ -3096,9 +3097,9 @@
       "risk_level": "Elevated",
       "breakeven": 133.5,
       "premium_per_day": 0.07,
-      "pullback_pct": 56.4,
+      "pullback_pct": 56.6,
       "above_ma200": false,
-      "signal": "56% off highs",
+      "signal": "57% off highs",
       "risk_note": "Below 200MA",
       "score": 5,
       "normalized": 0.417,
@@ -3109,7 +3110,7 @@
     {
       "ticker": "TSLA",
       "tier": "Opportunistic",
-      "price": 374.73,
+      "price": 374.7012,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 330.0,
@@ -3139,7 +3140,7 @@
     {
       "ticker": "BABA",
       "tier": "Opportunistic",
-      "price": 125.7,
+      "price": 125.78,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 119.0,
@@ -3156,7 +3157,7 @@
       "risk_level": "Elevated",
       "breakeven": 116.7,
       "premium_per_day": 0.11,
-      "pullback_pct": 34.8,
+      "pullback_pct": 34.7,
       "above_ma200": false,
       "signal": "35% off highs",
       "risk_note": "Below 200MA",
@@ -3169,7 +3170,7 @@
     {
       "ticker": "IBIT",
       "tier": "Opportunistic",
-      "price": 39.2,
+      "price": 39.23,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 34.0,
@@ -3199,7 +3200,7 @@
     {
       "ticker": "NBIS",
       "tier": "Opportunistic",
-      "price": 107.0505,
+      "price": 107.0,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 90.0,
@@ -3214,7 +3215,7 @@
       "risk_level": "Elevated",
       "breakeven": 87.06,
       "premium_per_day": 0.14,
-      "pullback_pct": 24.1,
+      "pullback_pct": 24.2,
       "above_ma200": true,
       "signal": "24% off highs",
       "risk_note": null,
@@ -3227,7 +3228,7 @@
     {
       "ticker": "CRDO",
       "tier": "Opportunistic",
-      "price": 97.6635,
+      "price": 97.4,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 80.0,
@@ -3244,7 +3245,7 @@
       "risk_level": "Elevated",
       "breakeven": 77.9,
       "premium_per_day": 0.1,
-      "pullback_pct": 54.3,
+      "pullback_pct": 54.4,
       "above_ma200": false,
       "signal": "54% off highs",
       "risk_note": "Below 200MA",
@@ -3257,7 +3258,7 @@
     {
       "ticker": "FIX",
       "tier": "Opportunistic",
-      "price": 1375.0,
+      "price": 1370.0,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 1200.0,
@@ -3272,9 +3273,9 @@
       "risk_level": "Elevated",
       "breakeven": 1174.1,
       "premium_per_day": 1.23,
-      "pullback_pct": 8.3,
+      "pullback_pct": 8.7,
       "above_ma200": true,
-      "signal": "8% off highs",
+      "signal": "9% off highs",
       "risk_note": null,
       "score": 4,
       "normalized": 0.333,
@@ -3285,7 +3286,7 @@
     {
       "ticker": "VRT",
       "tier": "Opportunistic",
-      "price": 254.9491,
+      "price": 252.4,
       "ivp": 68.7,
       "mode": "CSP",
       "strike": 210.0,
@@ -3302,7 +3303,7 @@
       "risk_level": "Elevated",
       "breakeven": 205.28,
       "premium_per_day": 0.17,
-      "pullback_pct": 9.6,
+      "pullback_pct": 10.5,
       "above_ma200": true,
       "signal": "10% off highs",
       "risk_note": ">8% above MA50",
@@ -3315,7 +3316,7 @@
     {
       "ticker": "AAPL",
       "tier": "Core",
-      "price": 254.48,
+      "price": 252.89,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 260.0,
@@ -3353,7 +3354,7 @@
     {
       "ticker": "AMZN",
       "tier": "Core",
-      "price": 207.99,
+      "price": 208.21,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 217.5,
@@ -3391,7 +3392,7 @@
     {
       "ticker": "GOOGL",
       "tier": "Core",
-      "price": 281.75,
+      "price": 281.99,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 292.5,
@@ -3429,7 +3430,7 @@
     {
       "ticker": "NVDA",
       "tier": "Core",
-      "price": 172.3994,
+      "price": 172.36,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 180.0,
@@ -3467,7 +3468,7 @@
     {
       "ticker": "TSM",
       "tier": "Core",
-      "price": 328.74,
+      "price": 328.7888,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 347.5,
@@ -3505,7 +3506,7 @@
     {
       "ticker": "IBKR",
       "tier": "Core",
-      "price": 66.2,
+      "price": 66.6,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 71.0,
@@ -3543,7 +3544,7 @@
     {
       "ticker": "NFLX",
       "tier": "Growth",
-      "price": 93.8,
+      "price": 93.32,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 100.0,
@@ -3581,7 +3582,7 @@
     {
       "ticker": "PLTR",
       "tier": "Growth",
-      "price": 148.35,
+      "price": 148.46,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 160.0,
@@ -3657,7 +3658,7 @@
     {
       "ticker": "NOW",
       "tier": "Growth",
-      "price": 103.85,
+      "price": 104.3338,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 120.0,
@@ -3695,7 +3696,7 @@
     {
       "ticker": "CLS",
       "tier": "Opportunistic",
-      "price": 277.9,
+      "price": 273.38,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 320.0,
@@ -3733,7 +3734,7 @@
     {
       "ticker": "CRDO",
       "tier": "Opportunistic",
-      "price": 97.6635,
+      "price": 97.4,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 120.0,
@@ -3771,7 +3772,7 @@
     {
       "ticker": "TSLA",
       "tier": "Opportunistic",
-      "price": 374.73,
+      "price": 374.7012,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 392.5,
@@ -3811,7 +3812,7 @@
     {
       "ticker": "BABA",
       "tier": "Opportunistic",
-      "price": 125.7,
+      "price": 125.78,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 132.0,
@@ -3849,7 +3850,7 @@
     {
       "ticker": "NBIS",
       "tier": "Opportunistic",
-      "price": 107.0505,
+      "price": 107.0,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 135.0,
@@ -3887,7 +3888,7 @@
     {
       "ticker": "LULU",
       "tier": "Opportunistic",
-      "price": 152.09,
+      "price": 151.39,
       "ivp": 68.7,
       "mode": "CC",
       "strike": 165.0,
@@ -3925,7 +3926,7 @@
     {
       "ticker": "AAPL",
       "tier": "Core",
-      "price": 254.48,
+      "price": 252.89,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 260.0,
@@ -3945,7 +3946,7 @@
     {
       "ticker": "AMZN",
       "tier": "Core",
-      "price": 207.99,
+      "price": 208.21,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 217.5,
@@ -3965,7 +3966,7 @@
     {
       "ticker": "GOOGL",
       "tier": "Core",
-      "price": 281.75,
+      "price": 281.99,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 292.5,
@@ -3985,7 +3986,7 @@
     {
       "ticker": "NVDA",
       "tier": "Core",
-      "price": 172.3994,
+      "price": 172.36,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 180.0,
@@ -4005,7 +4006,7 @@
     {
       "ticker": "TSM",
       "tier": "Core",
-      "price": 328.74,
+      "price": 328.7888,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 347.5,
@@ -4025,7 +4026,7 @@
     {
       "ticker": "IBKR",
       "tier": "Core",
-      "price": 66.2,
+      "price": 66.6,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 71.0,
@@ -4045,7 +4046,7 @@
     {
       "ticker": "NOW",
       "tier": "Growth",
-      "price": 103.85,
+      "price": 104.3338,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 135.0,
@@ -4065,7 +4066,7 @@
     {
       "ticker": "NFLX",
       "tier": "Growth",
-      "price": 93.8,
+      "price": 93.32,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 100.0,
@@ -4085,7 +4086,7 @@
     {
       "ticker": "PLTR",
       "tier": "Growth",
-      "price": 148.35,
+      "price": 148.46,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 160.0,
@@ -4125,7 +4126,7 @@
     {
       "ticker": "CLS",
       "tier": "Opportunistic",
-      "price": 277.9,
+      "price": 273.38,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 340.0,
@@ -4145,7 +4146,7 @@
     {
       "ticker": "CRDO",
       "tier": "Opportunistic",
-      "price": 97.6635,
+      "price": 97.4,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 120.0,
@@ -4165,7 +4166,7 @@
     {
       "ticker": "LULU",
       "tier": "Opportunistic",
-      "price": 152.09,
+      "price": 151.39,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 185.0,
@@ -4185,7 +4186,7 @@
     {
       "ticker": "TSLA",
       "tier": "Opportunistic",
-      "price": 374.73,
+      "price": 374.7012,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 392.5,
@@ -4205,7 +4206,7 @@
     {
       "ticker": "BABA",
       "tier": "Opportunistic",
-      "price": 125.7,
+      "price": 125.78,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 132.0,
@@ -4225,7 +4226,7 @@
     {
       "ticker": "IBIT",
       "tier": "Opportunistic",
-      "price": 39.2,
+      "price": 39.23,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 48.0,
@@ -4245,7 +4246,7 @@
     {
       "ticker": "NBIS",
       "tier": "Opportunistic",
-      "price": 107.0505,
+      "price": 107.0,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 135.0,
@@ -4265,7 +4266,7 @@
     {
       "ticker": "NVO",
       "tier": "Core",
-      "price": 36.46,
+      "price": 36.6,
       "ivp": 68.7,
       "mode": "LEAPS",
       "strike": 22.5,
@@ -4274,14 +4275,14 @@
       "premium": 15.85,
       "annualized_return": 0,
       "delta": 0.84,
-      "extrinsic_pct": 11.9,
+      "extrinsic_pct": 11.0,
       "below_min": false,
       "warnings": [
         "IVP elevated 69%"
       ],
       "passes_quality": false,
       "breakeven": 38.35,
-      "signal": "\u2705 Good (11.9%) | 55% off highs",
+      "signal": "\u2705 Good (11.0%) | 55% off highs",
       "risk_note": "IVP elevated 69%",
       "score": 11,
       "normalized": 0.846,
@@ -4292,7 +4293,7 @@
     {
       "ticker": "IBKR",
       "tier": "Core",
-      "price": 66.2,
+      "price": 66.6,
       "ivp": 68.7,
       "mode": "LEAPS",
       "strike": 40.0,
@@ -4301,14 +4302,14 @@
       "premium": 31.95,
       "annualized_return": 0,
       "delta": 0.84,
-      "extrinsic_pct": 18.0,
+      "extrinsic_pct": 16.7,
       "below_min": false,
       "warnings": [
         "IVP elevated 69%"
       ],
       "passes_quality": false,
       "breakeven": 71.95,
-      "signal": "\u26a0\ufe0f Acceptable (18.0%) | 16% off highs",
+      "signal": "\u26a0\ufe0f Acceptable (16.7%) | 16% off highs",
       "risk_note": "IVP elevated 69%",
       "score": 10,
       "normalized": 0.769,
@@ -4346,7 +4347,7 @@
     {
       "ticker": "AAPL",
       "tier": "Core",
-      "price": 254.48,
+      "price": 252.89,
       "ivp": 68.7,
       "mode": "LEAPS",
       "strike": 180.0,
@@ -4355,47 +4356,20 @@
       "premium": 95.0,
       "annualized_return": 0,
       "delta": 0.83,
-      "extrinsic_pct": 21.6,
+      "extrinsic_pct": 23.3,
       "below_min": true,
       "warnings": [
-        "High extrinsic 21.6%",
+        "High extrinsic 23.3%",
         "IVP elevated 69%"
       ],
       "passes_quality": false,
       "breakeven": 275.0,
-      "signal": "\ud83d\udd36 Expensive (21.6%) | 12% off highs",
-      "risk_note": "High extrinsic 21.6%, IVP elevated 69%",
+      "signal": "\ud83d\udd36 Expensive (23.3%) | 12% off highs",
+      "risk_note": "High extrinsic 23.3%, IVP elevated 69%",
       "score": 9,
       "normalized": 0.692,
       "quality_label": "Acceptable",
       "unified_score": 6.27,
-      "candidate_type": "review"
-    },
-    {
-      "ticker": "UBER",
-      "tier": "Growth",
-      "price": 70.77,
-      "ivp": 68.7,
-      "mode": "LEAPS",
-      "strike": 42.5,
-      "expiry": "2028-01-21",
-      "dte": 665,
-      "premium": 34.72,
-      "annualized_return": 0,
-      "delta": 0.9,
-      "extrinsic_pct": 18.6,
-      "below_min": false,
-      "warnings": [
-        "IVP elevated 69%"
-      ],
-      "passes_quality": false,
-      "breakeven": 77.22,
-      "signal": "\u26a0\ufe0f Acceptable (18.6%) | 31% off highs",
-      "risk_note": "IVP elevated 69%",
-      "score": 9,
-      "normalized": 0.692,
-      "quality_label": "Acceptable",
-      "unified_score": 6.57,
       "candidate_type": "review"
     },
     {
@@ -4428,7 +4402,7 @@
     {
       "ticker": "MSFT",
       "tier": "Core",
-      "price": 366.5,
+      "price": 366.35,
       "ivp": 68.7,
       "mode": "LEAPS",
       "strike": 270.0,
@@ -4437,16 +4411,16 @@
       "premium": 129.03,
       "annualized_return": 0,
       "delta": 0.81,
-      "extrinsic_pct": 25.2,
+      "extrinsic_pct": 25.3,
       "below_min": true,
       "warnings": [
-        "High extrinsic 25.2%",
+        "High extrinsic 25.3%",
         "IVP elevated 69%"
       ],
       "passes_quality": false,
       "breakeven": 399.03,
-      "signal": "\u274c Very expensive (25.2%) | 34% off highs",
-      "risk_note": "High extrinsic 25.2%, IVP elevated 69%",
+      "signal": "\u274c Very expensive (25.3%) | 34% off highs",
+      "risk_note": "High extrinsic 25.3%, IVP elevated 69%",
       "score": 8,
       "normalized": 0.615,
       "quality_label": "Acceptable",
@@ -4454,9 +4428,37 @@
       "candidate_type": "review"
     },
     {
+      "ticker": "UBER",
+      "tier": "Growth",
+      "price": 70.8892,
+      "ivp": 68.7,
+      "mode": "LEAPS",
+      "strike": 45.0,
+      "expiry": "2028-01-21",
+      "dte": 665,
+      "premium": 32.9,
+      "annualized_return": 0,
+      "delta": 0.88,
+      "extrinsic_pct": 21.3,
+      "below_min": true,
+      "warnings": [
+        "High extrinsic 21.3%",
+        "IVP elevated 69%"
+      ],
+      "passes_quality": false,
+      "breakeven": 77.9,
+      "signal": "\ud83d\udd36 Expensive (21.3%) | 30% off highs",
+      "risk_note": "High extrinsic 21.3%, IVP elevated 69%",
+      "score": 8,
+      "normalized": 0.615,
+      "quality_label": "Acceptable",
+      "unified_score": 5.83,
+      "candidate_type": "review"
+    },
+    {
       "ticker": "NVDA",
       "tier": "Core",
-      "price": 172.3994,
+      "price": 172.36,
       "ivp": 68.7,
       "mode": "LEAPS",
       "strike": 125.0,
@@ -4465,16 +4467,16 @@
       "premium": 67.25,
       "annualized_return": 0,
       "delta": 0.81,
-      "extrinsic_pct": 29.5,
+      "extrinsic_pct": 29.6,
       "below_min": true,
       "warnings": [
-        "High extrinsic 29.5%",
+        "High extrinsic 29.6%",
         "IVP elevated 69%"
       ],
       "passes_quality": false,
       "breakeven": 192.25,
-      "signal": "\u274c Very expensive (29.5%) | 19% off highs",
-      "risk_note": "High extrinsic 29.5%, IVP elevated 69%",
+      "signal": "\u274c Very expensive (29.6%) | 19% off highs",
+      "risk_note": "High extrinsic 29.6%, IVP elevated 69%",
       "score": 7,
       "normalized": 0.538,
       "quality_label": "Acceptable",
@@ -4484,7 +4486,7 @@
     {
       "ticker": "DDOG",
       "tier": "Growth",
-      "price": 125.11,
+      "price": 125.3,
       "ivp": 68.7,
       "mode": "LEAPS",
       "strike": 80.0,
@@ -4493,16 +4495,16 @@
       "premium": 63.25,
       "annualized_return": 0,
       "delta": 0.83,
-      "extrinsic_pct": 28.7,
+      "extrinsic_pct": 28.4,
       "below_min": true,
       "warnings": [
-        "High extrinsic 28.7%",
+        "High extrinsic 28.4%",
         "IVP elevated 69%"
       ],
       "passes_quality": false,
       "breakeven": 143.25,
-      "signal": "\u274c Very expensive (28.7%) | 38% off highs",
-      "risk_note": "High extrinsic 28.7%, IVP elevated 69%",
+      "signal": "\u274c Very expensive (28.4%) | 38% off highs",
+      "risk_note": "High extrinsic 28.4%, IVP elevated 69%",
       "score": 7,
       "normalized": 0.538,
       "quality_label": "Acceptable",
@@ -4512,7 +4514,7 @@
     {
       "ticker": "LULU",
       "tier": "Opportunistic",
-      "price": 152.09,
+      "price": 151.39,
       "ivp": 68.7,
       "mode": "LEAPS",
       "strike": 105.0,
@@ -4521,16 +4523,16 @@
       "premium": 64.3,
       "annualized_return": 0,
       "delta": 0.84,
-      "extrinsic_pct": 26.8,
+      "extrinsic_pct": 27.9,
       "below_min": true,
       "warnings": [
-        "High extrinsic 26.8%",
+        "High extrinsic 27.9%",
         "IVP elevated 69%"
       ],
       "passes_quality": false,
       "breakeven": 169.3,
-      "signal": "\u274c Very expensive (26.8%) | 56% off highs",
-      "risk_note": "High extrinsic 26.8%, IVP elevated 69%",
+      "signal": "\u274c Very expensive (27.9%) | 57% off highs",
+      "risk_note": "High extrinsic 27.9%, IVP elevated 69%",
       "score": 4,
       "normalized": 0.308,
       "quality_label": "Weak",
@@ -4540,14 +4542,14 @@
     {
       "ticker": "AAPL",
       "tier": "Core",
-      "price": 254.48,
+      "price": 252.89,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 265.0,
       "expiry": "2026-05-15",
       "dte": 49,
       "premium": 6.12,
-      "annualized_return": 17.9,
+      "annualized_return": 18.0,
       "delta": 0.35,
       "below_min": false,
       "warnings": [],
@@ -4563,7 +4565,7 @@
     {
       "ticker": "AMZN",
       "tier": "Core",
-      "price": 207.99,
+      "price": 208.21,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 235.0,
@@ -4586,14 +4588,14 @@
     {
       "ticker": "GOOGL",
       "tier": "Core",
-      "price": 281.75,
+      "price": 281.99,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 295.0,
       "expiry": "2026-05-15",
       "dte": 49,
       "premium": 9.98,
-      "annualized_return": 26.4,
+      "annualized_return": 26.3,
       "delta": 0.39,
       "below_min": false,
       "warnings": [],
@@ -4609,7 +4611,7 @@
     {
       "ticker": "NVDA",
       "tier": "Core",
-      "price": 172.3994,
+      "price": 172.36,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 180.0,
@@ -4632,14 +4634,14 @@
     {
       "ticker": "NFLX",
       "tier": "Growth",
-      "price": 93.8,
+      "price": 93.32,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 99.0,
       "expiry": "2026-05-15",
       "dte": 49,
       "premium": 3.42,
-      "annualized_return": 27.2,
+      "annualized_return": 27.3,
       "delta": 0.38,
       "below_min": false,
       "warnings": [],
@@ -4654,20 +4656,20 @@
     }
   ],
   "market": {
-    "vix": 28.4,
-    "vix_label": "\ud83d\ude2c VIX 28.4 \u2014 Elevated fear. Good premium selling opportunity.",
+    "vix": 27.44,
+    "vix_label": "\ud83d\ude2c VIX 27.44 \u2014 Elevated fear. Good premium selling opportunity.",
     "spy": 645.09,
     "spy_ma200": 661.48,
     "spy_above": false,
     "verdict": "\u2705 GOOD \u2014 Reasonable conditions. IVP filters individual trades. | \u26a0\ufe0f S&P below 200MA \u2014 reduce size."
   },
   "exposure": {
-    "portfolio_size": 14004000.0,
+    "portfolio_size": 14005000.0,
     "max_csp_allocation_pct": 25,
-    "max_csp_allocation_usd": 3501000.0,
-    "total_csp_obligation": 2591000.0,
-    "csp_allocation_pct": 18.5,
-    "remaining_csp_capacity": 910000.0,
+    "max_csp_allocation_usd": 3501250.0,
+    "total_csp_obligation": 2675000.0,
+    "csp_allocation_pct": 19.1,
+    "remaining_csp_capacity": 826250.0,
     "csp_positions": [
       {
         "ticker": "CLS",
@@ -4744,10 +4746,10 @@
       {
         "ticker": "MSFT",
         "strike": 365.0,
-        "contracts": 6,
-        "cso": 219000.0,
+        "contracts": 2,
+        "cso": 73000.0,
         "expiry": "20260417",
-        "source": "ibkr"
+        "source": "schwab"
       },
       {
         "ticker": "MSFT",
@@ -4827,7 +4829,7 @@
         "contracts": 2,
         "cso": 32000.0,
         "expiry": "20260501",
-        "source": "ibkr"
+        "source": "schwab"
       },
       {
         "ticker": "NVO",
@@ -4860,6 +4862,54 @@
         "cso": 124000.0,
         "expiry": "20260417",
         "source": "ibkr"
+      },
+      {
+        "ticker": "GOOGL",
+        "strike": 270.0,
+        "contracts": 2,
+        "cso": 54000.0,
+        "expiry": "20260515",
+        "source": "schwab"
+      },
+      {
+        "ticker": "MSFT",
+        "strike": 375.0,
+        "contracts": 1,
+        "cso": 37500.0,
+        "expiry": "20260424",
+        "source": "schwab"
+      },
+      {
+        "ticker": "CRDO",
+        "strike": 90.0,
+        "contracts": 2,
+        "cso": 18000.0,
+        "expiry": "20260417",
+        "source": "schwab"
+      },
+      {
+        "ticker": "TSLA",
+        "strike": 335.0,
+        "contracts": 1,
+        "cso": 33500.0,
+        "expiry": "20260424",
+        "source": "schwab"
+      },
+      {
+        "ticker": "MSFT",
+        "strike": 350.0,
+        "contracts": 2,
+        "cso": 70000.0,
+        "expiry": "20260424",
+        "source": "schwab"
+      },
+      {
+        "ticker": "CRDO",
+        "strike": 85.0,
+        "contracts": 2,
+        "cso": 17000.0,
+        "expiry": "20260417",
+        "source": "schwab"
       }
     ],
     "total_cc_notional": 428500.0,
@@ -4932,7 +4982,7 @@
     "total_premium_csp": 24681.0,
     "total_premium_cc": 22082.0,
     "total_premium_all": 46763.0,
-    "max_assignment_exposure": 2591000.0,
+    "max_assignment_exposure": 2675000.0,
     "max_shares_called_away": 2400,
     "leaps_positions": [
       {
@@ -5055,6 +5105,61 @@
         "avg_cost": 189.7869795,
         "breakeven": 359.79,
         "source": "ibkr"
+      },
+      {
+        "ticker": "NVDA",
+        "strike": 100.0,
+        "contracts": 1,
+        "expiry": "20280121",
+        "expiry_fmt": "Jan 2028",
+        "dte": 665,
+        "avg_cost": 94.0566,
+        "breakeven": 194.06,
+        "source": "schwab"
+      },
+      {
+        "ticker": "NVDA",
+        "strike": 130.0,
+        "contracts": 1,
+        "expiry": "20281215",
+        "expiry_fmt": "Dec 2028",
+        "dte": 994,
+        "avg_cost": 90.0066,
+        "breakeven": 220.01,
+        "source": "schwab"
+      },
+      {
+        "ticker": "IBIT",
+        "strike": 20.0,
+        "contracts": 10,
+        "expiry": "20270617",
+        "expiry_fmt": "Jun 2027",
+        "dte": 447,
+        "avg_cost": 22.50662,
+        "breakeven": 42.51,
+        "source": "schwab"
+      },
+      {
+        "ticker": "LULU",
+        "strike": 100.0,
+        "contracts": 2,
+        "expiry": "20280121",
+        "expiry_fmt": "Jan 2028",
+        "dte": 665,
+        "avg_cost": 80.5066,
+        "breakeven": 180.51,
+        "source": "schwab"
+      },
+      {
+        "ticker": "NVO",
+        "strike": 25.0,
+        "contracts": 10,
+        "expiry": "20280121",
+        "expiry_fmt": "Jan 2028",
+        "dte": 665,
+        "avg_cost": 15.05662,
+        "breakeven": 40.06,
+        "source": "schwab"
       }
     ],
     "bcs_positions": [
@@ -5084,7 +5189,7 @@
     {
       "ticker": "NVDA",
       "tier": "Core",
-      "price": 172.3994,
+      "price": 172.36,
       "ivp": 68.7,
       "mode": "CSP",
       "action_label": "SCALE CSP",
@@ -5103,9 +5208,9 @@
         "premium_received": 24681.0,
         "cso": 912000.0,
         "action_label": "SCALE CSP",
-        "current_obligation": 2591000.0,
-        "resulting_obligation": 3503000.0,
-        "resulting_pct": 25.0,
+        "current_obligation": 2675000.0,
+        "resulting_obligation": 3587000.0,
+        "resulting_pct": 25.6,
         "remaining_after": 0,
         "within_limit": false
       }
@@ -5113,7 +5218,7 @@
     {
       "ticker": "NVDA",
       "tier": "Core",
-      "price": 172.3994,
+      "price": 172.36,
       "ivp": 68.7,
       "mode": "CC",
       "action_label": "SELL CC",
@@ -5138,7 +5243,7 @@
     {
       "ticker": "TSLA",
       "tier": "Opportunistic",
-      "price": 374.73,
+      "price": 374.7012,
       "ivp": 68.7,
       "mode": "CC",
       "action_label": "SELL CC",
@@ -5163,7 +5268,7 @@
     {
       "ticker": "NVO",
       "tier": "Core",
-      "price": 36.46,
+      "price": 36.6,
       "ivp": 68.7,
       "mode": "LEAPS",
       "action_label": "LEAPS",
@@ -5186,14 +5291,14 @@
     {
       "ticker": "AAPL",
       "tier": "Core",
-      "price": 254.48,
+      "price": 252.89,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 265.0,
       "expiry": "2026-05-15",
       "dte": 49,
       "premium": 6.12,
-      "annualized_return": 17.9,
+      "annualized_return": 18.0,
       "delta": 0.35,
       "signal": "profit",
       "below_min": false,
@@ -5202,7 +5307,7 @@
     {
       "ticker": "AMZN",
       "tier": "Core",
-      "price": 207.99,
+      "price": 208.21,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 235.0,
@@ -5218,14 +5323,14 @@
     {
       "ticker": "GOOGL",
       "tier": "Core",
-      "price": 281.75,
+      "price": 281.99,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 295.0,
       "expiry": "2026-05-15",
       "dte": 49,
       "premium": 9.98,
-      "annualized_return": 26.4,
+      "annualized_return": 26.3,
       "delta": 0.39,
       "signal": "profit",
       "below_min": false,
@@ -5234,7 +5339,7 @@
     {
       "ticker": "NVDA",
       "tier": "Core",
-      "price": 172.3994,
+      "price": 172.36,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 180.0,
@@ -5250,14 +5355,14 @@
     {
       "ticker": "NFLX",
       "tier": "Growth",
-      "price": 93.8,
+      "price": 93.32,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 99.0,
       "expiry": "2026-05-15",
       "dte": 49,
       "premium": 3.42,
-      "annualized_return": 27.2,
+      "annualized_return": 27.3,
       "delta": 0.38,
       "signal": "profit",
       "below_min": false,
@@ -5266,7 +5371,7 @@
     {
       "ticker": "PLTR",
       "tier": "Growth",
-      "price": 148.35,
+      "price": 148.46,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 165.0,
@@ -5282,7 +5387,7 @@
     {
       "ticker": "TSLA",
       "tier": "Opportunistic",
-      "price": 374.73,
+      "price": 374.7012,
       "ivp": 68.7,
       "mode": "PIO",
       "strike": 395.0,
@@ -5298,6 +5403,66 @@
   ],
   "positions": [
     {
+      "ticker": "MSFT",
+      "tier": "Core",
+      "status": "Watchlist",
+      "exposure_pct": 0.0,
+      "target_range": "5\u201310%",
+      "pos_status": "Underweight",
+      "price_opp": "Pullback",
+      "action": "BUY",
+      "score": 9,
+      "pullback_pct": 34.0,
+      "above_ma200": false,
+      "shares_owned": 0,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0,
+      "uncovered_shares": 0,
+      "add_cc_contracts": 0,
+      "csp_contracts": 14,
+      "csp_obligation": 509000.0,
+      "exp_status": "CSP Only",
+      "account": "IRA",
+      "accounts_all": [
+        "IRA"
+      ],
+      "market_value": 0,
+      "mv_by_account": {},
+      "leaps": [],
+      "bcs": []
+    },
+    {
+      "ticker": "VRTX",
+      "tier": "Core",
+      "status": "Watchlist",
+      "exposure_pct": 0.0,
+      "target_range": "5\u201310%",
+      "pos_status": "Underweight",
+      "price_opp": "Neutral",
+      "action": "ADD",
+      "score": 9,
+      "pullback_pct": 11.8,
+      "above_ma200": true,
+      "shares_owned": 0,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0,
+      "uncovered_shares": 0,
+      "add_cc_contracts": 0,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "Watchlist",
+      "account": "IBKR",
+      "accounts_all": [
+        "IBKR"
+      ],
+      "market_value": 0,
+      "mv_by_account": {},
+      "leaps": [],
+      "bcs": []
+    },
+    {
       "ticker": "ASML",
       "tier": "Core",
       "status": "Owned",
@@ -5307,7 +5472,7 @@
       "price_opp": "Neutral",
       "action": "ADD",
       "score": 9,
-      "pullback_pct": 13.5,
+      "pullback_pct": 14.1,
       "above_ma200": true,
       "shares_owned": 90,
       "cc_contracts": 0,
@@ -5326,110 +5491,6 @@
       "mv_by_account": {
         "IBKR": 110001.89
       },
-      "leaps": [],
-      "bcs": []
-    },
-    {
-      "ticker": "IBKR",
-      "tier": "Core",
-      "status": "Owned",
-      "exposure_pct": 0.1,
-      "target_range": "5\u201310%",
-      "pos_status": "Underweight",
-      "price_opp": "Neutral",
-      "action": "ADD",
-      "score": 9,
-      "pullback_pct": 16.4,
-      "above_ma200": true,
-      "shares_owned": 190,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0.0,
-      "uncovered_shares": 190,
-      "add_cc_contracts": 1,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "Stock Only",
-      "account": "IBKR",
-      "accounts_all": [
-        "IBKR"
-      ],
-      "market_value": 13105.0,
-      "mv_by_account": {
-        "IBKR": 13105.49
-      },
-      "leaps": [
-        {
-          "ticker": "IBKR",
-          "strike": 40.0,
-          "contracts": 5,
-          "expiry": "20280121",
-          "expiry_fmt": "Jan 2028",
-          "dte": 665,
-          "avg_cost": 33.7569795,
-          "breakeven": 73.76,
-          "source": "ibkr"
-        }
-      ],
-      "bcs": []
-    },
-    {
-      "ticker": "VRTX",
-      "tier": "Core",
-      "status": "Watchlist",
-      "exposure_pct": 0.0,
-      "target_range": "5\u201310%",
-      "pos_status": "Underweight",
-      "price_opp": "Neutral",
-      "action": "ADD",
-      "score": 9,
-      "pullback_pct": 11.3,
-      "above_ma200": true,
-      "shares_owned": 0,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0,
-      "uncovered_shares": 0,
-      "add_cc_contracts": 0,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "Watchlist",
-      "account": "IBKR",
-      "accounts_all": [
-        "IBKR"
-      ],
-      "market_value": 0,
-      "mv_by_account": {},
-      "leaps": [],
-      "bcs": []
-    },
-    {
-      "ticker": "CPRT",
-      "tier": "Core",
-      "status": "Watchlist",
-      "exposure_pct": 0.0,
-      "target_range": "5\u201310%",
-      "pos_status": "Underweight",
-      "price_opp": "Pullback",
-      "action": "BUY",
-      "score": 9,
-      "pullback_pct": 48.3,
-      "above_ma200": false,
-      "shares_owned": 0,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0,
-      "uncovered_shares": 0,
-      "add_cc_contracts": 0,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "Watchlist",
-      "account": "IBKR",
-      "accounts_all": [
-        "IBKR"
-      ],
-      "market_value": 0,
-      "mv_by_account": {},
       "leaps": [],
       "bcs": []
     },
@@ -5466,6 +5527,80 @@
       "bcs": []
     },
     {
+      "ticker": "IBKR",
+      "tier": "Core",
+      "status": "Owned",
+      "exposure_pct": 0.1,
+      "target_range": "5\u201310%",
+      "pos_status": "Underweight",
+      "price_opp": "Neutral",
+      "action": "ADD",
+      "score": 9,
+      "pullback_pct": 15.9,
+      "above_ma200": true,
+      "shares_owned": 190,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0.0,
+      "uncovered_shares": 190,
+      "add_cc_contracts": 1,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "Stock Only",
+      "account": "IBKR",
+      "accounts_all": [
+        "IBKR"
+      ],
+      "market_value": 13105.0,
+      "mv_by_account": {
+        "IBKR": 13105.49
+      },
+      "leaps": [
+        {
+          "ticker": "IBKR",
+          "strike": 40.0,
+          "contracts": 5,
+          "expiry": "20280121",
+          "expiry_fmt": "Jan 2028",
+          "dte": 665,
+          "avg_cost": 33.7569795,
+          "breakeven": 73.76,
+          "source": "ibkr"
+        }
+      ],
+      "bcs": []
+    },
+    {
+      "ticker": "CPRT",
+      "tier": "Core",
+      "status": "Watchlist",
+      "exposure_pct": 0.0,
+      "target_range": "5\u201310%",
+      "pos_status": "Underweight",
+      "price_opp": "Pullback",
+      "action": "BUY",
+      "score": 9,
+      "pullback_pct": 48.3,
+      "above_ma200": false,
+      "shares_owned": 0,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0,
+      "uncovered_shares": 0,
+      "add_cc_contracts": 0,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "Watchlist",
+      "account": "IBKR",
+      "accounts_all": [
+        "IBKR"
+      ],
+      "market_value": 0,
+      "mv_by_account": {},
+      "leaps": [],
+      "bcs": []
+    },
+    {
       "ticker": "NVO",
       "tier": "Core",
       "status": "Owned",
@@ -5475,7 +5610,7 @@
       "price_opp": "Pullback",
       "action": "BUY",
       "score": 9,
-      "pullback_pct": 55.2,
+      "pullback_pct": 55.1,
       "above_ma200": false,
       "shares_owned": 2900,
       "cc_contracts": 0,
@@ -5505,38 +5640,19 @@
           "avg_cost": 19.5069795,
           "breakeven": 39.51,
           "source": "ibkr"
+        },
+        {
+          "ticker": "NVO",
+          "strike": 25.0,
+          "contracts": 10,
+          "expiry": "20280121",
+          "expiry_fmt": "Jan 2028",
+          "dte": 665,
+          "avg_cost": 15.05662,
+          "breakeven": 40.06,
+          "source": "schwab"
         }
       ],
-      "bcs": []
-    },
-    {
-      "ticker": "MSFT",
-      "tier": "Core",
-      "status": "Watchlist",
-      "exposure_pct": 0.0,
-      "target_range": "5\u201310%",
-      "pos_status": "Underweight",
-      "price_opp": "Pullback",
-      "action": "BUY",
-      "score": 9,
-      "pullback_pct": 34.0,
-      "above_ma200": false,
-      "shares_owned": 0,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0,
-      "uncovered_shares": 0,
-      "add_cc_contracts": 0,
-      "csp_contracts": 15,
-      "csp_obligation": 547500.0,
-      "exp_status": "CSP Only",
-      "account": "IBKR",
-      "accounts_all": [
-        "IBKR"
-      ],
-      "market_value": 0,
-      "mv_by_account": {},
-      "leaps": [],
       "bcs": []
     },
     {
@@ -5549,7 +5665,7 @@
       "price_opp": "Neutral",
       "action": "ADD",
       "score": 9,
-      "pullback_pct": 15.8,
+      "pullback_pct": 15.7,
       "above_ma200": true,
       "shares_owned": 253,
       "cc_contracts": 0,
@@ -5584,63 +5700,6 @@
       "bcs": []
     },
     {
-      "ticker": "NVDA",
-      "tier": "Core",
-      "status": "Owned",
-      "exposure_pct": 1.4,
-      "target_range": "5\u201310%",
-      "pos_status": "Underweight",
-      "price_opp": "Neutral",
-      "action": "ADD",
-      "score": 8,
-      "pullback_pct": 18.8,
-      "above_ma200": false,
-      "shares_owned": 1138,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0.0,
-      "uncovered_shares": 1138,
-      "add_cc_contracts": 11,
-      "csp_contracts": 8,
-      "csp_obligation": 131000.0,
-      "exp_status": "Stock + CSP",
-      "account": "CRT",
-      "accounts_all": [
-        "CRT",
-        "IRA"
-      ],
-      "market_value": 201713.0,
-      "mv_by_account": {
-        "CRT": 30163.0,
-        "IRA": 15512.4
-      },
-      "leaps": [
-        {
-          "ticker": "NVDA",
-          "strike": 90.0,
-          "contracts": 6,
-          "expiry": "20280121",
-          "expiry_fmt": "Jan 2028",
-          "dte": 665,
-          "avg_cost": 101.285312833,
-          "breakeven": 191.29,
-          "source": "ibkr"
-        }
-      ],
-      "bcs": [
-        {
-          "ticker": "NVDA",
-          "strike": 240.0,
-          "contracts": 4,
-          "expiry": "20280121",
-          "expiry_fmt": "Jan 2028",
-          "dte": 665,
-          "leg": "short",
-          "source": "ibkr"
-        }
-      ]
-    },
-    {
       "ticker": "BRK-B",
       "tier": "Core",
       "status": "Owned",
@@ -5673,41 +5732,86 @@
       "bcs": []
     },
     {
-      "ticker": "AAPL",
+      "ticker": "NVDA",
       "tier": "Core",
       "status": "Owned",
-      "exposure_pct": 9.5,
+      "exposure_pct": 1.4,
       "target_range": "5\u201310%",
-      "pos_status": "On Target",
+      "pos_status": "Underweight",
       "price_opp": "Neutral",
-      "action": "HOLD",
-      "score": 7,
-      "pullback_pct": 11.8,
-      "above_ma200": true,
-      "shares_owned": 5220,
+      "action": "ADD",
+      "score": 8,
+      "pullback_pct": 18.8,
+      "above_ma200": false,
+      "shares_owned": 1138,
       "cc_contracts": 0,
       "shares_covered": 0,
       "coverage_pct": 0.0,
-      "uncovered_shares": 5220,
-      "add_cc_contracts": 52,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "Stock Only",
-      "account": "IRA",
+      "uncovered_shares": 1138,
+      "add_cc_contracts": 11,
+      "csp_contracts": 8,
+      "csp_obligation": 131000.0,
+      "exp_status": "Stock + CSP",
+      "account": "CRT",
       "accounts_all": [
         "CRT",
         "IRA"
       ],
-      "market_value": 1328072.0,
+      "market_value": 201718.0,
       "mv_by_account": {
-        "CRT": 188270.8,
-        "IRA": 1139801.6
+        "CRT": 30166.5,
+        "IRA": 15514.2
       },
-      "leaps": [],
-      "bcs": []
+      "leaps": [
+        {
+          "ticker": "NVDA",
+          "strike": 90.0,
+          "contracts": 6,
+          "expiry": "20280121",
+          "expiry_fmt": "Jan 2028",
+          "dte": 665,
+          "avg_cost": 101.285312833,
+          "breakeven": 191.29,
+          "source": "ibkr"
+        },
+        {
+          "ticker": "NVDA",
+          "strike": 100.0,
+          "contracts": 1,
+          "expiry": "20280121",
+          "expiry_fmt": "Jan 2028",
+          "dte": 665,
+          "avg_cost": 94.0566,
+          "breakeven": 194.06,
+          "source": "schwab"
+        },
+        {
+          "ticker": "NVDA",
+          "strike": 130.0,
+          "contracts": 1,
+          "expiry": "20281215",
+          "expiry_fmt": "Dec 2028",
+          "dte": 994,
+          "avg_cost": 90.0066,
+          "breakeven": 220.01,
+          "source": "schwab"
+        }
+      ],
+      "bcs": [
+        {
+          "ticker": "NVDA",
+          "strike": 240.0,
+          "contracts": 4,
+          "expiry": "20280121",
+          "expiry_fmt": "Jan 2028",
+          "dte": 665,
+          "leg": "short",
+          "source": "ibkr"
+        }
+      ]
     },
     {
-      "ticker": "DDOG",
+      "ticker": "META",
       "tier": "Growth",
       "status": "Watchlist",
       "exposure_pct": 0.0,
@@ -5716,7 +5820,7 @@
       "price_opp": "Pullback",
       "action": "BUY",
       "score": 7,
-      "pullback_pct": 38.0,
+      "pullback_pct": 30.9,
       "above_ma200": false,
       "shares_owned": 0,
       "cc_contracts": 0,
@@ -5769,53 +5873,7 @@
       "bcs": []
     },
     {
-      "ticker": "GOOGL",
-      "tier": "Core",
-      "status": "Owned",
-      "exposure_pct": 6.0,
-      "target_range": "5\u201310%",
-      "pos_status": "On Target",
-      "price_opp": "Neutral",
-      "action": "HOLD",
-      "score": 7,
-      "pullback_pct": 19.3,
-      "above_ma200": true,
-      "shares_owned": 2264,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0.0,
-      "uncovered_shares": 2264,
-      "add_cc_contracts": 22,
-      "csp_contracts": 12,
-      "csp_obligation": 332000.0,
-      "exp_status": "Stock + CSP",
-      "account": "CRT",
-      "accounts_all": [
-        "CRT",
-        "IRA"
-      ],
-      "market_value": 638536.0,
-      "mv_by_account": {
-        "CRT": 535382.0,
-        "IRA": 84534.0
-      },
-      "leaps": [
-        {
-          "ticker": "GOOGL",
-          "strike": 180.0,
-          "contracts": 4,
-          "expiry": "20270617",
-          "expiry_fmt": "Jun 2027",
-          "dte": 447,
-          "avg_cost": 139.1569795,
-          "breakeven": 319.16,
-          "source": "ibkr"
-        }
-      ],
-      "bcs": []
-    },
-    {
-      "ticker": "META",
+      "ticker": "DDOG",
       "tier": "Growth",
       "status": "Watchlist",
       "exposure_pct": 0.0,
@@ -5824,7 +5882,7 @@
       "price_opp": "Pullback",
       "action": "BUY",
       "score": 7,
-      "pullback_pct": 30.8,
+      "pullback_pct": 37.9,
       "above_ma200": false,
       "shares_owned": 0,
       "cc_contracts": 0,
@@ -5845,6 +5903,52 @@
       "bcs": []
     },
     {
+      "ticker": "GOOGL",
+      "tier": "Core",
+      "status": "Owned",
+      "exposure_pct": 6.0,
+      "target_range": "5\u201310%",
+      "pos_status": "On Target",
+      "price_opp": "Neutral",
+      "action": "HOLD",
+      "score": 7,
+      "pullback_pct": 19.2,
+      "above_ma200": true,
+      "shares_owned": 2264,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0.0,
+      "uncovered_shares": 2264,
+      "add_cc_contracts": 22,
+      "csp_contracts": 14,
+      "csp_obligation": 386000.0,
+      "exp_status": "Stock + CSP",
+      "account": "CRT",
+      "accounts_all": [
+        "CRT",
+        "IRA"
+      ],
+      "market_value": 638250.0,
+      "mv_by_account": {
+        "CRT": 535135.0,
+        "IRA": 84495.0
+      },
+      "leaps": [
+        {
+          "ticker": "GOOGL",
+          "strike": 180.0,
+          "contracts": 4,
+          "expiry": "20270617",
+          "expiry_fmt": "Jun 2027",
+          "dte": 447,
+          "avg_cost": 139.1569795,
+          "breakeven": 319.16,
+          "source": "ibkr"
+        }
+      ],
+      "bcs": []
+    },
+    {
       "ticker": "UBER",
       "tier": "Growth",
       "status": "Watchlist",
@@ -5854,7 +5958,7 @@
       "price_opp": "Pullback",
       "action": "BUY",
       "score": 7,
-      "pullback_pct": 30.6,
+      "pullback_pct": 30.5,
       "above_ma200": false,
       "shares_owned": 0,
       "cc_contracts": 0,
@@ -5884,7 +5988,7 @@
       "price_opp": "Pullback",
       "action": "BUY",
       "score": 7,
-      "pullback_pct": 50.9,
+      "pullback_pct": 50.7,
       "above_ma200": false,
       "shares_owned": 300,
       "cc_contracts": 0,
@@ -5907,6 +6011,40 @@
       "bcs": []
     },
     {
+      "ticker": "AAPL",
+      "tier": "Core",
+      "status": "Owned",
+      "exposure_pct": 9.5,
+      "target_range": "5\u201310%",
+      "pos_status": "On Target",
+      "price_opp": "Neutral",
+      "action": "HOLD",
+      "score": 7,
+      "pullback_pct": 12.4,
+      "above_ma200": true,
+      "shares_owned": 5220,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0.0,
+      "uncovered_shares": 5220,
+      "add_cc_contracts": 52,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "Stock Only",
+      "account": "IRA",
+      "accounts_all": [
+        "CRT",
+        "IRA"
+      ],
+      "market_value": 1328490.0,
+      "mv_by_account": {
+        "CRT": 188330.0,
+        "IRA": 1140160.0
+      },
+      "leaps": [],
+      "bcs": []
+    },
+    {
       "ticker": "AMZN",
       "tier": "Core",
       "status": "Owned",
@@ -5916,7 +6054,7 @@
       "price_opp": "Neutral",
       "action": "HOLD",
       "score": 6,
-      "pullback_pct": 19.6,
+      "pullback_pct": 19.5,
       "above_ma200": false,
       "shares_owned": 5200,
       "cc_contracts": 0,
@@ -5932,10 +6070,10 @@
         "CRT",
         "IRA"
       ],
-      "market_value": 1086015.0,
+      "market_value": 1086823.0,
       "mv_by_account": {
-        "CRT": 382720.0,
-        "IRA": 457600.0
+        "CRT": 383088.0,
+        "IRA": 458040.0
       },
       "leaps": [],
       "bcs": []
@@ -6017,6 +6155,114 @@
       "bcs": []
     },
     {
+      "ticker": "BABA",
+      "tier": "Opportunistic",
+      "status": "Owned",
+      "exposure_pct": 0.3,
+      "target_range": "1\u20133%",
+      "pos_status": "Underweight",
+      "price_opp": "Pullback",
+      "action": "BUY",
+      "score": 5,
+      "pullback_pct": 34.7,
+      "above_ma200": false,
+      "shares_owned": 374,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0.0,
+      "uncovered_shares": 374,
+      "add_cc_contracts": 3,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "Stock Only",
+      "account": "IBKR",
+      "accounts_all": [
+        "IBKR"
+      ],
+      "market_value": 48571.0,
+      "mv_by_account": {
+        "IBKR": 48571.38
+      },
+      "leaps": [],
+      "bcs": []
+    },
+    {
+      "ticker": "FIX",
+      "tier": "Opportunistic",
+      "status": "Owned",
+      "exposure_pct": 0.8,
+      "target_range": "1\u20133%",
+      "pos_status": "Underweight",
+      "price_opp": "Neutral",
+      "action": "ADD",
+      "score": 5,
+      "pullback_pct": 8.7,
+      "above_ma200": true,
+      "shares_owned": 75,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0.0,
+      "uncovered_shares": 75,
+      "add_cc_contracts": 0,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "Stock Only",
+      "account": "IBKR",
+      "accounts_all": [
+        "IBKR"
+      ],
+      "market_value": 110539.0,
+      "mv_by_account": {
+        "IBKR": 110538.6
+      },
+      "leaps": [],
+      "bcs": []
+    },
+    {
+      "ticker": "CRDO",
+      "tier": "Opportunistic",
+      "status": "Owned",
+      "exposure_pct": 0.5,
+      "target_range": "1\u20133%",
+      "pos_status": "Underweight",
+      "price_opp": "Pullback",
+      "action": "BUY",
+      "score": 5,
+      "pullback_pct": 54.4,
+      "above_ma200": false,
+      "shares_owned": 636,
+      "cc_contracts": 5,
+      "shares_covered": 500,
+      "coverage_pct": 78.6,
+      "uncovered_shares": 136,
+      "add_cc_contracts": 1,
+      "csp_contracts": 14,
+      "csp_obligation": 125000.0,
+      "exp_status": "Stock + CC + CSP",
+      "account": "IBKR",
+      "accounts_all": [
+        "IBKR"
+      ],
+      "market_value": 66148.0,
+      "mv_by_account": {
+        "IBKR": 66148.33
+      },
+      "leaps": [
+        {
+          "ticker": "CRDO",
+          "strike": 70.0,
+          "contracts": 7,
+          "expiry": "20280121",
+          "expiry_fmt": "Jan 2028",
+          "dte": 665,
+          "avg_cost": 66.292693786,
+          "breakeven": 136.29,
+          "source": "ibkr"
+        }
+      ],
+      "bcs": []
+    },
+    {
       "ticker": "LULU",
       "tier": "Opportunistic",
       "status": "Owned",
@@ -6026,7 +6272,7 @@
       "price_opp": "Pullback",
       "action": "BUY",
       "score": 5,
-      "pullback_pct": 56.4,
+      "pullback_pct": 56.6,
       "above_ma200": false,
       "shares_owned": 245,
       "cc_contracts": 0,
@@ -6067,8 +6313,51 @@
           "avg_cost": 80.0069795,
           "breakeven": 175.01,
           "source": "ibkr"
+        },
+        {
+          "ticker": "LULU",
+          "strike": 100.0,
+          "contracts": 2,
+          "expiry": "20280121",
+          "expiry_fmt": "Jan 2028",
+          "dte": 665,
+          "avg_cost": 80.5066,
+          "breakeven": 180.51,
+          "source": "schwab"
         }
       ],
+      "bcs": []
+    },
+    {
+      "ticker": "NFLX",
+      "tier": "Growth",
+      "status": "Owned",
+      "exposure_pct": 4.0,
+      "target_range": "3\u20136%",
+      "pos_status": "On Target",
+      "price_opp": "Pullback",
+      "action": "ADD",
+      "score": 5,
+      "pullback_pct": 30.4,
+      "above_ma200": false,
+      "shares_owned": 6000,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0.0,
+      "uncovered_shares": 6000,
+      "add_cc_contracts": 60,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "Stock Only",
+      "account": "CRT",
+      "accounts_all": [
+        "CRT"
+      ],
+      "market_value": 561600.0,
+      "mv_by_account": {
+        "CRT": 561600.0
+      },
+      "leaps": [],
       "bcs": []
     },
     {
@@ -6104,70 +6393,6 @@
       "bcs": []
     },
     {
-      "ticker": "FIX",
-      "tier": "Opportunistic",
-      "status": "Owned",
-      "exposure_pct": 0.8,
-      "target_range": "1\u20133%",
-      "pos_status": "Underweight",
-      "price_opp": "Neutral",
-      "action": "ADD",
-      "score": 5,
-      "pullback_pct": 8.3,
-      "above_ma200": true,
-      "shares_owned": 75,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0.0,
-      "uncovered_shares": 75,
-      "add_cc_contracts": 0,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "Stock Only",
-      "account": "IBKR",
-      "accounts_all": [
-        "IBKR"
-      ],
-      "market_value": 110539.0,
-      "mv_by_account": {
-        "IBKR": 110538.6
-      },
-      "leaps": [],
-      "bcs": []
-    },
-    {
-      "ticker": "NFLX",
-      "tier": "Growth",
-      "status": "Owned",
-      "exposure_pct": 4.0,
-      "target_range": "3\u20136%",
-      "pos_status": "On Target",
-      "price_opp": "Pullback",
-      "action": "ADD",
-      "score": 5,
-      "pullback_pct": 30.1,
-      "above_ma200": false,
-      "shares_owned": 6000,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0.0,
-      "uncovered_shares": 6000,
-      "add_cc_contracts": 60,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "Stock Only",
-      "account": "CRT",
-      "accounts_all": [
-        "CRT"
-      ],
-      "market_value": 562320.0,
-      "mv_by_account": {
-        "CRT": 562320.0
-      },
-      "leaps": [],
-      "bcs": []
-    },
-    {
       "ticker": "VRT",
       "tier": "Opportunistic",
       "status": "Watchlist",
@@ -6177,7 +6402,7 @@
       "price_opp": "Neutral",
       "action": "ADD",
       "score": 5,
-      "pullback_pct": 9.6,
+      "pullback_pct": 10.5,
       "above_ma200": true,
       "shares_owned": 0,
       "cc_contracts": 0,
@@ -6198,82 +6423,6 @@
       "bcs": []
     },
     {
-      "ticker": "BABA",
-      "tier": "Opportunistic",
-      "status": "Owned",
-      "exposure_pct": 0.3,
-      "target_range": "1\u20133%",
-      "pos_status": "Underweight",
-      "price_opp": "Pullback",
-      "action": "BUY",
-      "score": 5,
-      "pullback_pct": 34.8,
-      "above_ma200": false,
-      "shares_owned": 374,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0.0,
-      "uncovered_shares": 374,
-      "add_cc_contracts": 3,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "Stock Only",
-      "account": "IBKR",
-      "accounts_all": [
-        "IBKR"
-      ],
-      "market_value": 48571.0,
-      "mv_by_account": {
-        "IBKR": 48571.38
-      },
-      "leaps": [],
-      "bcs": []
-    },
-    {
-      "ticker": "CRDO",
-      "tier": "Opportunistic",
-      "status": "Owned",
-      "exposure_pct": 0.5,
-      "target_range": "1\u20133%",
-      "pos_status": "Underweight",
-      "price_opp": "Pullback",
-      "action": "BUY",
-      "score": 5,
-      "pullback_pct": 54.3,
-      "above_ma200": false,
-      "shares_owned": 636,
-      "cc_contracts": 5,
-      "shares_covered": 500,
-      "coverage_pct": 78.6,
-      "uncovered_shares": 136,
-      "add_cc_contracts": 1,
-      "csp_contracts": 10,
-      "csp_obligation": 90000.0,
-      "exp_status": "Stock + CC + CSP",
-      "account": "IBKR",
-      "accounts_all": [
-        "IBKR"
-      ],
-      "market_value": 66148.0,
-      "mv_by_account": {
-        "IBKR": 66148.33
-      },
-      "leaps": [
-        {
-          "ticker": "CRDO",
-          "strike": 70.0,
-          "contracts": 7,
-          "expiry": "20280121",
-          "expiry_fmt": "Jan 2028",
-          "dte": 665,
-          "avg_cost": 66.292693786,
-          "breakeven": 136.29,
-          "source": "ibkr"
-        }
-      ],
-      "bcs": []
-    },
-    {
       "ticker": "CLS",
       "tier": "Opportunistic",
       "status": "Owned",
@@ -6283,7 +6432,7 @@
       "price_opp": "Pullback",
       "action": "ADD",
       "score": 4,
-      "pullback_pct": 23.5,
+      "pullback_pct": 24.8,
       "above_ma200": true,
       "shares_owned": 473,
       "cc_contracts": 4,
@@ -6315,7 +6464,7 @@
       "price_opp": "Pullback",
       "action": "ADD",
       "score": 4,
-      "pullback_pct": 24.1,
+      "pullback_pct": 24.2,
       "above_ma200": true,
       "shares_owned": 3658,
       "cc_contracts": 15,
@@ -6331,10 +6480,10 @@
         "CRT",
         "IRA"
       ],
-      "market_value": 414384.0,
+      "market_value": 414219.0,
       "mv_by_account": {
-        "CRT": 66906.25,
-        "IRA": 21410.0
+        "CRT": 66781.25,
+        "IRA": 21370.0
       },
       "leaps": [],
       "bcs": []
@@ -6384,40 +6533,6 @@
       "bcs": []
     },
     {
-      "ticker": "OWL",
-      "tier": "Other",
-      "status": "Owned",
-      "exposure_pct": 0.5,
-      "target_range": "0\u20130%",
-      "pos_status": "Underweight",
-      "price_opp": "Near High",
-      "action": "HOLD",
-      "score": 2,
-      "pullback_pct": 0,
-      "above_ma200": true,
-      "shares_owned": 7600,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0.0,
-      "uncovered_shares": 7600,
-      "add_cc_contracts": 76,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "Stock Only",
-      "account": "Personal",
-      "accounts_all": [
-        "Personal",
-        "IRA"
-      ],
-      "market_value": 68552.0,
-      "mv_by_account": {
-        "Personal": 55022.0,
-        "IRA": 13530.0
-      },
-      "leaps": [],
-      "bcs": []
-    },
-    {
       "ticker": "IIPR-A",
       "tier": "Other",
       "status": "Owned",
@@ -6450,6 +6565,40 @@
       "bcs": []
     },
     {
+      "ticker": "OWL",
+      "tier": "Other",
+      "status": "Owned",
+      "exposure_pct": 0.5,
+      "target_range": "0\u20130%",
+      "pos_status": "Underweight",
+      "price_opp": "Near High",
+      "action": "HOLD",
+      "score": 2,
+      "pullback_pct": 0,
+      "above_ma200": true,
+      "shares_owned": 7600,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0.0,
+      "uncovered_shares": 7600,
+      "add_cc_contracts": 76,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "Stock Only",
+      "account": "Personal",
+      "accounts_all": [
+        "Personal",
+        "IRA"
+      ],
+      "market_value": 68704.0,
+      "mv_by_account": {
+        "Personal": 55144.0,
+        "IRA": 13560.0
+      },
+      "leaps": [],
+      "bcs": []
+    },
+    {
       "ticker": "MSTR",
       "tier": "Other",
       "status": "Owned",
@@ -6474,9 +6623,9 @@
       "accounts_all": [
         "CRT"
       ],
-      "market_value": 66985.0,
+      "market_value": 67160.0,
       "mv_by_account": {
-        "CRT": 66985.0
+        "CRT": 67160.0
       },
       "leaps": [],
       "bcs": []
@@ -6533,16 +6682,16 @@
       "coverage_pct": 0.0,
       "uncovered_shares": 1627,
       "add_cc_contracts": 16,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "Stock Only",
+      "csp_contracts": 1,
+      "csp_obligation": 33500.0,
+      "exp_status": "Stock + CSP",
       "account": "CRT",
       "accounts_all": [
         "CRT"
       ],
-      "market_value": 616283.0,
+      "market_value": 616429.0,
       "mv_by_account": {
-        "CRT": 391415.2
+        "CRT": 391561.5
       },
       "leaps": [],
       "bcs": []
@@ -6573,15 +6722,27 @@
         "CRT",
         "IRA"
       ],
-      "market_value": 513847.0,
+      "market_value": 513978.0,
       "mv_by_account": {
-        "CRT": 367593.75,
-        "IRA": 146253.3
+        "CRT": 367687.5,
+        "IRA": 146290.6
       },
-      "leaps": [],
+      "leaps": [
+        {
+          "ticker": "IBIT",
+          "strike": 20.0,
+          "contracts": 10,
+          "expiry": "20270617",
+          "expiry_fmt": "Jun 2027",
+          "dte": 447,
+          "avg_cost": 22.50662,
+          "breakeven": 42.51,
+          "source": "schwab"
+        }
+      ],
       "bcs": []
     }
   ],
-  "analysis": "**BEST TRADES**\n\n1. **Best CSP**: NVDA $160 strike, 2025-05-01, 35 DTE, $4.25/$4.40, 0.28 delta, 28.2% annualized return\n\n2. **Best CC**: NVDA $180 strike, 2025-05-01, 35 DTE, $4.65/$4.75, 0.33 delta, 28.4% annualized return\n\n3. **Best LEAPS**: NVO $25 strike, 2027-12-17, 630 DTE, $14.05/$14.55, 0.88 delta, 19.9% extrinsic (acceptable for deep ITM)\n\n4. **Bull Call Spreads**: None available\n\n5. **Peter Lynch Discovery**: None\n\n6. **IVP Environment**: 68.7% IVP across board - premium sellers' paradise, options significantly overpriced\n\n7. **Position Income CCs Worth Considering**:\n   - GOOGL $295 strike, 2025-05-15, 49 DTE, $9.90/$10.05, 26.4% annualized\n   - NVDA $180 strike, 2025-05-15, 49 DTE, $6.30/$6.40, 27.4% annualized\n\n**Hard Pass**: TSLA CC - already overweight at 4.4% vs 2.5% max\n\nAll quality checks pass. High IVP environment favors premium selling strategies heavily.",
+  "analysis": "**NVDA CSP**: 160 strike, 2026-05-01, 35 DTE, 4.25/4.40, delta 0.28, 28.2% annualized return\n\n**AAPL CC** (existing position): 265 strike, 2026-05-15, 49 DTE, 6.05/6.20, delta 0.35, 18.0% annualized return\n\n**NVO LEAPS**: 25 strike, 2027-12-17, 630 DTE, 14.05/14.55, delta 0.88, 18.9% extrinsic (acceptable for deep ITM)\n\n**No Bull Call Spreads** meet criteria\n\n**No Peter Lynch discoveries** flagged\n\n**IVP Environment**: 68.7% across all names - premium sellers' paradise with elevated volatility rewarding patient income strategies\n\n**Quality Notes**: NVDA CSP excellent despite below 200MA warning - 23% pullback with 69% IVP creates compelling risk/reward at 160 support level",
   "total_opps": 11
 }
