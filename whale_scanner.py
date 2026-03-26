@@ -404,15 +404,21 @@ def schwab_parse_positions(accounts: list) -> dict:
                     continue
                 avg  = float(pos.get("averagePrice", 0) or 0)
                 mval = float(pos.get("marketValue",  0) or 0)
-                if ticker in holdings:
+                if ticker in holdings and holdings[ticker].get("asset_class") == "STK":
                     holdings[ticker]["quantity"]     += qty
                     holdings[ticker]["market_value"] += mval
+                    # Track per-account breakdown
+                    _by_acct = holdings[ticker].setdefault("mv_by_account", {})
+                    _by_acct[acc_label] = _by_acct.get(acc_label, 0) + mval
+                    # Use the account with the largest holding as primary label
+                    holdings[ticker]["account_type"] = max(_by_acct, key=_by_acct.get)
                 else:
                     holdings[ticker] = {
                         "quantity":     qty,
                         "avg_cost":     avg,
                         "market_value": mval,
                         "account_type": acc_label,
+                        "mv_by_account":{acc_label: mval},
                         "asset_class":  "STK",
                     }
 
@@ -4102,13 +4108,23 @@ def run_scanner():
     # Spec: strict rules for ownership, exclusions, grouping, action logic
 
     # ── Build exposure map: combined IBKR + Schwab (Spec §3) ──
-    exposure_map = {}
+    exposure_map  = {}
+    mv_map_total  = {}  # total market value per ticker across all accounts
+    mv_map_acct   = {}  # market value per ticker per account {ticker: {acct: mv}}
     for ticker, pos in ibkr.items():
         if pos.get("asset_class") == "STK":
-            mv = float(pos.get("market_value", 0) or 0)
+            mv   = float(pos.get("market_value", 0) or 0)
+            acct = pos.get("account_type", "") or "IBKR"
             if mv > 0 and PORTFOLIO_SIZE > 0:
                 t = ticker.replace("BRK B","BRK-B").strip()
                 exposure_map[t] = round(mv / PORTFOLIO_SIZE * 100, 1)
+                mv_map_total[t] = mv_map_total.get(t, 0) + mv
+                # Use pre-built per-account breakdown if available, else use single account
+                by_acct = pos.get("mv_by_account", {acct: mv})
+                if t not in mv_map_acct:
+                    mv_map_acct[t] = {}
+                for _a, _mv in by_acct.items():
+                    mv_map_acct[t][_a] = mv_map_acct[t].get(_a, 0) + _mv
 
     # ── Apply grouped ticker rule (Spec §6) ──
     # GOOG + GOOGL → combined exposure under GOOGL
@@ -4122,11 +4138,38 @@ def run_scanner():
         if sym in EXCLUDED_SYMBOLS:
             exposure_map.pop(sym)
 
+    # ── Build account_map: ticker -> account label ──────────────
+    account_map = {}
+    for _t, _p in ibkr.items():
+        if _p.get("asset_class") == "STK":
+            _acct = _p.get("account_type", "") or "IBKR"
+            _tk   = _t.replace("BRK B","BRK-B").strip()
+            if _tk not in account_map:
+                account_map[_tk] = _acct
+    # Also pick up account for tickers held via options only (no stock)
+    for _optpos in (portfolio_exposure.get("csp_positions", []) +
+                    portfolio_exposure.get("cc_positions", []) +
+                    portfolio_exposure.get("leaps_positions", [])):
+        _tk = _optpos.get("ticker", "")
+        if _tk and _tk not in account_map:
+            # Find account from the option position in ibkr dict
+            for _sym, _ipos in ibkr.items():
+                if (_ipos.get("asset_class") == "OPT" and
+                        _ipos.get("underlying","").upper() == _tk.upper()):
+                    _a = _ipos.get("account_type", "") or ""
+                    if _a:
+                        account_map[_tk] = _a
+                        break
+            if _tk not in account_map:
+                account_map[_tk] = "IBKR"
+
     # ── Ownership precedence rule (Spec §5) ──
-    # All owned tickers come from live positions — watchlist fills the rest
+    # owned_tickers includes ALL stocks with market value (universe + non-universe)
     owned_tickers    = set(exposure_map.keys())
     watchlist_tickers = set(ALL_TICKERS) - EXCLUDED_SYMBOLS - set(GROUPED_TICKERS.keys())
-    all_allocation_tickers = owned_tickers | watchlist_tickers
+    # Tickers with options but no stock position
+    option_only_tickers = set(account_map.keys()) - owned_tickers - EXCLUDED_SYMBOLS
+    all_allocation_tickers = owned_tickers | watchlist_tickers | option_only_tickers
     print(f"   📋 Allocation: {len(owned_tickers)} owned, {len(watchlist_tickers)} watchlist, {len(EXCLUDED_SYMBOLS)} excluded")
     # Debug account labels
     _acct_debug = {}
@@ -4250,6 +4293,9 @@ def run_scanner():
             "csp_obligation":  _csp_obligation,
             "exp_status":      _exp_status,
             "account":         _account,
+            # Market value: total and per-account
+            "market_value":    round(mv_map_total.get(ticker, 0), 0),
+            "mv_by_account":   mv_map_acct.get(ticker, {}),
             # LEAPS positions for this ticker
             "leaps":           [p for p in portfolio_exposure.get("leaps_positions",[]) if p["ticker"]==ticker],
             # BCS positions for this ticker (long legs only for display)
