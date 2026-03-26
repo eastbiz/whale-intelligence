@@ -500,6 +500,15 @@ def schwab_get_accounts() -> list:
                 "positions":       sec.get("positions", []),
             })
         print(f"   Schwab accounts: {len(result)} ✓")
+        for _acc in result:
+            _pos_count = len(_acc.get("positions", []))
+            _acct_id   = _acc.get("account_id","")
+            _acct_type = _acc.get("account_type","")
+            _stk = sum(1 for p in _acc.get("positions",[])
+                       if p.get("instrument",{}).get("assetType") in ("EQUITY","ETF","COLLECTIVE_INVESTMENT"))
+            _opt = sum(1 for p in _acc.get("positions",[])
+                       if p.get("instrument",{}).get("assetType") == "OPTION")
+            print(f"     Account {_acct_id} ({_acct_type}): {_pos_count} positions ({_stk} stocks, {_opt} options)")
         return result
     except Exception as e:
         print(f"   Schwab accounts error: {e}")
