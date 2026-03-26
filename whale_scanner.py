@@ -395,13 +395,22 @@ def schwab_parse_positions(accounts: list) -> dict:
         for pos in acc.get("positions", []):
             inst  = pos.get("instrument", {})
             asset = inst.get("assetType", "")
+            ticker_dbg = inst.get("symbol","")
+            if asset not in ("EQUITY","ETF","COLLECTIVE_INVESTMENT","OPTION","FIXED_INCOME","MUTUAL_FUND"):
+                print(f"     Unknown assetType: {asset!r} for {ticker_dbg!r}")
 
-            # ── Stocks / ETFs ──────────────────────────────────
-            if asset in ("EQUITY", "ETF", "COLLECTIVE_INVESTMENT"):
+            # ── Stocks / ETFs / Preferred / REITs ──────────────
+            if asset in ("EQUITY", "ETF", "COLLECTIVE_INVESTMENT",
+                         "FIXED_INCOME", "MUTUAL_FUND"):
                 ticker = inst.get("symbol", "").replace("/", "-")
                 qty    = float(pos.get("longQuantity", 0) or 0)
-                if qty <= 0:
+                # Also check shortQuantity for short stock positions
+                short_stk_qty = float(pos.get("shortQuantity", 0) or 0)
+                if qty <= 0 and short_stk_qty <= 0:
+                    print(f"     Skipping {inst.get('symbol','')} ({asset}): longQty={qty} shortQty={short_stk_qty}")
                     continue
+                if qty <= 0 and short_stk_qty > 0:
+                    qty = short_stk_qty  # short stock position
                 avg  = float(pos.get("averagePrice", 0) or 0)
                 mval = float(pos.get("marketValue",  0) or 0)
                 if ticker in holdings and holdings[ticker].get("asset_class") == "STK":
