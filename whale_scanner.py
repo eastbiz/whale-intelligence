@@ -4169,9 +4169,10 @@ def run_scanner():
 
         tier = ("Core" if ticker in CORE_STOCKS else
                 "Growth" if ticker in GROWTH_STOCKS else
-                "Cyclical" if ticker in CYCLICAL_STOCKS else "Opportunistic")
+                "Cyclical" if ticker in CYCLICAL_STOCKS else
+                "Opportunistic" if ticker in OPPORTUNISTIC_STOCKS else "Other")
 
-        target_low, target_high = TARGET_RANGES.get(tier, (1.0, 3.0))
+        target_low, target_high = TARGET_RANGES.get(tier, (0.0, 0.0))
         exposure = exposure_map.get(ticker, 0.0)
 
         # Ownership precedence (Spec §5): any exposure > 0 = Owned
@@ -4209,10 +4210,9 @@ def run_scanner():
         _csp_contracts = sum(p["contracts"] for p in portfolio_exposure.get("csp_positions", []) if p["ticker"] == ticker)
         _csp_obligation= sum(p["cso"]       for p in portfolio_exposure.get("csp_positions", []) if p["ticker"] == ticker)
         # Account source
-        # account_type is already resolved to a human label by schwab_parse_positions
-        # IBKR positions have no account_type — default to "IBKR"
+        # Use account_map which covers both stock and option-only positions
         _raw_acct = _stk_pos.get("account_type", "") or ""
-        _account  = _raw_acct if _raw_acct else "IBKR"
+        _account  = account_map.get(ticker, _raw_acct if _raw_acct else "IBKR")
         # Status label
         _has_stock = _shares_owned > 0
         _has_cc    = _cc_contracts > 0
