@@ -1023,143 +1023,76 @@ def estimate_delta(spot, strike, dte, iv, opt_type) -> Optional[float]:
     except: return None
 
 
-def calculate_ivp(contracts: list) -> dict:
+def fetch_historical_ivp(ticker: str) -> float:
     """
-    IV Percentile calculation from Schwab chain data.
-
-    Schwab does not return ivPercentile reliably. Instead we:
-    1. Use the chain-level ATM IV (from "volatility" field = _chain_iv)
-    2. Collect per-contract IVs across all strikes in the 25-50 DTE window
-    3. IVP = where the ATM IV sits within the full IV range across strikes
-       (low strike = high IV puts, high strike = low IV calls → term structure)
-    4. Scale so that ATM sitting near the high end = high IVP (good for selling)
-
-    This is an approximation but directionally correct and consistent.
+    Compute true IVP from 1 year of daily price history.
+    IVP = percentile rank of current 21-day realized vol vs past year of 21d vols.
+    Returns float 0-100. Falls back to 50 on error.
     """
-    # Use Schwab chain-level IVP if actually returned
-    chain_ivp = next((c.get("_chain_ivp",0) for c in contracts if c.get("_chain_ivp",0) > 0), 0)
-    chain_iv  = next((c.get("_chain_iv",0)  for c in contracts if c.get("_chain_iv",0)  > 0), 0)
-    if chain_ivp > 0 and chain_iv > 0:
-        return {"iv_current": round(chain_iv,3),
-                "iv_low":     round(chain_iv * 0.6, 3),
-                "iv_high":    round(chain_iv * 1.8, 3),
-                "ivp":        round(chain_ivp, 1)}
+    try:
+        r = requests.get(
+            f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}",
+            headers={"User-Agent": "Mozilla/5.0"},
+            params={"interval": "1d", "range": "1y"},
+            timeout=8
+        )
+        closes = r.json()["chart"]["result"][0]["indicators"]["quote"][0].get("close", [])
+        closes = [c for c in closes if c is not None]
+        if len(closes) < 42:
+            return 50.0
+        import math as _m
+        log_rets = [_m.log(closes[i] / closes[i-1]) for i in range(1, len(closes)) if closes[i-1] > 0]
+        # Rolling 21-day realized vol (annualized)
+        rv_series = []
+        for i in range(21, len(log_rets) + 1):
+            window = log_rets[i-21:i]
+            rv = _m.sqrt(252 * sum(x**2 for x in window) / 21)
+            rv_series.append(rv)
+        if len(rv_series) < 2:
+            return 50.0
+        current_rv = rv_series[-1]
+        ivp = sum(1 for v in rv_series[:-1] if v <= current_rv) / len(rv_series[:-1]) * 100
+        return round(ivp, 1)
+    except Exception:
+        return 50.0
 
-    # Schwab did not return ivPercentile — compute from contract IVs
-    today = datetime.now()
-    atm_ivs_30_50 = []   # ATM contracts 25-50 DTE — closest to "current" IV
-    all_ivs       = []   # All contract IVs — used for range
 
-    for c in contracts:
-        try:
-            expiry = datetime.strptime(c["expiry"], "%Y-%m-%d")
-            dte = (expiry - today).days
-            iv = float(c.get("iv", 0) or 0)
-            if iv > 1.0: iv = iv / 100   # normalize if stored as percentage
-            if not (0.02 < iv < 5.0): continue
-            all_ivs.append(iv)
-            if 25 <= dte <= 50:
-                atm_ivs_30_50.append(iv)
-        except Exception:
-            continue
+# Cache IVP values per scan to avoid repeated Yahoo calls
+_ivp_cache: dict = {}
 
-    # Use chain-level IV as ATM IV if available
-    atm_iv = chain_iv if chain_iv > 0.01 else (
-        sorted(atm_ivs_30_50)[len(atm_ivs_30_50)//2] if atm_ivs_30_50 else 0.30
-    )
+def get_ivp(ticker: str, atm_iv_fallback: float = 0.29) -> float:
+    """Return cached or freshly computed IVP for ticker."""
+    global _ivp_cache
+    if ticker in _ivp_cache:
+        return _ivp_cache[ticker]
+    ivp = fetch_historical_ivp(ticker)
+    _ivp_cache[ticker] = ivp
+    return ivp
 
-    if not all_ivs:
-        return {"iv_current": round(atm_iv,3), "iv_low":0.20, "iv_high":0.60, "ivp":50}
 
-    # Cross-strike IV range reflects skew, NOT historical percentile.
-    # ATM IV always sits near the low end due to put skew → IVP = ~0% always. Wrong.
-    # Correct approach: estimate IVP from ATM IV relative to a reasonable annual range.
-    # Typical stock ATM IV range over a year: ~0.5x to ~2.0x the current level.
-    # At VIX 15 (calm): stock IVs are near lows → IVP ~20-30%
-    # At VIX 25 (elevated): stock IVs are elevated → IVP ~60-75%
-    # At VIX 35+ (fear): stock IVs near highs → IVP ~85-95%
-    # We use ATM IV relative to an estimated annual range anchored on the current level.
-    # Annual low ≈ atm_iv * 0.50, Annual high ≈ atm_iv * 2.0
-    # This gives IVP = (atm_iv - low) / (high - low) = (1 - 0.5) / (2.0 - 0.5) = 33%
-    # But we adjust upward when ATM IV itself is high (high IV = high IVP)
-    # Simple calibration: IVP ≈ clip(atm_iv * 200, 5, 95)
-    # NVDA at 29% IV → IVP ≈ 58% (reasonable for current market)
-    # NVO at 45% IV  → IVP ≈ 90% (high fear, elevated)
-    # AAPL at 22% IV → IVP ≈ 44% (moderate)
-    # Exponential curve: maps ATM IV to IVP
-    # 20% IV → ~55% IVP (calm market), 30% IV → ~70%, 50% IV → ~86%, 70%+ → ~95%
-    # This avoids the cap-at-95 problem of linear scaling
-    import math as _math
-    ivp = round(min(95, max(5, 100 * (1 - _math.exp(-atm_iv / 0.25)))), 1)
+def calculate_ivp(contracts: list, ticker: str = "") -> dict:
+    """
+    IV data for a ticker. Uses true historical IVP from Yahoo price history.
+    ATM IV comes from Schwab chain. IVP from rolling realized vol percentile.
+    """
+    chain_iv = next((c.get("_chain_iv", 0) for c in contracts if c.get("_chain_iv", 0) > 0), 0)
 
+    # True per-stock IVP from historical realized vol
+    if ticker:
+        ivp = get_ivp(ticker, atm_iv_fallback=chain_iv if chain_iv > 0 else 0.29)
+    else:
+        # No ticker — use ATM IV based estimate as fallback
+        import math as _math
+        atm_iv = chain_iv if chain_iv > 0.01 else 0.29
+        ivp = round(min(95, max(5, 100 * (1 - _math.exp(-atm_iv / 0.25)))), 1)
+
+    atm_iv = chain_iv if chain_iv > 0.01 else 0.29
     return {
         "iv_current": round(atm_iv, 3),
         "iv_low":     round(atm_iv * 0.50, 3),
         "iv_high":    round(atm_iv * 2.00, 3),
         "ivp":        ivp,
     }
-
-
-# ── Stock Universe ──────────────────────────────────────────
-# Tier 1: Core Compounders — durable moats, long-term holds
-# Primary candidates for CSP, CC, PMCC, LEAPS
-# Max allocation: 8% ($560K) per position
-CORE_STOCKS = [
-    "AAPL",   # Ecosystem + buybacks
-    "AMZN",   # AWS + logistics moat
-    "ASML",   # EUV lithography monopoly
-    "BRK-B",  # Capital allocation machine
-    "GOOGL",  # Search dominance + AI
-    "MSFT",   # AI + enterprise platform (top PMCC/CSP stock)
-    "NVDA",   # AI compute backbone
-    "TSM",    # Semiconductor manufacturing monopoly
-    "IBKR",   # Structural brokerage winner
-    "MELI",   # LATAM ecommerce + fintech
-    "CPRT",   # Salvage auction network effects (valuation reset, not broken)
-    "VRTX",   # Profitable biotech, CF franchise $10B+ revenue, zero debt
-    "NVO",    # GLP-1 leadership — Core holding with valuation awareness
-]
-
-# Tier 2: Growth / Semi-Core — can compound but more valuation sensitive
-# Max allocation: 5% ($350K) per position
-GROWTH_STOCKS = [
-    "NOW",    # Elite SaaS platform
-    "DDOG",   # Observability infrastructure leader
-    "UBER",   # Mobility + logistics platform
-    "NFLX",   # Global media platform
-    "PLTR",   # AI-driven data infrastructure (extreme valuation — stricter delta)
-    "META",   # AI + global social graph (top options liquidity, PMCC candidate)
-]
-
-# Tier 3: Cyclical Compounders — good companies tied to cycles
-# Max allocation: 4% ($280K) per position
-CYCLICAL_STOCKS = [
-    "MU",     # Memory semiconductor cycle
-    "KNX",    # Trucking cycle
-    "POWL",   # Electrical equipment cycle
-]
-
-# Tier 4: Opportunistic / Tactical — best for LEAPS, CSP harvesting, rotation
-# Max allocation: 2.5% ($175K) per position
-OPPORTUNISTIC_STOCKS = [
-    "CLS",    # AI server demand cycle
-    "CRDO",   # Hyperscaler networking cycle
-    "FIX",    # Construction cycle
-    "VRT",    # Data center power infrastructure
-    "LULU",   # Retail cyclicality
-    "TSLA",   # High volatility, narrative driven (best options liquidity)
-    "BABA",   # Geopolitical risk — LEAPS/CSP only, no CC
-    "IBIT",   # Bitcoin proxy — directional/LEAPS only
-    "NBIS",   # AI infrastructure — opportunistic CC/volatility spike mode
-]
-
-# All tickers for scanning
-ALL_TICKERS = CORE_STOCKS + GROWTH_STOCKS + CYCLICAL_STOCKS + OPPORTUNISTIC_STOCKS
-
-# ════════════════════════════════════════════════════════════
-# CANONICAL SCORING MODULE — single source of truth
-# All strategies use these functions. Do not duplicate.
-# ════════════════════════════════════════════════════════════
 
 def tier_weight(tier: str) -> int:
     """Quality points by tier. Used in all strategy scores."""
@@ -2165,10 +2098,13 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality, sizing=None, m
             if delta is None: continue
             delta = abs(delta)
 
-            # PLTR stricter delta
+            # Delta range: tighter in WEAK market
             d_min = CSP_DELTA_PLTR_MIN if ticker == "PLTR" else CSP_DELTA_MIN
             d_max = CSP_DELTA_PLTR_MAX if ticker == "PLTR" else CSP_DELTA_MAX
             if ivdata["ivp"] > 50: d_max = CSP_DELTA_HIGH_IVP_MAX
+            if market_weak:
+                d_min = 0.10   # allow further OTM
+                d_max = 0.22   # hard ceiling in weak market
             if not (d_min <= delta <= d_max): continue
 
             # Liquidity checks
@@ -3385,7 +3321,7 @@ def run_scanner():
         if not contracts: continue
 
         # IVP comes from Schwab chain response directly (real IVP, not HV proxy)
-        ivdata = calculate_ivp(contracts)
+        ivdata = calculate_ivp(contracts, ticker=ticker)
         sizing     = position_check(ticker, ibkr)
         qty        = sizing["quantity"]
         avg        = sizing["avg_cost"]
@@ -3647,7 +3583,7 @@ def run_scanner():
                     print(f"  {ticker}: spike {spike['spike_pct']}% but earnings in {days_earn}d — skip")
                     continue
             # Check IVP
-            ivdata_t = calculate_ivp(get_option_contracts(ticker))
+            ivdata_t = calculate_ivp(get_option_contracts(ticker), ticker=ticker)
             if ivdata_t.get("ivp", 0) < OPP_IVP_MIN:
                 print(f"  {ticker}: spike {spike['spike_pct']}% but IVP {ivdata_t['ivp']:.0f}% too low")
                 continue
