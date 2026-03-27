@@ -4184,6 +4184,20 @@ def run_scanner():
                 leaps_entry["score"] = score_leaps(leaps_entry)
                 leaps_entry["normalized"] = normalized_score(leaps_entry["score"], "LEAPS")
                 leaps_entry["quality_label"] = quality_label(leaps_entry["score"], SCORE_MAX["LEAPS"])
+                # Add trend classifier to dashboard LEAPS entry
+                try:
+                    _trend_d  = leaps_trend_state(ticker, price)
+                    _w52h_d   = md.get("week52_high", price * 1.3)
+                    _ta_d     = leaps_trend_action(_trend_d, ivp_d, price, _w52h_d)
+                    leaps_entry["trend_label"]  = _ta_d["label"]
+                    leaps_entry["trend_signal"] = _ta_d["signal"]
+                    leaps_entry["trend_action"] = _ta_d["action"]
+                    print(f"   LEAPS trend {ticker}: {_ta_d['label']}")
+                except Exception as _te:
+                    leaps_entry["trend_label"]  = "WATCH"
+                    leaps_entry["trend_signal"] = f"Trend error: {_te}"
+                    leaps_entry["trend_action"] = "WATCH"
+                    print(f"   LEAPS trend error {ticker}: {_te}")
                 dashboard_leaps.append(leaps_entry)
 
     # Apply unified score for cross-strategy normalization (patch 5)
