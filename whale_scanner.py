@@ -1235,27 +1235,47 @@ def score_csp(opp: dict) -> int:
     """
     Canonical CSP score (max 12):
     Tier(3) + Delta(3) + IVP(2) + Pullback(2) + Income(2) - Penalties
+
+    Market regime adjustment:
+    WEAK (SPY below 50MA or 200MA): penalize high delta + short DTE, reward low delta
+    NORMAL: standard delta range 0.20-0.30
     """
     s = tier_weight(opp.get("tier",""))
-    # Delta: CONSTRAINT not scoring driver (patch guide section 3)
-    d = abs(opp.get("delta", 0))
-    if d > 0.35:            s -= 2   # hard penalty — above ceiling
-    elif d > 0.30:          s -= 1   # soft penalty — getting aggressive
-    # 0.15-0.30 = acceptable, no bonus for delta itself
+
+    d       = abs(opp.get("delta", 0))
+    dte     = opp.get("dte", 30)
+    market_weak = opp.get("market_weak", False)
+
+    if market_weak:
+        # WEAK regime: prefer delta 0.10-0.20, penalize > 0.20
+        if d > 0.25:        s -= 3   # strong penalty — too aggressive in weak market
+        elif d > 0.20:      s -= 2   # moderate penalty
+        elif d <= 0.15:     s += 1   # reward conservative delta
+        # Short DTE in weak market = dangerous
+        if dte < 30:        s -= 2   # additional penalty for short duration
+        elif dte >= 45:     s += 1   # reward longer duration
+    else:
+        # NORMAL regime: standard scoring
+        if d > 0.35:        s -= 2   # hard penalty
+        elif d > 0.30:      s -= 1   # soft penalty
+        # 0.15-0.30 = acceptable, no bonus for delta itself
+
     # IVP quality — CSP: higher IVP = better premium for selling
     ivp = opp.get("ivp", 0)
-    if ivp >= 40:            s += 2   # good/elevated = excellent for selling
-    elif ivp >= 20:          s += 1   # moderate = ok
-    # <20 = 0 (low IVP = thin premium environment)
+    if ivp >= 40:            s += 2
+    elif ivp >= 20:          s += 1
+
     # Pullback quality
     pb = opp.get("pullback_pct", 0)
     if pb > 15:             s += 2
     elif pb > 8:            s += 1
+
     # Income quality
     ann = opp.get("annualized_return", 0)
     if 15 <= ann <= 35:     s += 2
     elif 8 <= ann < 15:     s += 1
     elif ann > 35:          s += 1
+
     # Timing penalties
     warnings = opp.get("warnings", [])
     if ">8% above MA50" in warnings:  s -= 2
@@ -2109,7 +2129,7 @@ def get_max_alloc(ticker: str) -> float:
     else:                            return 0.025
 
 
-def find_best_csp(ticker, price, contracts, ivdata, pir, quality, sizing=None) -> tuple:
+def find_best_csp(ticker, price, contracts, ivdata, pir, quality, sizing=None, market_weak=False) -> tuple:
     """
     Find best cash-secured put opportunity.
     Returns (csp_dict, timing_dict) or (None, {})
@@ -2178,9 +2198,10 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality, sizing=None) -
             timing = timing_score("CSP", pir, ivdata["ivp"])
             # Canonical score — delta and annualized are not multiplied
             _s = {"tier": quality.get("tier", "Opportunistic") if quality else "Opportunistic",
-                  "delta": delta, "ivp": ivdata["ivp"],
+                  "delta": delta, "dte": dte, "ivp": ivdata["ivp"],
                   "annualized_return": annualized,
                   "pullback_pct": (1 - pir) * 100,
+                  "market_weak": market_weak,
                   "warnings": []}
             score = score_csp(_s)
             candidates.append({
@@ -3248,15 +3269,22 @@ def run_scanner():
     spy_price  = spy_md.get("price", 0)
     spy_ma200  = spy_md.get("ma200", 0)
     spy_above  = spy_price >= spy_ma200 if spy_ma200 > 0 else True
+    spy_ma50   = spy_md.get("ma50", 0)
+    spy_above_ma50 = spy_price >= spy_ma50 if spy_ma50 > 0 else True
+    market_weak = not spy_above or not spy_above_ma50  # WEAK if below either MA
     spy_regime = {
-        "above_ma200": spy_above,
-        "spy":         spy_price,
-        "ma200":       round(spy_ma200, 2),
+        "above_ma200":    spy_above,
+        "above_ma50":     spy_above_ma50,
+        "market_weak":    market_weak,
+        "spy":            spy_price,
+        "ma200":          round(spy_ma200, 2),
+        "ma50":           round(spy_ma50, 2),
         "label": (f"✅ S&P 500 above 200MA (${spy_ma200:.0f}) — Normal environment"
                   if spy_above else
                   f"⚠️ S&P 500 BELOW 200MA (${spy_ma200:.0f}) — Risk regime: reduce size, lower delta")
     }
     print(f"   {spy_regime['label']}")
+    print(f"   Market regime: {'⚠️ WEAK' if spy_regime.get('market_weak') else '✅ NORMAL'} (SPY {'above' if spy_regime.get('above_ma50') else 'BELOW'} 50MA, {'above' if spy_above else 'BELOW'} 200MA) — CSP delta preference: {'0.10–0.20' if spy_regime.get('market_weak') else '0.20–0.30'}")
 
     print("   😱 Fetching VIX...")
     vix_data   = get_vix()
@@ -3394,7 +3422,7 @@ def run_scanner():
             q_adjusted = dict(quality)
             if gng.get("spy_warning"):
                 q_adjusted["quality_score"] = max(0, quality["quality_score"] - 1)
-            csp, _ = find_best_csp(ticker, price, contracts, ivdata, pir, q_adjusted, sizing=sizing)
+            csp, _ = find_best_csp(ticker, price, contracts, ivdata, pir, q_adjusted, sizing=sizing, market_weak=spy_regime.get('market_weak', False))
             if csp:
                 # below_min trades still shown but scored lower
                 score_mult = 0.5 if csp.get("below_min") else 1.0
@@ -3406,7 +3434,8 @@ def run_scanner():
                       "warnings": [],
                       "breakeven": csp.get("strike",0) - csp.get("premium",0)}
                 csp_opps.append({**base,"csp":csp,
-                    "score": score_csp(_s) * (0.5 if csp.get("below_min") else 1.0)})
+                    "market_weak": spy_regime.get("market_weak", False),
+                    "score": score_csp({**_s, "market_weak": spy_regime.get("market_weak", False)}) * (0.5 if csp.get("below_min") else 1.0)})
                 print(f"  [{tier}] {ticker}: 💰 CSP ${csp['strike']} {csp['annualized_return']}% ann δ{csp['delta']} IVP{ivdata['ivp']:.0f}%")
 
         # ── Position Income Optimization (Mode 4) ──────────────
