@@ -1374,6 +1374,33 @@ def score_unified(opp: dict, mode: str = "CSP") -> float:
     return round(raw * 10, 2)  # scale to 0-10
 
 
+# ── Stock universe ────────────────────────────────────────────────────────────
+CORE_STOCKS = {
+    "AAPL", "AMZN", "GOOGL", "MSFT", "NVDA", "TSM", "ASML",
+    "MELI", "NVO", "VRTX", "IBKR", "CPRT", "BRK-B",
+}
+GROWTH_STOCKS = {
+    "META", "NOW", "DDOG", "UBER", "NFLX", "PLTR",
+}
+CYCLICAL_STOCKS = {
+    "MU", "KNX", "POWL",
+}
+OPPORTUNISTIC_STOCKS = {
+    "CLS", "CRDO", "FIX", "VRT", "LULU", "TSLA", "BABA", "IBIT", "NBIS", "MSTR",
+}
+
+ALL_TICKERS = sorted(
+    CORE_STOCKS | GROWTH_STOCKS | CYCLICAL_STOCKS | OPPORTUNISTIC_STOCKS
+)
+
+TARGET_RANGES = {
+    "Core":          (5.0, 10.0),
+    "Growth":        (3.0,  6.0),
+    "Cyclical":      (2.0,  5.0),
+    "Opportunistic": (1.0,  3.0),
+    "Other":         (0.0,  0.0),
+}
+
 # Speculative — wider OTM buffers required
 SPECULATIVE = {"IBIT", "BABA", "CRDO", "LULU", "NBIS"}
 
