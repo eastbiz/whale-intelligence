@@ -3857,8 +3857,9 @@ def run_scanner():
                 if annualized < 5 or annualized > 200: continue
                 otm_pct = round((price - strike) / price * 100, 1)
                 iv = round(float(c.get("iv", 0) or 0) * 100, 1)
-                _s = {"tier": "Opportunistic", "delta": delta, "ivp": 50,
-                      "annualized_return": annualized, "pullback_pct": 0, "warnings": []}
+                _s = {"tier": "Opportunistic", "delta": delta, "dte": dte, "ivp": 50,
+                      "annualized_return": annualized, "pullback_pct": 0,
+                      "market_weak": spy_regime.get("market_weak", False), "warnings": []}
                 score = score_csp(_s)
                 if score > best_score:
                     best_score = score
@@ -3983,9 +3984,10 @@ def run_scanner():
                 ann = (mid/strike)*(365/dte)*100
                 if ann < 3 or ann > 300: continue
                 # Canonical CSP score — no premium/day bias
-                _s = {"tier": tier, "delta": delta, "ivp": ivp_d,
+                _s = {"tier": tier, "delta": delta, "dte": dte, "ivp": ivp_d,
                       "annualized_return": ann,
                       "pullback_pct": round(pullback_t * 100, 1) if "pullback_t" in dir() else 0,
+                      "market_weak": spy_regime.get("market_weak", False),
                       "warnings": []}
                 score = score_csp(_s)
                 if score > best_csp_score:
@@ -4023,6 +4025,7 @@ def run_scanner():
                 "signal":f"{pullback:.0f}% off highs",  # IVP shown in header
                 "risk_note":", ".join(warnings) if warnings else None,
             }
+            csp_entry["market_weak"] = spy_regime.get("market_weak", False)
             csp_entry["score"] = score_csp(csp_entry)
             csp_entry["normalized"] = normalized_score(csp_entry["score"], "CSP")
             csp_entry["quality_label"] = quality_label(csp_entry["score"], SCORE_MAX["CSP"])
