@@ -4603,6 +4603,30 @@ def run_scanner():
         o["candidate_type"] = "execution" if o.get("passes_quality") and not o.get("below_min") and not o.get("warnings") else "review"
         review_candidates.append(o)
 
+    # Patch trend data into review_candidates LEAPS entries that are missing it
+    # Build a lookup from ticker -> trend data from all_opps (which has trend fields)
+    _trend_lookup = {o["ticker"]: o for o in all_opps if o.get("mode") == "LEAPS" and o.get("trend_label")}
+    for _o in review_candidates:
+        if _o.get("mode") == "LEAPS" and not _o.get("trend_label"):
+            if _o["ticker"] in _trend_lookup:
+                _src = _trend_lookup[_o["ticker"]]
+                _o["trend_label"]  = _src.get("trend_label", "")
+                _o["trend_signal"] = _src.get("trend_signal", "")
+                _o["trend_action"] = _src.get("trend_action", "WATCH")
+            else:
+                # Run classifier fresh for this ticker
+                try:
+                    _tr = leaps_trend_state(_o["ticker"], _o["price"])
+                    _w  = mkt.get(_o["ticker"], {}).get("week52_high", _o["price"] * 1.3)
+                    _ta = leaps_trend_action(_tr, _o["ivp"], _o["price"], _w)
+                    _o["trend_label"]  = _ta["label"]
+                    _o["trend_signal"] = _ta["signal"]
+                    _o["trend_action"] = _ta["action"]
+                except Exception:
+                    _o["trend_label"]  = "WATCH"
+                    _o["trend_signal"] = ""
+                    _o["trend_action"] = "WATCH"
+
     # Aggregate premium totals into exposure block
     _prem_csp = sum(o.get("sizing",{}).get("premium_received",0) for o in all_opps if o.get("mode") in ("CSP","DROP_CSP"))
     _prem_cc  = sum(o.get("sizing",{}).get("premium_received",0) for o in all_opps if o.get("mode") in ("CC","PIO","SPIKE_CC"))
