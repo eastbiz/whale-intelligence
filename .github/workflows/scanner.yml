@@ -74,16 +74,19 @@ jobs:
           SCHWAB_ACCESS_TOKEN:   ${{ secrets.SCHWAB_ACCESS_TOKEN }}
         run: python whale_scanner.py
 
-- name: Commit results
+      - name: Commit results
         run: |
           git config user.name "whale-scanner"
           git config user.email "scanner@whale-intelligence"
           if [ -f results.json ]; then
             git add -f results.json
-            git diff --staged --quiet && echo "No changes to commit" && exit 0
-            git commit -m "scan results $(date -u '+%Y-%m-%d %H:%M UTC')"
-            git push origin main || (git pull --rebase origin main && git push origin main)
-            echo "results.json committed OK"
+            if git diff --staged --quiet; then
+              echo "No changes to commit"
+            else
+              git commit -m "scan results $(date -u '+%Y-%m-%d %H:%M UTC')"
+              git push origin main || git pull --rebase origin main && git push origin main
+              echo "results.json committed OK"
+            fi
           else
             echo "WARNING: results.json not found"
           fi
