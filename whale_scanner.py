@@ -2271,10 +2271,11 @@ def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir, already_c
 
 def leaps_trend_state(ticker: str, price: float) -> dict:
     """
-    Classify recent price behavior to determine LEAPS entry timing.
-    Returns state, action label, and signal text.
+    Classify recent price behavior for LEAPS timing.
+    States: AT_LOWS | STILL_FALLING | REAL_BOUNCE | BASE_FORMING
 
-    States: FALLING | FAKE_BOUNCE | STABILIZING | REAL_BOUNCE
+    Evaluated strict top-down. First match wins.
+    Default: STILL_FALLING (conservative).
     """
     try:
         r = requests.get(
@@ -2287,105 +2288,102 @@ def leaps_trend_state(ticker: str, price: float) -> dict:
         closes = data["indicators"]["quote"][0].get("close", [])
         closes = [c for c in closes if c is not None]
         if len(closes) < 6:
-            return {"state": "UNKNOWN", "action": "WATCH", "signal": "Insufficient history"}
+            return {"state": "STILL_FALLING", "r1": 0, "r3": 0, "r5": 0, "off_low_5d": 0}
 
-        today        = closes[-1]
-        p1d          = closes[-2]
-        p3d          = closes[-4]  if len(closes) >= 4  else closes[0]
-        p5d          = closes[-6]  if len(closes) >= 6  else closes[0]
-        p10d         = closes[-11] if len(closes) >= 11 else closes[0]
-        recent_low   = min(closes[-5:])
+        today      = closes[-1]
+        p1d        = closes[-2]
+        p3d        = closes[-4] if len(closes) >= 4 else closes[0]
+        p5d        = closes[-6] if len(closes) >= 6 else closes[0]
+        recent_low = min(closes[-5:])
 
-        r1           = (today - p1d)  / p1d
-        r3           = (today - p3d)  / p3d
-        r5           = (today - p5d)  / p5d
-        off_low_5d   = (today - recent_low) / recent_low if recent_low > 0 else 0
+        r1       = (today - p1d)  / p1d        if p1d  > 0 else 0
+        r3       = (today - p3d)  / p3d        if p3d  > 0 else 0
+        r5       = (today - p5d)  / p5d        if p5d  > 0 else 0
+        off_low  = (today - recent_low) / recent_low if recent_low > 0 else 0
 
-        # Classify
-        if r3 <= -0.05 or r5 <= -0.08:
-            state  = "FALLING"
-        elif r1 > 0 and r3 < 0 and off_low_5d < 0.03:
-            state  = "FAKE_BOUNCE"
-        elif abs(r1) < 0.01 and r3 > -0.03 and off_low_5d >= 0.02:
-            state  = "STABILIZING"
-        elif r1 > 0.01 and r3 >= 0 and off_low_5d >= 0.04:
-            state  = "REAL_BOUNCE"
+        # Strict top-down — first match wins
+        if off_low <= 0.02:
+            state = "AT_LOWS"
+        elif r3 <= -0.05 or r5 <= -0.08:
+            state = "STILL_FALLING"
+        elif r1 > 0.01 and r3 >= 0 and off_low >= 0.05:
+            state = "REAL_BOUNCE"
+        elif off_low > 0.02 and off_low < 0.05 and abs(r1) < 0.01 and r3 > -0.03:
+            state = "BASE_FORMING"
         else:
-            state  = "STABILIZING"  # default — unclear, watch
+            state = "STILL_FALLING"  # conservative default
 
         return {
-            "state":      state,
-            "r1":         round(r1 * 100, 1),
-            "r3":         round(r3 * 100, 1),
-            "r5":         round(r5 * 100, 1),
-            "off_low_5d": round(off_low_5d * 100, 1),
-            "p10d":       round(p10d, 2),
+            "state":     state,
+            "r1":        round(r1 * 100, 1),
+            "r3":        round(r3 * 100, 1),
+            "r5":        round(r5 * 100, 1),
+            "off_low_5d": round(off_low * 100, 1),
         }
     except Exception as e:
-        return {"state": "UNKNOWN", "action": "WATCH", "signal": f"History error: {e}"}
+        return {"state": "STILL_FALLING", "r1": 0, "r3": 0, "r5": 0, "off_low_5d": 0}
 
 
 def leaps_trend_action(trend: dict, ivp: float, price: float, week52_high: float) -> dict:
     """
-    Map trend state + IVP + price context to a LEAPS action recommendation.
-    Returns action label and signal string.
+    Map trend state to action. IV filter applied as modifier after classification.
+    Spec §5-6: strict top-down, first match wins, IV overrides BUY only.
     """
-    state       = trend.get("state", "UNKNOWN")
-    off_high    = (week52_high - price) / week52_high if week52_high > 0 else 0
-    r1          = trend.get("r1", 0)
-    r3          = trend.get("r3", 0)
-    off_low     = trend.get("off_low_5d", 0)
+    state   = trend.get("state", "STILL_FALLING")
+    r1      = trend.get("r1", 0)
+    r3      = trend.get("r3", 0)
+    off_low = trend.get("off_low_5d", 0)
 
-    if state == "FALLING":
+    # §5.1 AT LOWS
+    if state == "AT_LOWS":
         return {
-            "action":  "WAIT",
-            "label":   "WAIT — STILL FALLING",
-            "signal":  f"Down {abs(r3):.1f}% / 3d — wait for base",
+            "action":    "WAIT",
+            "label":     "WAIT — AT LOWS",
+            "signal":    f"Price at 5-day low ({off_low:.1f}% off low) — no base yet",
             "recommend": False,
         }
-    elif state == "FAKE_BOUNCE":
+
+    # §5.2 STILL FALLING
+    if state == "STILL_FALLING":
         return {
-            "action":  "WAIT",
-            "label":   "WAIT — FAKE BOUNCE",
-            "signal":  f"+{r1:.1f}% today but still down {abs(r3):.1f}% / 3d, only {off_low:.1f}% off low",
+            "action":    "WAIT",
+            "label":     "WAIT — STILL FALLING",
+            "signal":    f"Down {abs(r3):.1f}% over 3 days — wait for stabilization",
             "recommend": False,
         }
-    elif state == "STABILIZING":
-        return {
-            "action":  "WATCH",
-            "label":   "WATCH — BASE FORMING",
-            "signal":  f"Price settling — {off_low:.1f}% off 5d low, wait for confirmation",
-            "recommend": False,
-        }
-    elif state == "REAL_BOUNCE":
-        if off_high < 0.10:
+
+    # §5.3 REAL BOUNCE — check IV modifier (§6)
+    if state == "REAL_BOUNCE":
+        if ivp > 60:
             return {
-                "action":  "WAIT",
-                "label":   "WAIT — NEAR HIGHS",
-                "signal":  f"Bounce confirmed but only {off_high*100:.1f}% off highs — premium too high",
+                "action":    "WAIT",
+                "label":     "WAIT — IV HIGH",
+                "signal":    f"Bounce confirmed but IVP {ivp:.0f}% — wait for IV to drop",
                 "recommend": False,
             }
-        elif ivp > 60:
-            return {
-                "action":  "WAIT",
-                "label":   "WAIT — IV HIGH",
-                "signal":  f"Bounce confirmed, {off_high*100:.1f}% off highs but IVP {ivp:.0f}% — wait for IV to drop",
-                "recommend": False,
-            }
-        else:
-            return {
-                "action":  "BUY",
-                "label":   "BUY — STABILIZED",
-                "signal":  f"Bounce confirmed, {off_high*100:.1f}% off highs, IVP {ivp:.0f}% acceptable",
-                "recommend": True,
-            }
-    else:
         return {
-            "action":  "WATCH",
-            "label":   "WATCH",
-            "signal":  "Unclear trend — monitor",
+            "action":    "BUY",
+            "label":     "BUY — STABILIZED",
+            "signal":    f"+{r1:.1f}% today, {off_low:.1f}% off lows, IVP {ivp:.0f}% — entry conditions met",
+            "recommend": True,
+        }
+
+    # §5.4 BASE FORMING
+    if state == "BASE_FORMING":
+        return {
+            "action":    "WATCH",
+            "label":     "WATCH — BASE FORMING",
+            "signal":    f"{off_low:.1f}% off recent low — selling pressure easing, no confirmed bounce yet",
             "recommend": False,
         }
+
+    # §5.5 Default — conservative
+    return {
+        "action":    "WAIT",
+        "label":     "WAIT — STILL FALLING",
+        "signal":    "No clear trend — staying cautious",
+        "recommend": False,
+    }
 
 def find_best_leaps(ticker, price, contracts, ivdata, pir):
     """Deep ITM LEAPS — delta 0.80-0.90, minimize extrinsic."""
