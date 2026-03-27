@@ -353,9 +353,11 @@ def schwab_get_ivp(ticker: str) -> float:
             timeout=15
         )
         if r.status_code != 200:
+            print(f"   schwab_get_ivp {ticker}: HTTP {r.status_code}")
             return 0
         candles = r.json().get("candles", [])
         if len(candles) < 30:
+            print(f"   schwab_get_ivp {ticker}: only {len(candles)} candles")
             return 0
         closes  = [c["close"] for c in candles if c.get("close")]
         returns = [(closes[i]-closes[i-1])/closes[i-1] for i in range(1,len(closes))]
@@ -369,7 +371,8 @@ def schwab_get_ivp(ticker: str) -> float:
             return 0
         curr = vols[-1]
         return round(sum(1 for v in vols if v < curr)/len(vols)*100, 1)
-    except:
+    except Exception as _e:
+        print(f"   schwab_get_ivp {ticker} error: {_e}")
         return 0
 
 
