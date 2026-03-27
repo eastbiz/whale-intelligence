@@ -5,8 +5,6 @@ on:
     # ── PDT (UTC-7, Mar–Nov) ─────────────────────────────────
     # 6:47 AM PT  (13:47 UTC) — morning scan
     - cron: '47 13 * * 1-5'
-    # 6:53 AM PT  (13:53 UTC) — backup: fires 6 min later if 13:47 was skipped
-    - cron: '53 13 * * 1-5'
     # 9:41 AM PT  (16:41 UTC) — midday scan
     - cron: '41 16 * * 1-5'
     # 11:47 AM PT (18:47 UTC) — pre-close scan
@@ -27,11 +25,10 @@ on:
         required: false
         default: 'manual trigger'
 
-# Prevent pile-up: if a run is still queued when the next fires, cancel the queued one
-# cancel-in-progress: false means a running scan completes — only the waiting one is dropped
+# Cancel any queued run when a new one arrives — running scans complete, waiting ones are dropped
 concurrency:
   group: whale-scanner
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -84,7 +81,7 @@ jobs:
               echo "No changes to commit"
             else
               git commit -m "scan results $(date -u '+%Y-%m-%d %H:%M UTC')"
-              git push origin main || git pull --rebase origin main && git push origin main
+              git push origin main || (git pull --rebase origin main && git push origin main)
               echo "results.json committed OK"
             fi
           else
