@@ -3347,8 +3347,14 @@ def run_scanner():
             contracts = get_option_contracts(ticker)
         if not contracts: continue
 
-        # IVP comes from Schwab chain response directly (real IVP, not HV proxy)
-        ivdata = calculate_ivp(contracts, ticker=ticker)
+        # Use Schwab price history for true per-stock IVP
+        # schwab_get_ivp fetches 1yr daily prices and computes realized vol percentile
+        _schwab_ivp = schwab_get_ivp(ticker) if SCHWAB_APP_KEY else 0
+        if _schwab_ivp > 0:
+            _chain_iv = next((c.get("_chain_iv",0) for c in contracts if c.get("_chain_iv",0) > 0), 0.29)
+            ivdata = {"iv_current": _chain_iv, "iv_low": _chain_iv*0.5, "iv_high": _chain_iv*2.0, "ivp": _schwab_ivp}
+        else:
+            ivdata = calculate_ivp(contracts, ticker=ticker)
         sizing     = position_check(ticker, ibkr)
         qty        = sizing["quantity"]
         avg        = sizing["avg_cost"]
@@ -3953,6 +3959,8 @@ def run_scanner():
                       "market_weak": spy_regime.get("market_weak", False),
                       "warnings": []}
                 score = score_csp(_s)
+                if dte in (20,45) and delta < 0.25:  # debug
+                    print(f"   DBG CSP {ticker}: dte={dte} d={delta:.2f} ann={ann:.0f}% mw={_s['market_weak']} score={score}")
                 if score > best_csp_score:
                     best_csp_score = score
                     best_csp = {"strike":strike,"expiry":c["expiry"],"dte":dte,
