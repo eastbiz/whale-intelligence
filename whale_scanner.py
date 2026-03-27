@@ -4199,13 +4199,15 @@ def run_scanner():
                     _trend_d  = leaps_trend_state(ticker, price)
                     _w52h_d   = md.get("week52_high", price * 1.3)
                     _ta_d     = leaps_trend_action(_trend_d, ivp_d, price, _w52h_d)
-                    leaps_entry["trend_label"]  = _ta_d["label"]
-                    leaps_entry["trend_signal"] = _ta_d["signal"]
-                    leaps_entry["trend_action"] = _ta_d["action"]
-                    print(f"   LEAPS trend {ticker}: {_ta_d['label']}")
+                    leaps_entry["trend_state"]  = str(_trend_d.get("state", "UNKNOWN"))
+                    leaps_entry["trend_label"]  = str(_ta_d.get("label", "WATCH"))
+                    leaps_entry["trend_signal"] = str(_ta_d.get("signal", ""))
+                    leaps_entry["trend_action"] = str(_ta_d.get("action", "WATCH"))
+                    print(f"   LEAPS trend {ticker}: {leaps_entry['trend_label']}")
                 except Exception as _te:
+                    leaps_entry["trend_state"]  = "UNKNOWN"
                     leaps_entry["trend_label"]  = "WATCH"
-                    leaps_entry["trend_signal"] = f"Trend error: {_te}"
+                    leaps_entry["trend_signal"] = ""
                     leaps_entry["trend_action"] = "WATCH"
                     print(f"   LEAPS trend error {ticker}: {_te}")
                 dashboard_leaps.append(leaps_entry)
@@ -4605,29 +4607,31 @@ def run_scanner():
         o["candidate_type"] = "execution" if o.get("passes_quality") and not o.get("below_min") and not o.get("warnings") else "review"
         review_candidates.append(o)
 
-    # Patch trend data into review_candidates LEAPS entries that are missing it
-    # Build a lookup from ticker -> trend data from all_opps (which has trend fields)
-    _trend_lookup = {o["ticker"]: o for o in all_opps if o.get("mode") == "LEAPS" and o.get("trend_label")}
+    # Ensure all LEAPS review_candidates have consistent string trend fields
     for _o in review_candidates:
-        if _o.get("mode") == "LEAPS" and not _o.get("trend_label"):
-            if _o["ticker"] in _trend_lookup:
-                _src = _trend_lookup[_o["ticker"]]
-                _o["trend_label"]  = _src.get("trend_label", "")
-                _o["trend_signal"] = _src.get("trend_signal", "")
-                _o["trend_action"] = _src.get("trend_action", "WATCH")
-            else:
-                # Run classifier fresh for this ticker
-                try:
-                    _tr = leaps_trend_state(_o["ticker"], _o["price"])
-                    _w  = mkt.get(_o["ticker"], {}).get("week52_high", _o["price"] * 1.3)
-                    _ta = leaps_trend_action(_tr, _o["ivp"], _o["price"], _w)
-                    _o["trend_label"]  = _ta["label"]
-                    _o["trend_signal"] = _ta["signal"]
-                    _o["trend_action"] = _ta["action"]
-                except Exception:
-                    _o["trend_label"]  = "WATCH"
-                    _o["trend_signal"] = ""
-                    _o["trend_action"] = "WATCH"
+        if _o.get("mode") != "LEAPS":
+            continue
+        if not _o.get("trend_label"):
+            try:
+                _tr = leaps_trend_state(_o["ticker"], _o["price"])
+                _w  = mkt.get(_o["ticker"], {}).get("week52_high", _o["price"] * 1.3)
+                _ta = leaps_trend_action(_tr, _o.get("ivp", 50), _o["price"], _w)
+                _o["trend_state"]  = str(_tr.get("state", "UNKNOWN"))
+                _o["trend_label"]  = str(_ta.get("label", "WATCH"))
+                _o["trend_signal"] = str(_ta.get("signal", ""))
+                _o["trend_action"] = str(_ta.get("action", "WATCH"))
+            except Exception:
+                _o["trend_state"]  = "UNKNOWN"
+                _o["trend_label"]  = "WATCH"
+                _o["trend_signal"] = ""
+                _o["trend_action"] = "WATCH"
+        else:
+            # Normalize existing fields to strings
+            if isinstance(_o.get("trend_action"), dict):
+                _o["trend_action"] = str(_o["trend_action"].get("action", "WATCH"))
+            _o["trend_label"]  = str(_o.get("trend_label", "WATCH"))
+            _o["trend_signal"] = str(_o.get("trend_signal", ""))
+            _o["trend_action"] = str(_o.get("trend_action", "WATCH"))
 
     # Aggregate premium totals into exposure block
     _prem_csp = sum(o.get("sizing",{}).get("premium_received",0) for o in all_opps if o.get("mode") in ("CSP","DROP_CSP"))
@@ -4657,6 +4661,12 @@ def run_scanner():
         "analysis":       analysis,
         "total_opps":     len(all_opps),
     }
+
+    # Debug: print trend fields for all LEAPS in review_candidates
+    _leaps_rc = [o for o in review_candidates if o.get("mode") == "LEAPS"]
+    print(f"   LEAPS in review_candidates: {len(_leaps_rc)}")
+    for _lo in _leaps_rc[:5]:
+        print(f"     {_lo['ticker']}: trend_label={_lo.get('trend_label')!r} trend_action={_lo.get('trend_action')!r}")
 
     with open("results.json","w") as f:
         json.dump(results, f, indent=2)
