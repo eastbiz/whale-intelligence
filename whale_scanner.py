@@ -1435,7 +1435,7 @@ SPIKE_CC_CANDIDATES = {"NBIS", "IBIT", "PLTR"}
 EXCLUDED_SYMBOLS = {
     "XIOR.CP27",   # Non-tradable synthetic/warrant — excluded per user spec
     "HOM.U",       # Income trust — not actively traded options
-    "EDEN", "SHUR", "VNA", "HTWS", "SGRO", "SVI", "GRBK", "GRAB",
+    "EDEN", "SHUR", "VNA", "HTWS", "SGRO", "SVI", "GRBK",  # GRAB removed — user holds LEAPS
     # Add any other non-US or non-tradable holdings here
 }
 
@@ -3771,7 +3771,7 @@ def run_scanner():
                 "action_label":        action_label,
             }
 
-        return {
+        d = {
             "ticker":            ticker,
             "tier":              o.get("tier",""),
             "price":             o.get("price",0),
@@ -3789,6 +3789,14 @@ def run_scanner():
             "risk_note":         None,
             "sizing":            sizing,
         }
+        # Pass through trend fields for LEAPS
+        if mode == "LEAPS":
+            d["trend_label"]  = o.get("trend_label",  s.get("trend_label",  ""))
+            d["trend_signal"] = o.get("trend_signal", s.get("trend_signal", ""))
+            d["trend_action"] = o.get("trend_action", s.get("trend_action", {}) if isinstance(s.get("trend_action"), dict) else {})
+            if isinstance(d["trend_action"], dict):
+                d["trend_action"] = d["trend_action"].get("action", "WATCH")
+        return d
 
     def find_best_csp_relaxed(ticker, price, contracts):
         """Relaxed CSP finder for dashboard — wider filters, no IVP minimum."""
