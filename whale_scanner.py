@@ -241,6 +241,12 @@ def schwab_get_quotes(tickers: list) -> dict:
         for ticker, info in r.json().items():
             q = info.get("quote", {})
             f = info.get("fundamental", {})
+            # ivPercentile is in the quote object for equities
+            _ivp_raw = (q.get("volatility", 0) or
+                        q.get("impliedYield", 0) or 0)
+            # Print raw fundamental keys on first ticker to debug
+            if not result:
+                print(f"   Schwab quote keys for {ticker}: q={list(q.keys())[:10]} f={list(f.keys())[:10]}")
             result[ticker] = {
                 "price":       float(q.get("lastPrice",  q.get("mark", 0)) or 0),
                 "week52_high": float(q.get("52WeekHigh", 0) or 0),
@@ -248,6 +254,7 @@ def schwab_get_quotes(tickers: list) -> dict:
                 "avg_volume":  int(q.get("totalVolume",  0) or 0),
                 "prev_close":  float(q.get("closePrice", 0) or 0),
                 "pe_ratio":    float(f.get("peRatio",    0) or 0),
+                "_raw_quote":  q,   # keep raw so we can find IVP field
             }
         print(f"   Schwab quotes: {len(result)}/{len(tickers)} ✓")
         return result
@@ -3350,14 +3357,32 @@ def run_scanner():
             contracts = get_option_contracts(ticker)
         if not contracts: continue
 
-        # Use Schwab price history for true per-stock IVP
-        # schwab_get_ivp fetches 1yr daily prices and computes realized vol percentile
+        # Compute ATM IV from individual contract volatilities (NOT chain-level)
+        # Schwab chain "volatility" field is unreliable (same for all stocks)
+        # Per-contract "volatility" IS correct and varies per stock
+        _atm_contracts = [c for c in contracts
+                          if c.get("option_type") == "P"
+                          and abs(float(c.get("delta",0) or 0)) > 0.40
+                          and abs(float(c.get("delta",0) or 0)) < 0.60
+                          and 20 <= (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days <= 50
+                          and float(c.get("iv",0) or 0) > 0.01]
+        if _atm_contracts:
+            _ivs = sorted([float(c.get("iv",0)) for c in _atm_contracts])
+            _atm_iv = _ivs[len(_ivs)//2]  # median ATM IV — correct per-stock value
+        else:
+            _atm_iv = 0.29  # fallback
+
+        # IVP = realized vol percentile from Schwab 1yr price history
         _schwab_ivp = schwab_get_ivp(ticker) if SCHWAB_APP_KEY else 0
         if _schwab_ivp > 0:
-            _chain_iv = next((c.get("_chain_iv",0) for c in contracts if c.get("_chain_iv",0) > 0), 0.29)
-            ivdata = {"iv_current": _chain_iv, "iv_low": _chain_iv*0.5, "iv_high": _chain_iv*2.0, "ivp": _schwab_ivp}
+            ivdata = {"iv_current": _atm_iv, "iv_low": _atm_iv*0.5, "iv_high": _atm_iv*2.0, "ivp": _schwab_ivp}
+            print(f"   IVP {ticker}: {_schwab_ivp:.1f}% (ATM IV={_atm_iv*100:.1f}%)")
         else:
-            ivdata = calculate_ivp(contracts, ticker=ticker)
+            # Fallback: estimate IVP from ATM IV relative to typical annual range
+            import math as _m
+            ivp_est = round(min(95, max(5, 100 * (1 - _m.exp(-_atm_iv / 0.25)))), 1)
+            ivdata = {"iv_current": _atm_iv, "iv_low": _atm_iv*0.5, "iv_high": _atm_iv*2.0, "ivp": ivp_est}
+            print(f"   IVP {ticker}: {ivp_est:.1f}% estimated (ATM IV={_atm_iv*100:.1f}%, schwab_get_ivp failed)")
         sizing     = position_check(ticker, ibkr)
         qty        = sizing["quantity"]
         avg        = sizing["avg_cost"]
@@ -3808,7 +3833,8 @@ def run_scanner():
                 if c.get("option_type") != "P": continue
                 expiry = datetime.strptime(c["expiry"], "%Y-%m-%d")
                 dte = (expiry - datetime.now()).days
-                if not (20 <= dte <= 60): continue  # wider DTE range
+                _mdte = 35 if spy_regime.get("market_weak") else 20
+                if not (_mdte <= dte <= 60): continue  # weak: min 35 DTE
                 strike = float(c["strike"])
                 if strike <= 0 or strike >= price: continue
                 bid = float(c.get("nbbo_bid", 0) or 0)
@@ -3932,9 +3958,10 @@ def run_scanner():
             except: pass
 
         # ── CSP: very relaxed ────────────────────────────────
+        _min_dte = 35 if spy_regime.get("market_weak") else 20
         puts_30_60 = [c for c in contracts_d
                       if c.get("option_type") == "P"
-                      and 20 <= (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days <= 60
+                      and _min_dte <= (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days <= 60
                       and float(c.get("strike",0) or 0) < price]
         best_csp = None; best_csp_score = 0
         for c in puts_30_60:
