@@ -3510,6 +3510,7 @@ def run_scanner():
                 leaps["trend_action"] = _ta
                 leaps["trend_label"]  = _ta["label"]
                 leaps["trend_signal"] = _ta["signal"]
+                print(f"   TREND DEBUG {ticker}: label={_ta["label"]!r} action={_ta["action"]!r} state={_trend.get("state")!r}")
             if leaps is None and ivdata["ivp"] > 0:
                 print(f"  [{tier}] {ticker}: LEAPS rejected — IVP {ivdata['ivp']:.0f}% timing: {leaps_timing.get('signal','')[:50]}")
         else:
