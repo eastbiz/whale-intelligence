@@ -3406,6 +3406,7 @@ def run_scanner():
     # Caches for dashboard reuse — avoid re-fetching chains
     contracts_cache = {}
     schwab_ivp_cache = {}
+    trend_state_cache = {}  # ticker -> leaps_trend_state result, reused by CSP engine
     qty_cache = {}
     avg_cache = {}
 
@@ -3617,6 +3618,7 @@ def run_scanner():
         if gng["buy_leaps"] and not leaps_blocked:
             # Trend classifier — determines entry timing quality
             _trend  = leaps_trend_state(ticker, price)
+            trend_state_cache[ticker] = _trend  # cache for CSP engine
             _w52h   = mkt.get(ticker, {}).get("week52_high", price * 1.3)
             _ta     = leaps_trend_action(_trend, ivdata["ivp"], price, _w52h)
             leaps, leaps_timing = find_best_leaps(ticker, price, contracts, ivdata, pir)
@@ -4055,15 +4057,20 @@ def run_scanner():
                       and _min_dte <= (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days <= 60
                       and float(c.get("strike",0) or 0) < price]
         # Precompute stock-level inputs for csp_engine
-        _price_1d = price / (1 + md.get("day_change_pct", 0)) if md.get("day_change_pct") else price
-        _hist_closes = []  # use day_change for 1d; 5d from market data
         _drop_1d = md.get("day_change_pct", 0)
         _ma50_t  = md.get("ma50", price)
         _ma200_t = md.get("ma200", price)
-        # 5d drop: approximate from week52 range and current price move
-        # We use day_change as 1d; for 5d we rely on price vs ma50 as proxy
-        # Best available: pct_above_ma50 over short window
-        _drop_5d = min(_drop_1d * 2.5, -0.001) if _drop_1d < 0 else 0  # conservative estimate
+        # 5d drop: use cached trend state (r5 from Yahoo 15d history)
+        _trend_cached = trend_state_cache.get(ticker)
+        if _trend_cached and _trend_cached.get("r5") is not None:
+            _drop_5d = _trend_cached["r5"] / 100  # r5 stored as percentage
+        else:
+            # Fallback: fetch trend state now and cache it
+            _trend_cached = leaps_trend_state(ticker, price)
+            trend_state_cache[ticker] = _trend_cached
+            _drop_5d = _trend_cached.get("r5", 0) / 100
+        # off_low_5d from trend state
+        _off_low_5d = _trend_cached.get("off_low_5d", 5.0) if _trend_cached else 5.0
 
         best_csp = None; best_csp_score = -1
         for c in puts_30_60:
@@ -4093,7 +4100,7 @@ def run_scanner():
                     "tier": tier, "delta": delta, "dte": dte, "strike": strike,
                     "premium": mid, "ivp": ivp_d,
                     "drop_1d": _drop_1d, "drop_5d": _drop_5d,
-                    "off_low_5d": 5.0,  # conservative default; full calc in main scanner
+                    "off_low_5d": _off_low_5d,
                     "price": price, "ma50": _ma50_t, "ma200": _ma200_t,
                     "contracts": _contracts,
                     "over_allocation": False,
