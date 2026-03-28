@@ -1176,123 +1176,122 @@ def score_cc(opp: dict) -> int:
 
 def csp_engine(opp: dict, spy_day_chg: float = 0) -> dict:
     """
-    CSP Entry Engine v2 — price-first, risk-aware.
-    Spec: March 2026 Final. Steps 0-7.
-    Returns: {action, drop_type, yield_30d, flags, sort_key}
+    CSP Entry Engine v3 — price-first, risk-aware.
+    Actions: BUY_SAFE, BUY_RISKY, WAIT, SKIP
+    Penalty stacking limited to top 2 strongest.
     """
-    tier    = opp.get("tier", "Opportunistic")
-    delta   = abs(opp.get("delta", 0))
-    dte     = opp.get("dte", 30)
-    strike  = opp.get("strike", 0)
-    premium = opp.get("premium", 0)
-    ivp     = opp.get("ivp", 50)
-    drop_1d = opp.get("drop_1d", 0)
-    drop_5d = opp.get("drop_5d", 0)
-    off_low = opp.get("off_low_5d", 5.0)  # % off 5d low
-    price   = opp.get("price", 0)
-    ma50    = opp.get("ma50", price)
-    ma200   = opp.get("ma200", price * 0.9)
+    tier      = opp.get("tier", "Opportunistic")
+    delta     = abs(opp.get("delta", 0))
+    dte       = opp.get("dte", 30)
+    strike    = opp.get("strike", 0)
+    premium   = opp.get("premium", 0)
+    ivp       = opp.get("ivp", 50)
+    drop_1d   = opp.get("drop_1d", 0)
+    drop_5d   = opp.get("drop_5d", 0)
+    off_low   = opp.get("off_low_5d", 5.0)
+    price     = opp.get("price", 0)
+    ma50      = opp.get("ma50", price)
+    ma200     = opp.get("ma200", price * 0.9)
     contracts = opp.get("contracts", 1)
+    pullback  = opp.get("pullback_pct", 0)
 
-    flags   = []
-    action  = "SKIP"
+    flags = []
 
-    # ── Step 0: SPY day filter ─────────────────────────────────
+    # ── Step 0: SPY panic day — hard skip ─────────────────────
     if spy_day_chg <= -0.03:
         return {"action": "SKIP", "drop_type": "WEAK", "yield_30d": 0,
                 "flags": ["SPY PANIC DAY"], "sort_key": 0}
     spy_downgrade = spy_day_chg <= -0.02
 
     # ── Step 1: Drop classification ────────────────────────────
-    # pullback_pct = how far stock is off its 52w high (already computed)
-    pullback_pct = opp.get("pullback_pct", 0)  # e.g. 25 means 25% off high
-
     if drop_1d <= -0.04 or drop_5d <= -0.08:
-        drop_type = "STRONG"
-        action    = "BUY"
+        drop_type = "STRONG";  action = "BUY"
     elif drop_1d <= -0.02 or drop_5d <= -0.04:
-        drop_type = "MODERATE"
-        action    = "WATCH"
-    elif pullback_pct >= 20:
-        # Stock already well off highs — treat as sustained drop opportunity
-        drop_type = "STRONG" if pullback_pct >= 35 else "MODERATE"
-        action    = "BUY"    if pullback_pct >= 35 else "WATCH"
-    elif pullback_pct >= 10:
-        drop_type = "MODERATE"
-        action    = "WATCH"
+        drop_type = "MODERATE"; action = "WAIT"
+    elif pullback >= 35:
+        drop_type = "STRONG";  action = "BUY"
+    elif pullback >= 20:
+        drop_type = "MODERATE"; action = "WAIT"
+    elif pullback >= 10:
+        drop_type = "MODERATE"; action = "WAIT"
     else:
-        drop_type = "WEAK"
-        action    = "WATCH"  # No drop = lower priority but still evaluate
+        drop_type = "WEAK";    action = "WAIT"
 
-    # SPY -2% day: downgrade
     if spy_downgrade and action == "BUY":
-        action = "WATCH"
-        flags.append("HIGH VOLATILITY")
+        action = "WAIT"; flags.append("HIGH VOLATILITY")
 
-    # ── Step 2: Trend filter ───────────────────────────────────
-    if price > 0 and ma200 > 0 and price < ma200:
+    # ── Step 2: Trend penalties — MAX 2, priority ordered ─────
+    # Priority: 1=below200DMA (strongest), 2=at_lows, 3=below50DMA (weakest)
+    penalties = []
+    below_200 = price > 0 and ma200 > 0 and price < ma200
+    below_50  = price > 0 and ma50  > 0 and price < ma50
+    at_lows   = off_low <= 2.0
+
+    if below_200: penalties.append("BELOW 200DMA")
+    if at_lows:   penalties.append("AT LOWS")
+    if below_50 and len(penalties) < 2: penalties.append("BELOW 50DMA")
+    # Only apply top 2 penalties max
+    flags.extend(penalties[:2])
+
+    # Downgrades: only if strongest penalty present
+    if below_200 or at_lows:
         if action == "BUY":
-            action = "WATCH"
-        flags.append("BELOW 200DMA")
-    if price > 0 and ma50 > 0 and price < ma50:
-        if action == "BUY":
-            action = "WATCH"
-        flags.append("BELOW 50DMA")
+            action = "WAIT"
+
+    # Hard skip for Opportunistic at lows
+    if at_lows and tier == "Opportunistic":
+        yield_30d = (premium / strike) * (30 / dte) if strike > 0 and dte > 0 else 0
+        return {"action": "SKIP", "drop_type": drop_type,
+                "yield_30d": round(yield_30d*100, 2),
+                "flags": ["AT LOWS — SKIP"], "sort_key": 0}
 
     # ── Step 3: Yield validation ───────────────────────────────
     yield_30d = (premium / strike) * (30 / dte) if strike > 0 and dte > 0 else 0
-
-    # IVP modifier on threshold
     min_yields = {"Core": 0.015, "Growth": 0.020, "Opportunistic": 0.025, "Cyclical": 0.020}
     base_min   = min_yields.get(tier, 0.020)
-    if ivp < 30:
-        threshold = base_min * 0.80   # IVP low → easier to qualify
-    elif ivp > 60:
-        threshold = base_min * 1.20   # IVP high → harder to qualify
-    else:
-        threshold = base_min
+    threshold  = base_min * (0.80 if ivp < 30 else 1.20 if ivp > 60 else 1.0)
 
     if yield_30d < threshold:
-        return {"action": "SKIP", "drop_type": drop_type, "yield_30d": round(yield_30d*100,2),
+        return {"action": "SKIP", "drop_type": drop_type,
+                "yield_30d": round(yield_30d*100, 2),
                 "flags": ["LOW YIELD"], "sort_key": 0}
 
-    # Absolute premium minimum $500
-    total_premium = premium * contracts * 100
-    if total_premium < 500:
-        return {"action": "SKIP", "drop_type": drop_type, "yield_30d": round(yield_30d*100,2),
+    # Absolute $500 minimum
+    if premium * contracts * 100 < 500:
+        return {"action": "SKIP", "drop_type": drop_type,
+                "yield_30d": round(yield_30d*100, 2),
                 "flags": ["PREMIUM < $500"], "sort_key": 0}
 
     # ── Step 4: Delta check ────────────────────────────────────
     max_delta = 0.30 if ivp > 50 else 0.25
     if delta > max_delta:
-        return {"action": "SKIP", "drop_type": drop_type, "yield_30d": round(yield_30d*100,2),
-                "flags": [f"DELTA {delta:.2f} > {max_delta}"], "sort_key": 0}
+        return {"action": "SKIP", "drop_type": drop_type,
+                "yield_30d": round(yield_30d*100, 2),
+                "flags": [f"DELTA > {max_delta}"], "sort_key": 0}
 
-    # ── Step 5: At-lows logic ──────────────────────────────────
-    if off_low <= 2.0:
-        if tier == "Opportunistic":
-            return {"action": "SKIP", "drop_type": drop_type, "yield_30d": round(yield_30d*100,2),
-                    "flags": ["AT LOWS — SKIP"], "sort_key": 0}
-        else:  # Core and Growth: downgrade one level
-            if action == "BUY":
-                action = "WATCH"
-            flags.append("AT LOWS")
+    # ── Step 5: Portfolio context ──────────────────────────────
+    if opp.get("over_allocation"):      flags.append("OVER ALLOCATION")
+    if opp.get("csp_exposure_pct",0) > 50: flags.append("EXTREME CSP EXPOSURE")
+    elif opp.get("csp_exposure_pct",0) > 30: flags.append("HIGH CSP EXPOSURE")
 
-    # ── Step 6: Portfolio context ──────────────────────────────
-    if opp.get("over_allocation"):
-        flags.append("OVER ALLOCATION")
-    if opp.get("csp_exposure_pct", 0) > 50:
-        flags.append("EXTREME CSP EXPOSURE")
-    elif opp.get("csp_exposure_pct", 0) > 30:
-        flags.append("HIGH CSP EXPOSURE")
+    # ── Step 6: Classify as BUY_SAFE or BUY_RISKY ─────────────
+    # BUY_SAFE: no major flags, good setup
+    # BUY_RISKY: best available, has flags but actionable
+    risky_flags = {"BELOW 200DMA", "AT LOWS", "HIGH VOLATILITY", "OVER ALLOCATION"}
+    has_risky   = any(f in risky_flags for f in flags)
 
-    # ── Step 7: Entry timing ───────────────────────────────────
-    if drop_1d <= -0.04:
-        flags.append("WAIT FOR STABILIZATION")
+    if action == "BUY":
+        action = "BUY_RISKY" if has_risky else "BUY_SAFE"
 
-    # Sort key: STRONG=3, MODERATE=2, WEAK=1, then yield_30d as tiebreaker
-    drop_score = 3 if drop_type == "STRONG" else 2 if drop_type == "MODERATE" else 1
-    sort_key   = drop_score * 10 + min(yield_30d * 100, 9.9)
+    # Sort key: BUY_SAFE=4, BUY_RISKY=3, WAIT STRONG=2, WAIT MODERATE=1, WAIT WEAK=0.x
+    if action == "BUY_SAFE":
+        drop_score = 4
+    elif action == "BUY_RISKY":
+        drop_score = 3
+    else:
+        drop_score = 2 if drop_type == "STRONG" else 1 if drop_type == "MODERATE" else 0.5
+
+    sort_key = drop_score * 10 + min(yield_30d * 100, 9.9)
 
     return {
         "action":    action,
@@ -1301,6 +1300,33 @@ def csp_engine(opp: dict, spy_day_chg: float = 0) -> dict:
         "flags":     flags,
         "sort_key":  round(sort_key, 3),
     }
+
+
+def csp_promote_best(dashboard_csps: list) -> list:
+    """
+    Post-processing: if no BUY_SAFE or BUY_RISKY exists,
+    promote top 1-3 WAIT candidates to BUY_RISKY.
+    Selection: highest yield_30d, no EXTREME flags.
+    """
+    has_buy = any(c.get("action") in ("BUY_SAFE","BUY_RISKY") for c in dashboard_csps)
+    if has_buy:
+        return dashboard_csps
+
+    bad_flags = {"EXTREME CSP EXPOSURE","OVER ALLOCATION","AT LOWS — SKIP","LOW YIELD","PREMIUM < $500"}
+    candidates = [c for c in dashboard_csps
+                  if c.get("action") == "WAIT"
+                  and not any(f in bad_flags for f in (c.get("csp_flags") or []))]
+    candidates.sort(key=lambda x: x.get("yield_30d",0), reverse=True)
+
+    promoted = 0
+    for c in candidates:
+        if promoted >= 2: break
+        c["action"]    = "BUY_RISKY"
+        c["csp_flags"] = (c.get("csp_flags") or []) + ["BEST AVAILABLE"]
+        c["sort_key"]  = 30 + min(c.get("yield_30d",0), 9.9)
+        promoted += 1
+
+    return dashboard_csps
 
 
 def score_csp(opp: dict) -> int:
@@ -4398,6 +4424,7 @@ def run_scanner():
         o["unified_score"] = score_unified(o, "LEAPS")
 
     # Sort by canonical score descending — never by annualized return
+    dashboard_csps = csp_promote_best(dashboard_csps)
     dashboard_csps.sort(key=lambda x: x.get("sort_key", x.get("score",0)), reverse=True)
     dashboard_ccs.sort(key=lambda x: x.get("score", 0), reverse=True)
     dashboard_leaps.sort(key=lambda x: x.get("score", 0), reverse=True)
