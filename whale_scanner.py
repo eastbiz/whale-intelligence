@@ -1204,15 +1204,25 @@ def csp_engine(opp: dict, spy_day_chg: float = 0) -> dict:
     spy_downgrade = spy_day_chg <= -0.02
 
     # ── Step 1: Drop classification ────────────────────────────
+    # pullback_pct = how far stock is off its 52w high (already computed)
+    pullback_pct = opp.get("pullback_pct", 0)  # e.g. 25 means 25% off high
+
     if drop_1d <= -0.04 or drop_5d <= -0.08:
         drop_type = "STRONG"
         action    = "BUY"
     elif drop_1d <= -0.02 or drop_5d <= -0.04:
         drop_type = "MODERATE"
         action    = "WATCH"
+    elif pullback_pct >= 20:
+        # Stock already well off highs — treat as sustained drop opportunity
+        drop_type = "STRONG" if pullback_pct >= 35 else "MODERATE"
+        action    = "BUY"    if pullback_pct >= 35 else "WATCH"
+    elif pullback_pct >= 10:
+        drop_type = "MODERATE"
+        action    = "WATCH"
     else:
-        return {"action": "SKIP", "drop_type": "WEAK", "yield_30d": 0,
-                "flags": ["NO DROP"], "sort_key": 0}
+        drop_type = "WEAK"
+        action    = "WATCH"  # No drop = lower priority but still evaluate
 
     # SPY -2% day: downgrade
     if spy_downgrade and action == "BUY":
@@ -1280,8 +1290,8 @@ def csp_engine(opp: dict, spy_day_chg: float = 0) -> dict:
     if drop_1d <= -0.04:
         flags.append("WAIT FOR STABILIZATION")
 
-    # Sort key: STRONG=2 MODERATE=1, then yield_30d as tiebreaker
-    drop_score = 2 if drop_type == "STRONG" else 1
+    # Sort key: STRONG=3, MODERATE=2, WEAK=1, then yield_30d as tiebreaker
+    drop_score = 3 if drop_type == "STRONG" else 2 if drop_type == "MODERATE" else 1
     sort_key   = drop_score * 10 + min(yield_30d * 100, 9.9)
 
     return {
@@ -4096,11 +4106,13 @@ def run_scanner():
                 _contracts = max(1, round(_target_cso / (strike * 100)))
 
                 # Run new CSP engine
+                _pullback = round(pullback_from_high(price, md.get("week52_high", price)) * 100, 1)
                 _eng_opp = {
                     "tier": tier, "delta": delta, "dte": dte, "strike": strike,
                     "premium": mid, "ivp": ivp_d,
                     "drop_1d": _drop_1d, "drop_5d": _drop_5d,
                     "off_low_5d": _off_low_5d,
+                    "pullback_pct": _pullback,
                     "price": price, "ma50": _ma50_t, "ma200": _ma200_t,
                     "contracts": _contracts,
                     "over_allocation": False,
