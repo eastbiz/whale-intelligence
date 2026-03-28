@@ -4120,6 +4120,7 @@ def run_scanner():
                 }
                 _result = csp_engine(_eng_opp, spy_day_chg=spy_regime.get("day_change", 0))
                 if _result["action"] == "SKIP":
+                    print(f"   DBG CSP SKIP {ticker}: dte={dte} d={delta:.2f} flags={_result['flags']} drop1d={_drop_1d:.2%} drop5d={_drop_5d:.2%} yield={_result['yield_30d']:.2f}% contracts={_contracts}")
                     continue
                 sort_key = _result["sort_key"]
                 if sort_key > best_csp_score:
