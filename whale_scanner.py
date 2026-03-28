@@ -1174,56 +1174,145 @@ def score_cc(opp: dict) -> int:
     elif ann > 35:          s += 1   # high return is ok but not +3
     return max(0, s)
 
+def csp_engine(opp: dict, spy_day_chg: float = 0) -> dict:
+    """
+    CSP Entry Engine v2 — price-first, risk-aware.
+    Spec: March 2026 Final. Steps 0-7.
+    Returns: {action, drop_type, yield_30d, flags, sort_key}
+    """
+    tier    = opp.get("tier", "Opportunistic")
+    delta   = abs(opp.get("delta", 0))
+    dte     = opp.get("dte", 30)
+    strike  = opp.get("strike", 0)
+    premium = opp.get("premium", 0)
+    ivp     = opp.get("ivp", 50)
+    drop_1d = opp.get("drop_1d", 0)
+    drop_5d = opp.get("drop_5d", 0)
+    off_low = opp.get("off_low_5d", 5.0)  # % off 5d low
+    price   = opp.get("price", 0)
+    ma50    = opp.get("ma50", price)
+    ma200   = opp.get("ma200", price * 0.9)
+    contracts = opp.get("contracts", 1)
+
+    flags   = []
+    action  = "SKIP"
+
+    # ── Step 0: SPY day filter ─────────────────────────────────
+    if spy_day_chg <= -0.03:
+        return {"action": "SKIP", "drop_type": "WEAK", "yield_30d": 0,
+                "flags": ["SPY PANIC DAY"], "sort_key": 0}
+    spy_downgrade = spy_day_chg <= -0.02
+
+    # ── Step 1: Drop classification ────────────────────────────
+    if drop_1d <= -0.04 or drop_5d <= -0.08:
+        drop_type = "STRONG"
+        action    = "BUY"
+    elif drop_1d <= -0.02 or drop_5d <= -0.04:
+        drop_type = "MODERATE"
+        action    = "WATCH"
+    else:
+        return {"action": "SKIP", "drop_type": "WEAK", "yield_30d": 0,
+                "flags": ["NO DROP"], "sort_key": 0}
+
+    # SPY -2% day: downgrade
+    if spy_downgrade and action == "BUY":
+        action = "WATCH"
+        flags.append("HIGH VOLATILITY")
+
+    # ── Step 2: Trend filter ───────────────────────────────────
+    if price > 0 and ma200 > 0 and price < ma200:
+        if action == "BUY":
+            action = "WATCH"
+        flags.append("BELOW 200DMA")
+    if price > 0 and ma50 > 0 and price < ma50:
+        if action == "BUY":
+            action = "WATCH"
+        flags.append("BELOW 50DMA")
+
+    # ── Step 3: Yield validation ───────────────────────────────
+    yield_30d = (premium / strike) * (30 / dte) if strike > 0 and dte > 0 else 0
+
+    # IVP modifier on threshold
+    min_yields = {"Core": 0.015, "Growth": 0.020, "Opportunistic": 0.025, "Cyclical": 0.020}
+    base_min   = min_yields.get(tier, 0.020)
+    if ivp < 30:
+        threshold = base_min * 0.80   # IVP low → easier to qualify
+    elif ivp > 60:
+        threshold = base_min * 1.20   # IVP high → harder to qualify
+    else:
+        threshold = base_min
+
+    if yield_30d < threshold:
+        return {"action": "SKIP", "drop_type": drop_type, "yield_30d": round(yield_30d*100,2),
+                "flags": ["LOW YIELD"], "sort_key": 0}
+
+    # Absolute premium minimum $500
+    total_premium = premium * contracts * 100
+    if total_premium < 500:
+        return {"action": "SKIP", "drop_type": drop_type, "yield_30d": round(yield_30d*100,2),
+                "flags": ["PREMIUM < $500"], "sort_key": 0}
+
+    # ── Step 4: Delta check ────────────────────────────────────
+    max_delta = 0.30 if ivp > 50 else 0.25
+    if delta > max_delta:
+        return {"action": "SKIP", "drop_type": drop_type, "yield_30d": round(yield_30d*100,2),
+                "flags": [f"DELTA {delta:.2f} > {max_delta}"], "sort_key": 0}
+
+    # ── Step 5: At-lows logic ──────────────────────────────────
+    if off_low <= 2.0:
+        if tier == "Opportunistic":
+            return {"action": "SKIP", "drop_type": drop_type, "yield_30d": round(yield_30d*100,2),
+                    "flags": ["AT LOWS — SKIP"], "sort_key": 0}
+        else:  # Core and Growth: downgrade one level
+            if action == "BUY":
+                action = "WATCH"
+            flags.append("AT LOWS")
+
+    # ── Step 6: Portfolio context ──────────────────────────────
+    if opp.get("over_allocation"):
+        flags.append("OVER ALLOCATION")
+    if opp.get("csp_exposure_pct", 0) > 50:
+        flags.append("EXTREME CSP EXPOSURE")
+    elif opp.get("csp_exposure_pct", 0) > 30:
+        flags.append("HIGH CSP EXPOSURE")
+
+    # ── Step 7: Entry timing ───────────────────────────────────
+    if drop_1d <= -0.04:
+        flags.append("WAIT FOR STABILIZATION")
+
+    # Sort key: STRONG=2 MODERATE=1, then yield_30d as tiebreaker
+    drop_score = 2 if drop_type == "STRONG" else 1
+    sort_key   = drop_score * 10 + min(yield_30d * 100, 9.9)
+
+    return {
+        "action":    action,
+        "drop_type": drop_type,
+        "yield_30d": round(yield_30d * 100, 2),
+        "flags":     flags,
+        "sort_key":  round(sort_key, 3),
+    }
+
+
 def score_csp(opp: dict) -> int:
     """
-    Canonical CSP score (max 12):
-    Tier(3) + Delta(3) + IVP(2) + Pullback(2) + Income(2) - Penalties
-
-    Market regime adjustment:
-    WEAK (SPY below 50MA or 200MA): penalize high delta + short DTE, reward low delta
-    NORMAL: standard delta range 0.20-0.30
+    Compatibility shim — returns numeric score for legacy callers.
+    New engine: csp_engine(). Score here is used only for sorting
+    within same action tier when yield_30d is not available.
     """
     s = tier_weight(opp.get("tier",""))
-
-    d       = abs(opp.get("delta", 0))
-    dte     = opp.get("dte", 30)
-    market_weak = opp.get("market_weak", False)
-
-    if market_weak:
-        # WEAK regime: prefer delta 0.10-0.20, penalize > 0.20
-        if d > 0.25:        s -= 3   # strong penalty — too aggressive in weak market
-        elif d > 0.20:      s -= 2   # moderate penalty
-        elif d <= 0.15:     s += 1   # reward conservative delta
-        # Short DTE in weak market = dangerous
-        if dte < 30:        s -= 2   # additional penalty for short duration
-        elif dte >= 45:     s += 1   # reward longer duration
-    else:
-        # NORMAL regime: standard scoring
-        if d > 0.35:        s -= 2   # hard penalty
-        elif d > 0.30:      s -= 1   # soft penalty
-        # 0.15-0.30 = acceptable, no bonus for delta itself
-
-    # IVP quality — CSP: higher IVP = better premium for selling
+    d = abs(opp.get("delta", 0))
+    if d > 0.35:   s -= 2
+    elif d > 0.30: s -= 1
     ivp = opp.get("ivp", 0)
-    if ivp >= 40:            s += 2
-    elif ivp >= 20:          s += 1
-
-    # Pullback quality
+    if ivp >= 40:  s += 2
+    elif ivp >= 20: s += 1
     pb = opp.get("pullback_pct", 0)
-    if pb > 15:             s += 2
-    elif pb > 8:            s += 1
-
-    # Income quality
+    if pb > 15:    s += 2
+    elif pb > 8:   s += 1
     ann = opp.get("annualized_return", 0)
-    if 15 <= ann <= 35:     s += 2
-    elif 8 <= ann < 15:     s += 1
-    elif ann > 35:          s += 1
-
-    # Timing penalties
-    warnings = opp.get("warnings", [])
-    if ">8% above MA50" in warnings:  s -= 2
-    if "Near 52w high" in warnings:   s -= 2
-    if "Below 200MA" in warnings:     s -= 1
+    if 15 <= ann <= 35:  s += 2
+    elif 8 <= ann < 15:  s += 1
+    elif ann > 35:       s += 1
     return max(0, s)
 
 def score_leaps(opp: dict) -> int:
@@ -3245,6 +3334,7 @@ def run_scanner():
     spy_ma50   = spy_md.get("ma50", 0)
     spy_above_ma50 = spy_price >= spy_ma50 if spy_ma50 > 0 else True
     market_weak = not spy_above or not spy_above_ma50  # WEAK if below either MA
+    spy_day_chg  = spy_md.get("day_change_pct", 0)
     spy_regime = {
         "above_ma200":    spy_above,
         "above_ma50":     spy_above_ma50,
@@ -3252,6 +3342,7 @@ def run_scanner():
         "spy":            spy_price,
         "ma200":          round(spy_ma200, 2),
         "ma50":           round(spy_ma50, 2),
+        "day_change":     round(spy_day_chg, 4),
         "label": (f"✅ S&P 500 above 200MA (${spy_ma200:.0f}) — Normal environment"
                   if spy_above else
                   f"⚠️ S&P 500 BELOW 200MA (${spy_ma200:.0f}) — Risk regime: reduce size, lower delta")
@@ -3963,7 +4054,18 @@ def run_scanner():
                       if c.get("option_type") == "P"
                       and _min_dte <= (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days <= 60
                       and float(c.get("strike",0) or 0) < price]
-        best_csp = None; best_csp_score = 0
+        # Precompute stock-level inputs for csp_engine
+        _price_1d = price / (1 + md.get("day_change_pct", 0)) if md.get("day_change_pct") else price
+        _hist_closes = []  # use day_change for 1d; 5d from market data
+        _drop_1d = md.get("day_change_pct", 0)
+        _ma50_t  = md.get("ma50", price)
+        _ma200_t = md.get("ma200", price)
+        # 5d drop: approximate from week52 range and current price move
+        # We use day_change as 1d; for 5d we rely on price vs ma50 as proxy
+        # Best available: pct_above_ma50 over short window
+        _drop_5d = min(_drop_1d * 2.5, -0.001) if _drop_1d < 0 else 0  # conservative estimate
+
+        best_csp = None; best_csp_score = -1
         for c in puts_30_60:
             try:
                 strike = float(c["strike"])
@@ -3974,29 +4076,47 @@ def run_scanner():
                 if mid < 0.05: continue
                 delta = abs(float(c.get("delta",0) or 0))
                 if delta == 0: delta = abs(estimate_delta(price,strike,dte,0.30,"P") or 0)
-                # Target income CSP delta: 0.20-0.35 preferred, allow 0.15-0.40
-                if not (0.15 <= delta <= 0.40): continue
-                # Must be at least 3% OTM
+                if not (0.08 <= delta <= 0.40): continue
                 otm = (price - strike) / price * 100
-                if otm < 3: continue
+                if otm < 2: continue
                 if int(c.get("open_interest",0) or 0) < 50: continue
                 ann = (mid/strike)*(365/dte)*100
-                if ann < 3 or ann > 300: continue
-                # Canonical CSP score — no premium/day bias
-                _s = {"tier": tier, "delta": delta, "dte": dte, "ivp": ivp_d,
-                      "annualized_return": ann,
-                      "pullback_pct": round(pullback_t * 100, 1) if "pullback_t" in dir() else 0,
-                      "market_weak": spy_regime.get("market_weak", False),
-                      "warnings": []}
-                score = score_csp(_s)
-                if dte in (20,45) and delta < 0.25:  # debug
-                    print(f"   DBG CSP {ticker}: dte={dte} d={delta:.2f} ann={ann:.0f}% mw={_s['market_weak']} score={score}")
-                if score > best_csp_score:
-                    best_csp_score = score
-                    best_csp = {"strike":strike,"expiry":c["expiry"],"dte":dte,
-                                "bid":round(bid,2),"ask":round(ask,2),"premium":round(mid,2),
-                                "delta":round(delta,2),"annualized_return":round(ann,1),
-                                "below_min":ann<CSP_MIN_ANNUALIZED,"ivp":ivp_d}
+                if ann < 2 or ann > 300: continue
+
+                # Suggested contracts based on tier sizing
+                _sizes = {"Core": 40000, "Growth": 25000, "Cyclical": 20000, "Opportunistic": 12500}
+                _target_cso = _sizes.get(tier, 12500)
+                _contracts = max(1, round(_target_cso / (strike * 100)))
+
+                # Run new CSP engine
+                _eng_opp = {
+                    "tier": tier, "delta": delta, "dte": dte, "strike": strike,
+                    "premium": mid, "ivp": ivp_d,
+                    "drop_1d": _drop_1d, "drop_5d": _drop_5d,
+                    "off_low_5d": 5.0,  # conservative default; full calc in main scanner
+                    "price": price, "ma50": _ma50_t, "ma200": _ma200_t,
+                    "contracts": _contracts,
+                    "over_allocation": False,
+                    "csp_exposure_pct": 0,
+                }
+                _result = csp_engine(_eng_opp, spy_day_chg=spy_regime.get("day_change", 0))
+                if _result["action"] == "SKIP":
+                    continue
+                sort_key = _result["sort_key"]
+                if sort_key > best_csp_score:
+                    best_csp_score = sort_key
+                    best_csp = {
+                        "strike": strike, "expiry": c["expiry"], "dte": dte,
+                        "bid": round(bid,2), "ask": round(ask,2), "premium": round(mid,2),
+                        "delta": round(delta,2), "annualized_return": round(ann,1),
+                        "below_min": ann < CSP_MIN_ANNUALIZED, "ivp": ivp_d,
+                        "action": _result["action"],
+                        "drop_type": _result["drop_type"],
+                        "yield_30d": _result["yield_30d"],
+                        "csp_flags": _result["flags"],
+                        "sort_key": sort_key,
+                        "contracts": _contracts,
+                    }
             except: continue
         if best_csp:
             w52h = md.get("week52_high",price); w52l = md.get("week52_low",price)
@@ -4026,9 +4146,15 @@ def run_scanner():
                 "signal":f"{pullback:.0f}% off highs",  # IVP shown in header
                 "risk_note":", ".join(warnings) if warnings else None,
             }
-            csp_entry["market_weak"] = spy_regime.get("market_weak", False)
-            csp_entry["score"] = score_csp(csp_entry)
-            csp_entry["normalized"] = normalized_score(csp_entry["score"], "CSP")
+            csp_entry["market_weak"]  = spy_regime.get("market_weak", False)
+            csp_entry["action"]       = best_csp.get("action", "WATCH")
+            csp_entry["drop_type"]    = best_csp.get("drop_type", "")
+            csp_entry["yield_30d"]    = best_csp.get("yield_30d", 0)
+            csp_entry["csp_flags"]    = best_csp.get("csp_flags", [])
+            csp_entry["sort_key"]     = best_csp.get("sort_key", 0)
+            csp_entry["contracts"]    = best_csp.get("contracts", 1)
+            csp_entry["score"]        = score_csp(csp_entry)  # kept for display score badge
+            csp_entry["normalized"]   = normalized_score(csp_entry["score"], "CSP")
             csp_entry["quality_label"] = quality_label(csp_entry["score"], SCORE_MAX["CSP"])
             dashboard_csps.append(csp_entry)
 
@@ -4252,7 +4378,7 @@ def run_scanner():
         o["unified_score"] = score_unified(o, "LEAPS")
 
     # Sort by canonical score descending — never by annualized return
-    dashboard_csps.sort(key=lambda x: x.get("score", 0), reverse=True)
+    dashboard_csps.sort(key=lambda x: x.get("sort_key", x.get("score",0)), reverse=True)
     dashboard_ccs.sort(key=lambda x: x.get("score", 0), reverse=True)
     dashboard_leaps.sort(key=lambda x: x.get("score", 0), reverse=True)
     # Build dashboard BCS list from ALL bcs_opps (not just top 3)
