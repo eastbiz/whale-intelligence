@@ -1,5 +1,5 @@
 {
-  "scan_time": "2026-03-28 10:30 ET",
+  "scan_time": "2026-03-28 10:34 ET",
   "scan_date": "2026-03-28",
   "execution_candidates": [
     {
@@ -24,9 +24,9 @@
         "premium_received": 13115.0,
         "cso": 884500.0,
         "action_label": "SCALE CSP",
-        "current_obligation": 2893300.0,
-        "resulting_obligation": 3777800.0,
-        "resulting_pct": 27.9,
+        "current_obligation": 2856800.0,
+        "resulting_obligation": 3741300.0,
+        "resulting_pct": 27.6,
         "remaining_after": 0,
         "within_limit": false
       }
@@ -926,7 +926,7 @@
       "warnings": [],
       "passes_quality": true,
       "risk_level": "Low",
-      "breakeven": 26.23,
+      "breakeven": 21.9,
       "premium_per_day": 0.14,
       "position_status": "Profit",
       "signal": "Profit | Income | IVP 30%",
@@ -1293,6 +1293,46 @@
       "candidate_type": "review"
     },
     {
+      "ticker": "IBIT",
+      "tier": "Opportunistic",
+      "price": 37.58,
+      "ivp": 73.9,
+      "mode": "CC",
+      "strike": 44.0,
+      "expiry": "2026-05-15",
+      "dte": 47,
+      "premium": 0.78,
+      "annualized_return": 13.7,
+      "delta": 0.21,
+      "below_min": false,
+      "warnings": [
+        "Overweight \u2014 higher delta allowed"
+      ],
+      "passes_quality": false,
+      "risk_level": "Medium",
+      "breakeven": 43.4,
+      "premium_per_day": 0.02,
+      "position_status": "Loss",
+      "signal": "Loss | \u26a0\ufe0f Overweight \u2014 reduce via CC | IVP 74%",
+      "risk_note": "Overweight position \u2014 delta up to 0.50 allowed",
+      "score": 4,
+      "normalized": 0.308,
+      "quality_label": "Weak",
+      "action_label": "SELL CC",
+      "sizing": {
+        "suggested_contracts": 131,
+        "capital_required": 0,
+        "premium_received": 10218.0,
+        "nva": 576400.0,
+        "shares_covered": 13100,
+        "already_covered": 0,
+        "total_shares": 13105,
+        "action_label": "SELL CC"
+      },
+      "unified_score": 4.73,
+      "candidate_type": "review"
+    },
+    {
       "ticker": "LULU",
       "tier": "Opportunistic",
       "price": 144.8,
@@ -1345,7 +1385,7 @@
       "below_min": false,
       "warnings": [],
       "passes_quality": true,
-      "signal": "\ud83d\udcc8 Profit | Above cost basis $26 | IVP 30%",
+      "signal": "\ud83d\udcc8 Profit | Above cost basis $22 | IVP 30%",
       "risk_note": null,
       "unified_score": 5.78,
       "candidate_type": "execution"
@@ -1448,6 +1488,26 @@
       "signal": "\ud83d\udcc8 Profit | Above cost basis $149 | IVP 54%",
       "risk_note": null,
       "unified_score": 6.23,
+      "candidate_type": "execution"
+    },
+    {
+      "ticker": "IBIT",
+      "tier": "Opportunistic",
+      "price": 37.58,
+      "ivp": 73.9,
+      "mode": "PIO",
+      "strike": 46.0,
+      "expiry": "2026-05-15",
+      "dte": 47,
+      "premium": 0.49,
+      "annualized_return": 8.4,
+      "delta": 0.15,
+      "below_min": false,
+      "warnings": [],
+      "passes_quality": true,
+      "signal": "\ud83d\udcc9 Loss | Above cost basis $43 | IVP 74%",
+      "risk_note": null,
+      "unified_score": 3.85,
       "candidate_type": "execution"
     },
     {
@@ -1974,10 +2034,10 @@
       "warnings": [],
       "passes_quality": true,
       "risk_level": "Low",
-      "breakeven": 26.23,
+      "breakeven": 21.9,
       "premium_per_day": 0.15,
       "position_status": "Profit",
-      "signal": "Profit position | Above cost basis $26",
+      "signal": "Profit position | Above cost basis $22",
       "risk_note": null,
       "candidate_type": "execution"
     },
@@ -2763,7 +2823,7 @@
       "warnings": [],
       "passes_quality": true,
       "risk_level": "Low",
-      "breakeven": 26.23,
+      "breakeven": 21.9,
       "premium_per_day": 0.14,
       "position_status": "Profit",
       "signal": "Profit | Income | IVP 30%",
@@ -3130,6 +3190,46 @@
       "candidate_type": "review"
     },
     {
+      "ticker": "IBIT",
+      "tier": "Opportunistic",
+      "price": 37.58,
+      "ivp": 73.9,
+      "mode": "CC",
+      "strike": 44.0,
+      "expiry": "2026-05-15",
+      "dte": 47,
+      "premium": 0.78,
+      "annualized_return": 13.7,
+      "delta": 0.21,
+      "below_min": false,
+      "warnings": [
+        "Overweight \u2014 higher delta allowed"
+      ],
+      "passes_quality": false,
+      "risk_level": "Medium",
+      "breakeven": 43.4,
+      "premium_per_day": 0.02,
+      "position_status": "Loss",
+      "signal": "Loss | \u26a0\ufe0f Overweight \u2014 reduce via CC | IVP 74%",
+      "risk_note": "Overweight position \u2014 delta up to 0.50 allowed",
+      "score": 4,
+      "normalized": 0.308,
+      "quality_label": "Weak",
+      "action_label": "SELL CC",
+      "sizing": {
+        "suggested_contracts": 131,
+        "capital_required": 0,
+        "premium_received": 10218.0,
+        "nva": 576400.0,
+        "shares_covered": 13100,
+        "already_covered": 0,
+        "total_shares": 13105,
+        "action_label": "SELL CC"
+      },
+      "unified_score": 4.73,
+      "candidate_type": "review"
+    },
+    {
       "ticker": "LULU",
       "tier": "Opportunistic",
       "price": 144.8,
@@ -3182,7 +3282,7 @@
       "below_min": false,
       "warnings": [],
       "passes_quality": true,
-      "signal": "\ud83d\udcc8 Profit | Above cost basis $26 | IVP 30%",
+      "signal": "\ud83d\udcc8 Profit | Above cost basis $22 | IVP 30%",
       "risk_note": null,
       "unified_score": 5.78,
       "candidate_type": "execution"
@@ -3285,6 +3385,26 @@
       "signal": "\ud83d\udcc8 Profit | Above cost basis $149 | IVP 54%",
       "risk_note": null,
       "unified_score": 6.23,
+      "candidate_type": "execution"
+    },
+    {
+      "ticker": "IBIT",
+      "tier": "Opportunistic",
+      "price": 37.58,
+      "ivp": 73.9,
+      "mode": "PIO",
+      "strike": 46.0,
+      "expiry": "2026-05-15",
+      "dte": 47,
+      "premium": 0.49,
+      "annualized_return": 8.4,
+      "delta": 0.15,
+      "below_min": false,
+      "warnings": [],
+      "passes_quality": true,
+      "signal": "\ud83d\udcc9 Loss | Above cost basis $43 | IVP 74%",
+      "risk_note": null,
+      "unified_score": 3.85,
       "candidate_type": "execution"
     },
     {
@@ -3811,10 +3931,10 @@
       "warnings": [],
       "passes_quality": true,
       "risk_level": "Low",
-      "breakeven": 26.23,
+      "breakeven": 21.9,
       "premium_per_day": 0.15,
       "position_status": "Profit",
-      "signal": "Profit position | Above cost basis $26",
+      "signal": "Profit position | Above cost basis $22",
       "risk_note": null,
       "candidate_type": "execution"
     },
@@ -3923,9 +4043,9 @@
     "portfolio_size": 13545000.0,
     "max_csp_allocation_pct": 25,
     "max_csp_allocation_usd": 3386250.0,
-    "total_csp_obligation": 2893300.0,
-    "csp_allocation_pct": 21.4,
-    "remaining_csp_capacity": 492950.0,
+    "total_csp_obligation": 2856800.0,
+    "csp_allocation_pct": 21.1,
+    "remaining_csp_capacity": 529450.0,
     "csp_positions": [
       {
         "ticker": "AMZN",
@@ -4018,8 +4138,8 @@
       {
         "ticker": "MSFT",
         "strike": 365.0,
-        "contracts": 2,
-        "cso": 73000.0,
+        "contracts": 1,
+        "cso": 36500.0,
         "expiry": "20260417",
         "source": "schwab"
       },
@@ -4216,7 +4336,7 @@
     "total_premium_csp": 13115.0,
     "total_premium_cc": 30679.0,
     "total_premium_all": 43794.0,
-    "max_assignment_exposure": 2893300.0,
+    "max_assignment_exposure": 2856800.0,
     "max_shares_called_away": 800,
     "leaps_positions": [
       {
@@ -4353,17 +4473,6 @@
       },
       {
         "ticker": "NVDA",
-        "strike": 100.0,
-        "contracts": 1,
-        "expiry": "20280121",
-        "expiry_fmt": "Jan 2028",
-        "dte": 663,
-        "avg_cost": 94.0566,
-        "breakeven": 194.06,
-        "source": "schwab"
-      },
-      {
-        "ticker": "NVDA",
         "strike": 130.0,
         "contracts": 1,
         "expiry": "20281215",
@@ -4371,6 +4480,17 @@
         "dte": 992,
         "avg_cost": 90.0066,
         "breakeven": 220.01,
+        "source": "schwab"
+      },
+      {
+        "ticker": "NVDA",
+        "strike": 100.0,
+        "contracts": 2,
+        "expiry": "20280121",
+        "expiry_fmt": "Jan 2028",
+        "dte": 663,
+        "avg_cost": 93.5066,
+        "breakeven": 193.51,
         "source": "schwab"
       },
       {
@@ -4453,9 +4573,9 @@
         "premium_received": 13115.0,
         "cso": 884500.0,
         "action_label": "SCALE CSP",
-        "current_obligation": 2893300.0,
-        "resulting_obligation": 3777800.0,
-        "resulting_pct": 27.9,
+        "current_obligation": 2856800.0,
+        "resulting_obligation": 3741300.0,
+        "resulting_pct": 27.6,
         "remaining_after": 0,
         "within_limit": false
       }
@@ -4668,142 +4788,6 @@
   ],
   "positions": [
     {
-      "ticker": "MSFT",
-      "tier": "Core",
-      "status": "Watchlist",
-      "exposure_pct": 0.0,
-      "target_range": "5\u201310%",
-      "pos_status": "Underweight",
-      "price_opp": "Pullback",
-      "action": "BUY",
-      "score": 9,
-      "pullback_pct": 35.9,
-      "above_ma200": false,
-      "shares_owned": 0,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0,
-      "uncovered_shares": 0,
-      "add_cc_contracts": 0,
-      "csp_contracts": 14,
-      "csp_obligation": 509000.0,
-      "exp_status": "CSP Only",
-      "account": "IRA",
-      "accounts_all": [
-        "IRA"
-      ],
-      "market_value": 0,
-      "mv_by_account": {},
-      "leaps": [],
-      "bcs": []
-    },
-    {
-      "ticker": "TSM",
-      "tier": "Core",
-      "status": "Owned",
-      "exposure_pct": 0.6,
-      "target_range": "5\u201310%",
-      "pos_status": "Underweight",
-      "price_opp": "Neutral",
-      "action": "ADD",
-      "score": 9,
-      "pullback_pct": 16.8,
-      "above_ma200": true,
-      "shares_owned": 253,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0.0,
-      "uncovered_shares": 253,
-      "add_cc_contracts": 2,
-      "csp_contracts": 4,
-      "csp_obligation": 124000.0,
-      "exp_status": "Stock + CSP",
-      "account": "IBKR",
-      "accounts_all": [
-        "IBKR"
-      ],
-      "market_value": 82743.0,
-      "mv_by_account": {
-        "IBKR": 82742.69
-      },
-      "leaps": [
-        {
-          "ticker": "TSM",
-          "strike": 170.0,
-          "contracts": 2,
-          "expiry": "20280121",
-          "expiry_fmt": "Jan 2028",
-          "dte": 663,
-          "avg_cost": 189.7869795,
-          "breakeven": 359.79,
-          "source": "ibkr"
-        }
-      ],
-      "bcs": []
-    },
-    {
-      "ticker": "VRTX",
-      "tier": "Core",
-      "status": "Watchlist",
-      "exposure_pct": 0.0,
-      "target_range": "5\u201310%",
-      "pos_status": "Underweight",
-      "price_opp": "Neutral",
-      "action": "ADD",
-      "score": 9,
-      "pullback_pct": 15.0,
-      "above_ma200": true,
-      "shares_owned": 0,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0,
-      "uncovered_shares": 0,
-      "add_cc_contracts": 0,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "Watchlist",
-      "account": "IBKR",
-      "accounts_all": [
-        "IBKR"
-      ],
-      "market_value": 0,
-      "mv_by_account": {},
-      "leaps": [],
-      "bcs": []
-    },
-    {
-      "ticker": "ASML",
-      "tier": "Core",
-      "status": "Owned",
-      "exposure_pct": 0.8,
-      "target_range": "5\u201310%",
-      "pos_status": "Underweight",
-      "price_opp": "Neutral",
-      "action": "ADD",
-      "score": 9,
-      "pullback_pct": 16.2,
-      "above_ma200": true,
-      "shares_owned": 90,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0.0,
-      "uncovered_shares": 90,
-      "add_cc_contracts": 0,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "Stock Only",
-      "account": "IBKR",
-      "accounts_all": [
-        "IBKR"
-      ],
-      "market_value": 104082.0,
-      "mv_by_account": {
-        "IBKR": 104082.34
-      },
-      "leaps": [],
-      "bcs": []
-    },
-    {
       "ticker": "CPRT",
       "tier": "Core",
       "status": "Watchlist",
@@ -4976,6 +4960,142 @@
       "bcs": []
     },
     {
+      "ticker": "TSM",
+      "tier": "Core",
+      "status": "Owned",
+      "exposure_pct": 0.6,
+      "target_range": "5\u201310%",
+      "pos_status": "Underweight",
+      "price_opp": "Neutral",
+      "action": "ADD",
+      "score": 9,
+      "pullback_pct": 16.8,
+      "above_ma200": true,
+      "shares_owned": 253,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0.0,
+      "uncovered_shares": 253,
+      "add_cc_contracts": 2,
+      "csp_contracts": 4,
+      "csp_obligation": 124000.0,
+      "exp_status": "Stock + CSP",
+      "account": "IBKR",
+      "accounts_all": [
+        "IBKR"
+      ],
+      "market_value": 82743.0,
+      "mv_by_account": {
+        "IBKR": 82742.69
+      },
+      "leaps": [
+        {
+          "ticker": "TSM",
+          "strike": 170.0,
+          "contracts": 2,
+          "expiry": "20280121",
+          "expiry_fmt": "Jan 2028",
+          "dte": 663,
+          "avg_cost": 189.7869795,
+          "breakeven": 359.79,
+          "source": "ibkr"
+        }
+      ],
+      "bcs": []
+    },
+    {
+      "ticker": "VRTX",
+      "tier": "Core",
+      "status": "Watchlist",
+      "exposure_pct": 0.0,
+      "target_range": "5\u201310%",
+      "pos_status": "Underweight",
+      "price_opp": "Neutral",
+      "action": "ADD",
+      "score": 9,
+      "pullback_pct": 15.0,
+      "above_ma200": true,
+      "shares_owned": 0,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0,
+      "uncovered_shares": 0,
+      "add_cc_contracts": 0,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "Watchlist",
+      "account": "IBKR",
+      "accounts_all": [
+        "IBKR"
+      ],
+      "market_value": 0,
+      "mv_by_account": {},
+      "leaps": [],
+      "bcs": []
+    },
+    {
+      "ticker": "ASML",
+      "tier": "Core",
+      "status": "Owned",
+      "exposure_pct": 0.8,
+      "target_range": "5\u201310%",
+      "pos_status": "Underweight",
+      "price_opp": "Neutral",
+      "action": "ADD",
+      "score": 9,
+      "pullback_pct": 16.2,
+      "above_ma200": true,
+      "shares_owned": 90,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0.0,
+      "uncovered_shares": 90,
+      "add_cc_contracts": 0,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "Stock Only",
+      "account": "IBKR",
+      "accounts_all": [
+        "IBKR"
+      ],
+      "market_value": 104082.0,
+      "mv_by_account": {
+        "IBKR": 104082.34
+      },
+      "leaps": [],
+      "bcs": []
+    },
+    {
+      "ticker": "MSFT",
+      "tier": "Core",
+      "status": "Watchlist",
+      "exposure_pct": 0.0,
+      "target_range": "5\u201310%",
+      "pos_status": "Underweight",
+      "price_opp": "Pullback",
+      "action": "BUY",
+      "score": 9,
+      "pullback_pct": 35.9,
+      "above_ma200": false,
+      "shares_owned": 0,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0,
+      "uncovered_shares": 0,
+      "add_cc_contracts": 0,
+      "csp_contracts": 13,
+      "csp_obligation": 472500.0,
+      "exp_status": "CSP Only",
+      "account": "CRT",
+      "accounts_all": [
+        "CRT"
+      ],
+      "market_value": 0,
+      "mv_by_account": {},
+      "leaps": [],
+      "bcs": []
+    },
+    {
       "ticker": "NVDA",
       "tier": "Core",
       "status": "Owned",
@@ -4998,13 +5118,13 @@
       "exp_status": "Stock + CSP",
       "account": "CRT",
       "accounts_all": [
-        "CRT",
-        "IRA"
+        "IRA",
+        "CRT"
       ],
       "market_value": 190685.0,
       "mv_by_account": {
-        "CRT": 29316.0,
-        "IRA": 15076.8
+        "IRA": 15076.8,
+        "CRT": 29316.0
       },
       "leaps": [
         {
@@ -5020,17 +5140,6 @@
         },
         {
           "ticker": "NVDA",
-          "strike": 100.0,
-          "contracts": 1,
-          "expiry": "20280121",
-          "expiry_fmt": "Jan 2028",
-          "dte": 663,
-          "avg_cost": 94.0566,
-          "breakeven": 194.06,
-          "source": "schwab"
-        },
-        {
-          "ticker": "NVDA",
           "strike": 130.0,
           "contracts": 1,
           "expiry": "20281215",
@@ -5038,6 +5147,17 @@
           "dte": 992,
           "avg_cost": 90.0066,
           "breakeven": 220.01,
+          "source": "schwab"
+        },
+        {
+          "ticker": "NVDA",
+          "strike": 100.0,
+          "contracts": 2,
+          "expiry": "20280121",
+          "expiry_fmt": "Jan 2028",
+          "dte": 663,
+          "avg_cost": 93.5066,
+          "breakeven": 193.51,
           "source": "schwab"
         }
       ],
@@ -5053,52 +5173,6 @@
           "source": "ibkr"
         }
       ]
-    },
-    {
-      "ticker": "GOOGL",
-      "tier": "Core",
-      "status": "Owned",
-      "exposure_pct": 6.0,
-      "target_range": "5\u201310%",
-      "pos_status": "On Target",
-      "price_opp": "Pullback",
-      "action": "ADD",
-      "score": 8,
-      "pullback_pct": 21.8,
-      "above_ma200": true,
-      "shares_owned": 2264,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0.0,
-      "uncovered_shares": 2264,
-      "add_cc_contracts": 22,
-      "csp_contracts": 14,
-      "csp_obligation": 386000.0,
-      "exp_status": "Stock + CSP",
-      "account": "CRT",
-      "accounts_all": [
-        "CRT",
-        "IRA"
-      ],
-      "market_value": 621106.0,
-      "mv_by_account": {
-        "CRT": 521246.0,
-        "IRA": 82302.0
-      },
-      "leaps": [
-        {
-          "ticker": "GOOGL",
-          "strike": 180.0,
-          "contracts": 4,
-          "expiry": "20270617",
-          "expiry_fmt": "Jun 2027",
-          "dte": 445,
-          "avg_cost": 139.1569795,
-          "breakeven": 319.16,
-          "source": "ibkr"
-        }
-      ],
-      "bcs": []
     },
     {
       "ticker": "BRK-B",
@@ -5133,37 +5207,49 @@
       "bcs": []
     },
     {
-      "ticker": "AMZN",
+      "ticker": "GOOGL",
       "tier": "Core",
       "status": "Owned",
-      "exposure_pct": 7.7,
+      "exposure_pct": 6.0,
       "target_range": "5\u201310%",
       "pos_status": "On Target",
       "price_opp": "Pullback",
       "action": "ADD",
-      "score": 7,
-      "pullback_pct": 23.3,
-      "above_ma200": false,
-      "shares_owned": 5200,
+      "score": 8,
+      "pullback_pct": 21.8,
+      "above_ma200": true,
+      "shares_owned": 2264,
       "cc_contracts": 0,
       "shares_covered": 0,
       "coverage_pct": 0.0,
-      "uncovered_shares": 5200,
-      "add_cc_contracts": 52,
-      "csp_contracts": 6,
-      "csp_obligation": 111000.0,
+      "uncovered_shares": 2264,
+      "add_cc_contracts": 22,
+      "csp_contracts": 14,
+      "csp_obligation": 386000.0,
       "exp_status": "Stock + CSP",
-      "account": "IRA",
+      "account": "CRT",
       "accounts_all": [
-        "CRT",
-        "IRA"
+        "IRA",
+        "CRT"
       ],
-      "market_value": 1036673.0,
+      "market_value": 621106.0,
       "mv_by_account": {
-        "CRT": 366785.6,
-        "IRA": 438548.0
+        "IRA": 82302.0,
+        "CRT": 521246.0
       },
-      "leaps": [],
+      "leaps": [
+        {
+          "ticker": "GOOGL",
+          "strike": 180.0,
+          "contracts": 4,
+          "expiry": "20270617",
+          "expiry_fmt": "Jun 2027",
+          "dte": 445,
+          "avg_cost": 139.1569795,
+          "breakeven": 319.16,
+          "source": "ibkr"
+        }
+      ],
       "bcs": []
     },
     {
@@ -5231,41 +5317,7 @@
       "bcs": []
     },
     {
-      "ticker": "AAPL",
-      "tier": "Core",
-      "status": "Owned",
-      "exposure_pct": 9.6,
-      "target_range": "5\u201310%",
-      "pos_status": "On Target",
-      "price_opp": "Neutral",
-      "action": "HOLD",
-      "score": 7,
-      "pullback_pct": 14.3,
-      "above_ma200": true,
-      "shares_owned": 5220,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0.0,
-      "uncovered_shares": 5220,
-      "add_cc_contracts": 52,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "Stock Only",
-      "account": "IRA",
-      "accounts_all": [
-        "CRT",
-        "IRA"
-      ],
-      "market_value": 1298736.0,
-      "mv_by_account": {
-        "CRT": 184112.0,
-        "IRA": 1114624.0
-      },
-      "leaps": [],
-      "bcs": []
-    },
-    {
-      "ticker": "UBER",
+      "ticker": "META",
       "tier": "Growth",
       "status": "Watchlist",
       "exposure_pct": 0.0,
@@ -5274,7 +5326,7 @@
       "price_opp": "Pullback",
       "action": "BUY",
       "score": 7,
-      "pullback_pct": 32.5,
+      "pullback_pct": 34.7,
       "above_ma200": false,
       "shares_owned": 0,
       "cc_contracts": 0,
@@ -5325,7 +5377,75 @@
       "bcs": []
     },
     {
-      "ticker": "META",
+      "ticker": "AMZN",
+      "tier": "Core",
+      "status": "Owned",
+      "exposure_pct": 7.7,
+      "target_range": "5\u201310%",
+      "pos_status": "On Target",
+      "price_opp": "Pullback",
+      "action": "ADD",
+      "score": 7,
+      "pullback_pct": 23.3,
+      "above_ma200": false,
+      "shares_owned": 5200,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0.0,
+      "uncovered_shares": 5200,
+      "add_cc_contracts": 52,
+      "csp_contracts": 6,
+      "csp_obligation": 111000.0,
+      "exp_status": "Stock + CSP",
+      "account": "IRA",
+      "accounts_all": [
+        "IRA",
+        "CRT"
+      ],
+      "market_value": 1036673.0,
+      "mv_by_account": {
+        "IRA": 438548.0,
+        "CRT": 366785.6
+      },
+      "leaps": [],
+      "bcs": []
+    },
+    {
+      "ticker": "AAPL",
+      "tier": "Core",
+      "status": "Owned",
+      "exposure_pct": 9.6,
+      "target_range": "5\u201310%",
+      "pos_status": "On Target",
+      "price_opp": "Neutral",
+      "action": "HOLD",
+      "score": 7,
+      "pullback_pct": 14.3,
+      "above_ma200": true,
+      "shares_owned": 5220,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0.0,
+      "uncovered_shares": 5220,
+      "add_cc_contracts": 52,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "Stock Only",
+      "account": "IRA",
+      "accounts_all": [
+        "IRA",
+        "CRT"
+      ],
+      "market_value": 1298736.0,
+      "mv_by_account": {
+        "IRA": 1114624.0,
+        "CRT": 184112.0
+      },
+      "leaps": [],
+      "bcs": []
+    },
+    {
+      "ticker": "UBER",
       "tier": "Growth",
       "status": "Watchlist",
       "exposure_pct": 0.0,
@@ -5334,7 +5454,7 @@
       "price_opp": "Pullback",
       "action": "BUY",
       "score": 7,
-      "pullback_pct": 34.7,
+      "pullback_pct": 32.5,
       "above_ma200": false,
       "shares_owned": 0,
       "cc_contracts": 0,
@@ -5431,83 +5551,7 @@
       "bcs": []
     },
     {
-      "ticker": "FIX",
-      "tier": "Opportunistic",
-      "status": "Owned",
-      "exposure_pct": 0.8,
-      "target_range": "1\u20133%",
-      "pos_status": "Underweight",
-      "price_opp": "Neutral",
-      "action": "ADD",
-      "score": 5,
-      "pullback_pct": 9.1,
-      "above_ma200": true,
-      "shares_owned": 75,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0.0,
-      "uncovered_shares": 75,
-      "add_cc_contracts": 0,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "Stock Only",
-      "account": "IBKR",
-      "accounts_all": [
-        "IBKR"
-      ],
-      "market_value": 102731.0,
-      "mv_by_account": {
-        "IBKR": 102731.35
-      },
-      "leaps": [],
-      "bcs": []
-    },
-    {
-      "ticker": "CRDO",
-      "tier": "Opportunistic",
-      "status": "Owned",
-      "exposure_pct": 0.4,
-      "target_range": "1\u20133%",
-      "pos_status": "Underweight",
-      "price_opp": "Pullback",
-      "action": "BUY",
-      "score": 5,
-      "pullback_pct": 55.8,
-      "above_ma200": false,
-      "shares_owned": 636,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0.0,
-      "uncovered_shares": 636,
-      "add_cc_contracts": 6,
-      "csp_contracts": 19,
-      "csp_obligation": 165000.0,
-      "exp_status": "Stock + CSP",
-      "account": "IBKR",
-      "accounts_all": [
-        "IBKR"
-      ],
-      "market_value": 60629.0,
-      "mv_by_account": {
-        "IBKR": 60629.07
-      },
-      "leaps": [
-        {
-          "ticker": "CRDO",
-          "strike": 70.0,
-          "contracts": 7,
-          "expiry": "20280121",
-          "expiry_fmt": "Jan 2028",
-          "dte": 663,
-          "avg_cost": 66.292693786,
-          "breakeven": 136.29,
-          "source": "ibkr"
-        }
-      ],
-      "bcs": []
-    },
-    {
-      "ticker": "NFLX",
+      "ticker": "PLTR",
       "tier": "Growth",
       "status": "Owned",
       "exposure_pct": 4.1,
@@ -5516,14 +5560,46 @@
       "price_opp": "Pullback",
       "action": "ADD",
       "score": 5,
-      "pullback_pct": 30.9,
+      "pullback_pct": 31.9,
       "above_ma200": false,
-      "shares_owned": 6000,
+      "shares_owned": 3886,
       "cc_contracts": 0,
       "shares_covered": 0,
       "coverage_pct": 0.0,
-      "uncovered_shares": 6000,
-      "add_cc_contracts": 60,
+      "uncovered_shares": 3886,
+      "add_cc_contracts": 38,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "Stock Only",
+      "account": "IBKR",
+      "accounts_all": [
+        "IBKR"
+      ],
+      "market_value": 555931.0,
+      "mv_by_account": {
+        "IBKR": 555931.16
+      },
+      "leaps": [],
+      "bcs": []
+    },
+    {
+      "ticker": "MSTR",
+      "tier": "Opportunistic",
+      "status": "Owned",
+      "exposure_pct": 0.5,
+      "target_range": "1\u20133%",
+      "pos_status": "Underweight",
+      "price_opp": "Pullback",
+      "action": "BUY",
+      "score": 5,
+      "pullback_pct": 72.5,
+      "above_ma200": false,
+      "shares_owned": 500,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0.0,
+      "uncovered_shares": 500,
+      "add_cc_contracts": 5,
       "csp_contracts": 0,
       "csp_obligation": 0,
       "exp_status": "Stock Only",
@@ -5531,9 +5607,9 @@
       "accounts_all": [
         "CRT"
       ],
-      "market_value": 560580.0,
+      "market_value": 63015.0,
       "mv_by_account": {
-        "CRT": 560580.0
+        "CRT": 63015.0
       },
       "leaps": [],
       "bcs": []
@@ -5605,38 +5681,6 @@
       "bcs": []
     },
     {
-      "ticker": "MSTR",
-      "tier": "Opportunistic",
-      "status": "Owned",
-      "exposure_pct": 0.5,
-      "target_range": "1\u20133%",
-      "pos_status": "Underweight",
-      "price_opp": "Pullback",
-      "action": "BUY",
-      "score": 5,
-      "pullback_pct": 72.5,
-      "above_ma200": false,
-      "shares_owned": 500,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0.0,
-      "uncovered_shares": 500,
-      "add_cc_contracts": 5,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "Stock Only",
-      "account": "CRT",
-      "accounts_all": [
-        "CRT"
-      ],
-      "market_value": 63015.0,
-      "mv_by_account": {
-        "CRT": 63015.0
-      },
-      "leaps": [],
-      "bcs": []
-    },
-    {
       "ticker": "BABA",
       "tier": "Opportunistic",
       "status": "Owned",
@@ -5664,6 +5708,38 @@
       "market_value": 45886.0,
       "mv_by_account": {
         "IBKR": 45886.06
+      },
+      "leaps": [],
+      "bcs": []
+    },
+    {
+      "ticker": "FIX",
+      "tier": "Opportunistic",
+      "status": "Owned",
+      "exposure_pct": 0.8,
+      "target_range": "1\u20133%",
+      "pos_status": "Underweight",
+      "price_opp": "Neutral",
+      "action": "ADD",
+      "score": 5,
+      "pullback_pct": 9.1,
+      "above_ma200": true,
+      "shares_owned": 75,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0.0,
+      "uncovered_shares": 75,
+      "add_cc_contracts": 0,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "Stock Only",
+      "account": "IBKR",
+      "accounts_all": [
+        "IBKR"
+      ],
+      "market_value": 102731.0,
+      "mv_by_account": {
+        "IBKR": 102731.35
       },
       "leaps": [],
       "bcs": []
@@ -5699,7 +5775,7 @@
       "bcs": []
     },
     {
-      "ticker": "PLTR",
+      "ticker": "NFLX",
       "tier": "Growth",
       "status": "Owned",
       "exposure_pct": 4.1,
@@ -5708,26 +5784,70 @@
       "price_opp": "Pullback",
       "action": "ADD",
       "score": 5,
-      "pullback_pct": 31.9,
+      "pullback_pct": 30.9,
       "above_ma200": false,
-      "shares_owned": 3886,
+      "shares_owned": 6000,
       "cc_contracts": 0,
       "shares_covered": 0,
       "coverage_pct": 0.0,
-      "uncovered_shares": 3886,
-      "add_cc_contracts": 38,
+      "uncovered_shares": 6000,
+      "add_cc_contracts": 60,
       "csp_contracts": 0,
       "csp_obligation": 0,
       "exp_status": "Stock Only",
+      "account": "CRT",
+      "accounts_all": [
+        "CRT"
+      ],
+      "market_value": 560580.0,
+      "mv_by_account": {
+        "CRT": 560580.0
+      },
+      "leaps": [],
+      "bcs": []
+    },
+    {
+      "ticker": "CRDO",
+      "tier": "Opportunistic",
+      "status": "Owned",
+      "exposure_pct": 0.4,
+      "target_range": "1\u20133%",
+      "pos_status": "Underweight",
+      "price_opp": "Pullback",
+      "action": "BUY",
+      "score": 5,
+      "pullback_pct": 55.8,
+      "above_ma200": false,
+      "shares_owned": 636,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0.0,
+      "uncovered_shares": 636,
+      "add_cc_contracts": 6,
+      "csp_contracts": 19,
+      "csp_obligation": 165000.0,
+      "exp_status": "Stock + CSP",
       "account": "IBKR",
       "accounts_all": [
         "IBKR"
       ],
-      "market_value": 555931.0,
+      "market_value": 60629.0,
       "mv_by_account": {
-        "IBKR": 555931.16
+        "IBKR": 60629.07
       },
-      "leaps": [],
+      "leaps": [
+        {
+          "ticker": "CRDO",
+          "strike": 70.0,
+          "contracts": 7,
+          "expiry": "20280121",
+          "expiry_fmt": "Jan 2028",
+          "dte": 663,
+          "avg_cost": 66.292693786,
+          "breakeven": 136.29,
+          "source": "ibkr"
+        }
+      ],
       "bcs": []
     },
     {
@@ -5785,13 +5905,13 @@
       "exp_status": "10% Covered",
       "account": "CRT",
       "accounts_all": [
-        "CRT",
-        "IRA"
+        "IRA",
+        "CRT"
       ],
       "market_value": 368815.0,
       "mv_by_account": {
-        "CRT": 63012.5,
-        "IRA": 20164.0
+        "IRA": 20164.0,
+        "CRT": 63012.5
       },
       "leaps": [],
       "bcs": []
@@ -5851,13 +5971,13 @@
       "exp_status": "Stock Only",
       "account": "CRT",
       "accounts_all": [
-        "CRT",
-        "IRA"
+        "IRA",
+        "CRT"
       ],
       "market_value": 490127.0,
       "mv_by_account": {
-        "CRT": 350625.0,
-        "IRA": 139502.0
+        "IRA": 139502.0,
+        "CRT": 350625.0
       },
       "leaps": [
         {
@@ -5872,6 +5992,106 @@
           "source": "schwab"
         }
       ],
+      "bcs": []
+    },
+    {
+      "ticker": "IIPR-A",
+      "tier": "Other",
+      "status": "Owned",
+      "exposure_pct": 0.2,
+      "target_range": "0\u20130%",
+      "pos_status": "Overweight",
+      "price_opp": "Near High",
+      "action": "TRIM",
+      "score": -4,
+      "pullback_pct": 0,
+      "above_ma200": true,
+      "shares_owned": 1000,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0.0,
+      "uncovered_shares": 1000,
+      "add_cc_contracts": 10,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "Stock Only",
+      "account": "IRA",
+      "accounts_all": [
+        "IRA"
+      ],
+      "market_value": 22440.0,
+      "mv_by_account": {
+        "IRA": 22440.0
+      },
+      "leaps": [],
+      "bcs": []
+    },
+    {
+      "ticker": "OWL",
+      "tier": "Other",
+      "status": "Owned",
+      "exposure_pct": 0.5,
+      "target_range": "0\u20130%",
+      "pos_status": "Overweight",
+      "price_opp": "Near High",
+      "action": "TRIM",
+      "score": -4,
+      "pullback_pct": 0,
+      "above_ma200": true,
+      "shares_owned": 7600,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0.0,
+      "uncovered_shares": 7600,
+      "add_cc_contracts": 76,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "Stock Only",
+      "account": "Personal",
+      "accounts_all": [
+        "Personal",
+        "IRA"
+      ],
+      "market_value": 67184.0,
+      "mv_by_account": {
+        "Personal": 53924.0,
+        "IRA": 13260.0
+      },
+      "leaps": [],
+      "bcs": []
+    },
+    {
+      "ticker": "NLCP",
+      "tier": "Other",
+      "status": "Owned",
+      "exposure_pct": 1.7,
+      "target_range": "0\u20130%",
+      "pos_status": "Overweight",
+      "price_opp": "Near High",
+      "action": "TRIM",
+      "score": -4,
+      "pullback_pct": 0,
+      "above_ma200": true,
+      "shares_owned": 15490,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0.0,
+      "uncovered_shares": 15490,
+      "add_cc_contracts": 154,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "Stock Only",
+      "account": "Personal",
+      "accounts_all": [
+        "Personal",
+        "IRA"
+      ],
+      "market_value": 232350.0,
+      "mv_by_account": {
+        "Personal": 178950.0,
+        "IRA": 53400.0
+      },
+      "leaps": [],
       "bcs": []
     },
     {
@@ -5930,72 +6150,6 @@
       ]
     },
     {
-      "ticker": "NLCP",
-      "tier": "Other",
-      "status": "Owned",
-      "exposure_pct": 1.7,
-      "target_range": "0\u20130%",
-      "pos_status": "Overweight",
-      "price_opp": "Near High",
-      "action": "TRIM",
-      "score": -4,
-      "pullback_pct": 0,
-      "above_ma200": true,
-      "shares_owned": 15490,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0.0,
-      "uncovered_shares": 15490,
-      "add_cc_contracts": 154,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "Stock Only",
-      "account": "Personal",
-      "accounts_all": [
-        "Personal",
-        "IRA"
-      ],
-      "market_value": 232350.0,
-      "mv_by_account": {
-        "Personal": 178950.0,
-        "IRA": 53400.0
-      },
-      "leaps": [],
-      "bcs": []
-    },
-    {
-      "ticker": "IIPR-A",
-      "tier": "Other",
-      "status": "Owned",
-      "exposure_pct": 0.2,
-      "target_range": "0\u20130%",
-      "pos_status": "Overweight",
-      "price_opp": "Near High",
-      "action": "TRIM",
-      "score": -4,
-      "pullback_pct": 0,
-      "above_ma200": true,
-      "shares_owned": 1000,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0.0,
-      "uncovered_shares": 1000,
-      "add_cc_contracts": 10,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "Stock Only",
-      "account": "IRA",
-      "accounts_all": [
-        "IRA"
-      ],
-      "market_value": 22440.0,
-      "mv_by_account": {
-        "IRA": 22440.0
-      },
-      "leaps": [],
-      "bcs": []
-    },
-    {
       "ticker": "PATH",
       "tier": "Other",
       "status": "Owned",
@@ -6038,42 +6192,8 @@
         }
       ],
       "bcs": []
-    },
-    {
-      "ticker": "OWL",
-      "tier": "Other",
-      "status": "Owned",
-      "exposure_pct": 0.5,
-      "target_range": "0\u20130%",
-      "pos_status": "Overweight",
-      "price_opp": "Near High",
-      "action": "TRIM",
-      "score": -4,
-      "pullback_pct": 0,
-      "above_ma200": true,
-      "shares_owned": 7600,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0.0,
-      "uncovered_shares": 7600,
-      "add_cc_contracts": 76,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "Stock Only",
-      "account": "Personal",
-      "accounts_all": [
-        "Personal",
-        "IRA"
-      ],
-      "market_value": 67184.0,
-      "mv_by_account": {
-        "Personal": 53924.0,
-        "IRA": 13260.0
-      },
-      "leaps": [],
-      "bcs": []
     }
   ],
-  "analysis": "**BEST TRADES TODAY:**\n\n1. **Best CSP:** NVDA $145 strike, 2026-05-01, 33 DTE, $2.13/$2.17, delta 0.15, 16.4% annualized\n   - Note: Delta below your 0.20 minimum but quality stock at good level\n\n2. **Best CC:** AMZN $215 strike, 2026-05-01, 33 DTE, $5.05/$5.30, delta 0.30, 28.8% annualized\n   - Superior to NVDA CC due to higher annualized return\n\n3. **Best LEAPS:** BABA $80 strike, 2028-01-21, 663 DTE, $51.00/$53.75, delta 0.85\n   - **HARD PASS** - Trend action says WAIT, price at 5-day lows with no base formed\n\n4. **Bull Call Spreads:** None available\n\n5. **Peter Lynch:** None available\n\n6. **IVP Environment:** Elevated volatility across the board (NVDA 58%, AMZN 55%, NBIS 90%) - good premium selling environment\n\n**QUALITY CONCERNS:** All stocks below 200MA except AAPL/GOOGL. Market weakness evident but IVP levels make premium collection attractive for income strategies.\n\n**RECOMMENDATION:** Focus on AMZN CC for best risk-adjusted income. Skip LEAPS until BABA forms a base.",
+  "analysis": "**BEST TRADES:**\n\n1. **Best CSP:** NVDA - $145 strike, 2026-05-01 expiry, 33 DTE, $2.13/$2.17, delta 0.15, 16.4% annualized\n   - Warning: Delta too low (0.15 vs framework 0.20-0.30)\n\n2. **Best CC:** AMZN - $215 strike, 2026-05-01 expiry, 33 DTE, $5.05/$5.30, delta 0.30, 28.8% annualized\n\n3. **Best LEAPS:** BABA - $80 strike, 2028-01-21 expiry, 663 DTE, $51.00/$53.75, delta 0.85, 19.5% extrinsic\n   - **HARD PASS** - Trend signal shows \"AT LOWS\" with no base formation\n\n4. **Best Bull Call Spread:** None available\n\n5. **Peter Lynch Discovery:** None\n\n6. **Position Income CCs:** GOOGL $290 strike, 2026-05-15 expiry, 26.9% annualized return (best opportunity)\n\n7. **IVP Environment:** Elevated across board (NVDA 58%, AMZN 55%, GOOGL 54%) - strong premium environment\n\n**RECOMMENDATION:** Focus on AMZN covered call - excellent 28.8% annualized return in high-IV environment. Skip BABA LEAPS until price stabilizes above current lows.",
   "total_opps": 12
 }
