@@ -5062,15 +5062,27 @@ def run_scanner():
         _strike = _pos.get("strike", 0)
         _expiry = _pos.get("expiry", "")
         _mark = 0
+        # Normalize expiry to YYYY-MM-DD for comparison
+        _exp_norm = str(_expiry).replace("-","")[:8]  # YYYYMMDD
         for _c in _contracts_opt:
-            if (abs(float(_c.get("strike",0)) - _strike) < 0.01 and
-                    str(_c.get("expiry",""))[:10] == str(_expiry)[:10] and
+            _c_exp = str(_c.get("expiry","")).replace("-","")[:8]
+            if (abs(float(_c.get("strike",0)) - _strike) < 0.5 and
+                    _c_exp == _exp_norm and
                     _c.get("option_type") == "P"):
                 _b = float(_c.get("nbbo_bid",0) or 0)
                 _a = float(_c.get("nbbo_ask",0) or 0)
                 if _b > 0 or _a > 0:
                     _mark = (_b + _a) / 2
                 break
+        # If still 0, find closest strike
+        if _mark == 0:
+            _puts = [_c for _c in _contracts_opt if _c.get("option_type") == "P"
+                     and abs(float(_c.get("strike",0)) - _strike) < 1.0]
+            if _puts:
+                _c = _puts[0]
+                _b = float(_c.get("nbbo_bid",0) or 0)
+                _a = float(_c.get("nbbo_ask",0) or 0)
+                _mark = (_b + _a) / 2 if (_b > 0 or _a > 0) else 0
         # Earnings
         _earn = get_earnings_date(_ticker)
         _earn_days = (_earn - datetime.now()).days if _earn else 999
@@ -5115,9 +5127,11 @@ def run_scanner():
         _mark_cc = _pos.get("mark", 0)
         if not _mark_cc:
             _contracts_opt = contracts_cache.get(_ticker, [])
+            _exp_norm_cc = str(_expiry).replace("-","")[:8]
             for _c in _contracts_opt:
-                if (abs(float(_c.get("strike",0)) - _strike) < 0.01 and
-                        str(_c.get("expiry",""))[:10] == str(_expiry)[:10] and
+                _c_exp = str(_c.get("expiry","")).replace("-","")[:8]
+                if (abs(float(_c.get("strike",0)) - _strike) < 0.5 and
+                        _c_exp == _exp_norm_cc and
                         _c.get("option_type") == "C"):
                     _b = float(_c.get("nbbo_bid",0) or 0)
                     _a = float(_c.get("nbbo_ask",0) or 0)
