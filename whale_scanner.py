@@ -1370,188 +1370,181 @@ def score_csp(opp: dict) -> int:
 def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
                                total_csp_exposure: float, spy_day_chg: float = 0) -> dict:
     """
-    CSP / CC Position Management Engine.
-    Spec: March 2026. Determines CLOSE NOW / REDUCE / HOLD / DEFENSIVE.
-    Actions evaluated in strict priority order — first match wins.
+    CSP / CC Position Management Engine v2.
+    Spec: March 2026 v2. Breakeven-first, safe-zone protected.
+    Actions: DEFENSIVE, CLOSE NOW, OPTIONAL CLOSE, REDUCE, HOLD
+    Priority: profit capture > real risk > time > velocity > earnings
     """
     ticker        = pos.get("ticker", "")
-    pos_type      = pos.get("type", "CSP")         # "CSP" or "CC"
+    pos_type      = pos.get("type", "CSP")
     contracts     = pos.get("contracts", 1)
     strike        = pos.get("strike", 0)
     expiry_str    = pos.get("expiry", "")
-    prem_received = pos.get("premium_received", 0)  # net credit per share at open (proxy = avg_cost)
-    mark          = pos.get("mark", 0)              # current option mid price per share
+    prem_received = abs(pos.get("premium_received", 0))
+    mark          = pos.get("mark", 0)
     tier          = pos.get("tier", "Opportunistic")
     earn_days     = pos.get("days_to_earnings", 999)
     assignment_intent = pos.get("assignment_intent", False)
 
-    md            = mkt.get(ticker, {})
-    underlying    = md.get("price", 0)
-    day_chg       = md.get("day_change_pct", 0)
-    chg_3d        = md.get("change_3d_pct", 0)
+    md         = mkt.get(ticker, {})
+    underlying = md.get("price", 0)
+    day_chg    = md.get("day_change_pct", 0)
+    chg_3d     = md.get("change_3d_pct", 0)
 
     # ── DTE ────────────────────────────────────────────────────────────
     try:
         from datetime import datetime as _dt
-        exp_fmt = "%Y%m%d" if len(expiry_str) == 8 else "%Y-%m-%d"
-        dte = (_dt.strptime(expiry_str[:10].replace("-",""), "%Y%m%d") - _dt.now()).days
+        _raw = str(expiry_str).replace("-","")
+        if len(_raw) >= 8:
+            dte = (_dt.strptime(_raw[:8], "%Y%m%d") - _dt.now()).days
+        else:
+            dte = 30
     except Exception:
         dte = 30
+    dte = max(0, dte)
 
     # ── Market regime ──────────────────────────────────────────────────
-    volatile = abs(spy_day_chg) >= 0.015  # SPY move >= 1.5%
+    volatile = abs(spy_day_chg) >= 0.015
 
-    # ── Derived metrics ────────────────────────────────────────────────
-    if prem_received > 0 and mark >= 0:
-        profit_pct          = round((prem_received - mark) / prem_received * 100, 1)
-        extrinsic_remaining = round(mark / prem_received * 100, 1)
+    # ── Core metrics ───────────────────────────────────────────────────
+    # Profit % — capped display at -100%
+    if prem_received > 0:
+        profit_pct       = round((prem_received - mark) / prem_received * 100, 1)
+        remaining_prem   = round(mark / prem_received * 100, 1)
     else:
-        profit_pct          = 0
-        extrinsic_remaining = 100
+        profit_pct       = 0
+        remaining_prem   = 100
 
+    profit_pct = max(profit_pct, -100)
+
+    # Dollar P&L
+    pnl_dollar = round((prem_received - mark) * contracts * 100, 0)
+
+    # Breakeven (PRIMARY risk metric per v2 spec)
     if pos_type == "CSP":
-        distance_to_strike = round((underlying - strike) / underlying * 100, 1) if underlying > 0 else 99
+        breakeven          = round(strike - prem_received, 2)
+        dist_to_breakeven  = round((underlying - breakeven) / underlying * 100, 1) if underlying > 0 else 99
+        dist_to_strike     = round((underlying - strike) / underlying * 100, 1) if underlying > 0 else 99
     else:  # CC
-        distance_to_strike = round((strike - underlying) / underlying * 100, 1) if underlying > 0 else 99
+        breakeven          = round(strike + prem_received, 2)
+        dist_to_breakeven  = round((breakeven - underlying) / underlying * 100, 1) if underlying > 0 else 99
+        dist_to_strike     = round((strike - underlying) / underlying * 100, 1) if underlying > 0 else 99
 
-    is_fast_drop        = day_chg <= -0.020
-    is_accelerating     = chg_3d  <= -0.040
-    is_fast_rally       = day_chg >= 0.020
-    csp_exposure_pct    = round(total_csp_exposure / portfolio_value * 100, 1) if portfolio_value > 0 else 0
+    # Velocity signals — only meaningful when risk is present
+    is_fast_drop       = day_chg <= -0.020
+    is_accelerating    = chg_3d  <= -0.040
+    is_fast_rally      = day_chg >= 0.020
 
-    # ── Thresholds by regime ───────────────────────────────────────────
-    profit_target       = 50 if volatile else 60
-    near_exp_dte        = 5  if volatile else 3
-    danger_dist         = 5  if volatile else 3
-    good_day_threshold  = 40 if volatile else 50
+    # Safe zone: long DTE + good cushion → cannot be DEFENSIVE, ignore velocity
+    in_safe_zone = dte > 30 and dist_to_breakeven >= 10
 
-    reasons = []
-    action  = "HOLD"
+    # Earnings zone
+    if earn_days < 3:   earn_zone = "CRITICAL"
+    elif earn_days <= 7: earn_zone = "DANGER"
+    elif earn_days <= 14: earn_zone = "CAUTION"
+    else:               earn_zone = "SAFE"
 
-    # ── EARNINGS OVERRIDE (hard — evaluated before all else) ───────────
-    if earn_days <= 7:
-        earn_zone = "CRITICAL" if earn_days < 3 else "DANGER"
-    elif earn_days <= 14:
-        earn_zone = "CAUTION"
-    else:
-        earn_zone = "SAFE"
+    earn_risk = earn_days <= 5
 
-    if earn_zone != "SAFE":
-        if pos_type == "CSP":
-            if not assignment_intent and earn_days <= 5:
-                return _mgmt_result("CLOSE NOW", f"Earnings in {earn_days}d — close before binary event",
-                                    profit_pct, dte, distance_to_strike, extrinsic_remaining, earn_zone)
-            if earn_days <= 7 and profit_pct >= 40:
-                return _mgmt_result("CLOSE NOW", f"Earnings {earn_days}d away, {profit_pct}% profit — take it",
-                                    profit_pct, dte, distance_to_strike, extrinsic_remaining, earn_zone)
-            if earn_days <= 7 and distance_to_strike <= 5:
-                return _mgmt_result("CLOSE NOW", f"Earnings {earn_days}d, only {distance_to_strike}% above strike",
-                                    profit_pct, dte, distance_to_strike, extrinsic_remaining, earn_zone)
-            if earn_days <= 7 and (is_fast_drop or is_accelerating):
-                return _mgmt_result("CLOSE NOW", f"Earnings {earn_days}d + fast drop — too risky",
-                                    profit_pct, dte, distance_to_strike, extrinsic_remaining, earn_zone)
-        else:  # CC
-            if earn_days <= 5 and distance_to_strike <= 5:
-                return _mgmt_result("CLOSE NOW", f"Earnings {earn_days}d, stock within {distance_to_strike}% of call strike",
-                                    profit_pct, dte, distance_to_strike, extrinsic_remaining, earn_zone)
-            if earn_days <= 5 and profit_pct >= 50:
-                return _mgmt_result("CLOSE NOW", f"Earnings {earn_days}d, {profit_pct}% profit — don't cap upside into event",
-                                    profit_pct, dte, distance_to_strike, extrinsic_remaining, earn_zone)
+    # ── Helper to return result ────────────────────────────────────────
+    def R(action, reason):
+        priority = {"DEFENSIVE":0,"CLOSE NOW":1,"OPTIONAL CLOSE":2,"REDUCE":3,"HOLD":4}
+        return {
+            "action":          action,
+            "reason":          reason,
+            "profit_pct":      profit_pct,
+            "pnl_dollar":      pnl_dollar,
+            "dte":             dte,
+            "breakeven":       breakeven,
+            "dist_to_be_pct":  dist_to_breakeven,
+            "dist_to_strike":  dist_to_strike,
+            "remaining_prem":  remaining_prem,
+            "earn_zone":       earn_zone,
+            "earn_days":       earn_days,
+            "sort_priority":   priority.get(action, 4),
+        }
 
-    # ── CSP MANAGEMENT RULES (priority order) ─────────────────────────
+    # ══════════════════════════════════════════════════════════════════
+    # STEP 1: PROFIT OVERRIDE (top priority — §6)
+    # ══════════════════════════════════════════════════════════════════
+    if profit_pct >= 95:
+        return R("CLOSE NOW", f"{profit_pct}% profit captured — excellent result, close now")
+    if profit_pct >= 90:
+        return R("OPTIONAL CLOSE", f"{profit_pct}% profit captured, low risk, long DTE" if in_safe_zone else f"{profit_pct}% profit — strong exit window")
+
+    # ══════════════════════════════════════════════════════════════════
+    # CSP LOGIC (§7)
+    # ══════════════════════════════════════════════════════════════════
     if pos_type == "CSP":
-        # P1: Immediate assignment risk
-        if distance_to_strike <= 2:
-            return _mgmt_result("DEFENSIVE", f"Only {distance_to_strike}% above strike — assignment risk immediate",
-                                profit_pct, dte, distance_to_strike, extrinsic_remaining, earn_zone)
-        # P2: Fast drop near strike
-        if is_fast_drop and distance_to_strike <= 5:
-            return _mgmt_result("CLOSE NOW", f"Fast drop ({day_chg*100:.1f}% today) with only {distance_to_strike}% cushion",
-                                profit_pct, dte, distance_to_strike, extrinsic_remaining, earn_zone)
-        # P3: Multi-day acceleration down
-        if is_accelerating:
-            return _mgmt_result("CLOSE NOW", f"3-day drop {chg_3d*100:.1f}% — downside accelerating",
-                                profit_pct, dte, distance_to_strike, extrinsic_remaining, earn_zone)
-        # P4: Profit target hit
-        if profit_pct >= profit_target:
-            return _mgmt_result("CLOSE NOW", f"{profit_pct}% profit captured — at {profit_target}% target",
-                                profit_pct, dte, distance_to_strike, extrinsic_remaining, earn_zone)
-        # P5: Extrinsic almost gone
-        if extrinsic_remaining <= 25:
-            return _mgmt_result("CLOSE NOW", f"Only {extrinsic_remaining}% premium remains — last pennies not worth the risk",
-                                profit_pct, dte, distance_to_strike, extrinsic_remaining, earn_zone)
-        # P6: Near expiration with little left
-        if dte <= near_exp_dte and extrinsic_remaining <= 35:
-            return _mgmt_result("CLOSE NOW", f"{dte} DTE, {extrinsic_remaining}% remaining — poor reward for late hold",
-                                profit_pct, dte, distance_to_strike, extrinsic_remaining, earn_zone)
-        # P7: Green day exit
-        if is_fast_rally and profit_pct >= good_day_threshold:
-            return _mgmt_result("CLOSE NOW", f"Up {day_chg*100:.1f}% today with {profit_pct}% profit — use green day to exit",
-                                profit_pct, dte, distance_to_strike, extrinsic_remaining, earn_zone)
-        # Portfolio overlay: high exposure upgrades
-        if csp_exposure_pct > 30:
-            action = "REDUCE"
-            reasons.append(f"CSP exposure {csp_exposure_pct}% of portfolio — reduce")
-        # P8: Risk score
-        risk = 0
-        if dte <= near_exp_dte: risk += 2
-        if distance_to_strike <= danger_dist: risk += 2
-        if profit_pct >= profit_target: risk += 1
-        if day_chg <= -0.015: risk += 1
-        if risk >= 3:
-            return _mgmt_result("CLOSE NOW", f"Risk score {risk} — multiple danger signals",
-                                profit_pct, dte, distance_to_strike, extrinsic_remaining, earn_zone)
-        if risk == 2 and action != "REDUCE":
-            action = "REDUCE"
-            reasons.append(f"Moderate risk score — reduce size")
 
-    # ── CC MANAGEMENT RULES (priority order) ──────────────────────────
+        # DEFENSIVE — rare, requires real risk (§7 + §8 safe zone guard)
+        if not in_safe_zone:
+            defensive_trigger = (
+                dte <= 7 and dist_to_breakeven <= 2 and
+                (is_accelerating or earn_risk)
+            )
+            if defensive_trigger:
+                return R("DEFENSIVE", f"DTE {dte}, only {dist_to_breakeven}% above breakeven" +
+                         (" + earnings in " + str(earn_days) + "d" if earn_risk else " + 3d drop accelerating"))
+
+        # CLOSE NOW — §7
+        if dte <= 7 and not assignment_intent:
+            if profit_pct >= 50:
+                return R("CLOSE NOW", f"DTE {dte}, {profit_pct}% profit — take it")
+            if remaining_prem <= 25:
+                return R("CLOSE NOW", f"DTE {dte}, only {remaining_prem}% premium remains")
+            if profit_pct < 0:
+                return R("CLOSE NOW", f"DTE {dte}, small loss — don't hold into expiry")
+
+        # OPTIONAL CLOSE — §7
+        if profit_pct >= 70 and dist_to_breakeven >= 8:
+            return R("OPTIONAL CLOSE", f"{profit_pct}% profit, {dist_to_breakeven}% above breakeven — good exit window")
+
+        # REDUCE — §7
+        if dte <= 21 and profit_pct >= 40 and dist_to_breakeven <= 5:
+            return R("REDUCE", f"DTE {dte}, {profit_pct}% profit, only {dist_to_breakeven}% above breakeven — reduce size")
+
+        # Velocity escalation — only when risk present (§9)
+        if not in_safe_zone and is_accelerating and dist_to_breakeven <= 5:
+            return R("CLOSE NOW", f"3D drop {chg_3d*100:.1f}%, only {dist_to_breakeven}% above breakeven")
+
+        # Earnings escalation (§10)
+        if earn_risk and dist_to_breakeven <= 5:
+            return R("CLOSE NOW", f"Earnings in {earn_days}d, only {dist_to_breakeven}% above breakeven")
+        if earn_risk and profit_pct >= 40:
+            return R("OPTIONAL CLOSE", f"Earnings in {earn_days}d, {profit_pct}% profit — consider closing before event")
+
+        # HOLD — safe zone or nothing triggered
+        if in_safe_zone:
+            return R("HOLD", f"DTE {dte}, {dist_to_breakeven}% above breakeven — safe to hold")
+        return R("HOLD", f"{profit_pct}% profit, DTE {dte}, {dist_to_breakeven}% above breakeven")
+
+    # ══════════════════════════════════════════════════════════════════
+    # CC LOGIC (§11)
+    # ══════════════════════════════════════════════════════════════════
     else:
-        # P1: Extrinsic almost gone
-        if extrinsic_remaining <= 22:
-            return _mgmt_result("CLOSE NOW", f"Only {extrinsic_remaining}% premium remains — free the shares",
-                                profit_pct, dte, distance_to_strike, extrinsic_remaining, earn_zone)
-        # P2: Near expiry with small mark
-        if dte <= near_exp_dte and mark < 0.20:
-            return _mgmt_result("CLOSE NOW", f"{dte} DTE, mark ${mark:.2f} — not worth keeping cap on",
-                                profit_pct, dte, distance_to_strike, extrinsic_remaining, earn_zone)
-        # P3: Stock rallying hard near strike
-        if is_fast_rally and distance_to_strike <= 3:
-            return _mgmt_result("CLOSE NOW", f"Stock up {day_chg*100:.1f}% within {distance_to_strike}% of call strike — avoid losing upside",
-                                profit_pct, dte, distance_to_strike, extrinsic_remaining, earn_zone)
-        # P4: Stock falling, most premium captured
-        if is_fast_drop and profit_pct >= 50:
-            return _mgmt_result("CLOSE NOW", f"Stock falling + {profit_pct}% profit — downside protection consumed",
-                                profit_pct, dte, distance_to_strike, extrinsic_remaining, earn_zone)
-        # P5: Profit target
-        if profit_pct >= profit_target:
-            return _mgmt_result("CLOSE NOW", f"{profit_pct}% profit — at target, free the shares",
-                                profit_pct, dte, distance_to_strike, extrinsic_remaining, earn_zone)
-        # P6: Portfolio overlay
-        if csp_exposure_pct > 30:
-            action = "REDUCE"
-            reasons.append(f"High portfolio concentration — reduce CC coverage")
+        # CLOSE NOW
+        if remaining_prem <= 20:
+            return R("CLOSE NOW", f"Only {remaining_prem}% premium remains — free the shares")
+        if dte <= 7 and mark < 0.20:
+            return R("CLOSE NOW", f"DTE {dte}, mark ${mark:.2f} — not worth keeping cap on")
+        if is_fast_rally and dist_to_strike <= 3:
+            return R("CLOSE NOW", f"Stock up {day_chg*100:.1f}%, within {dist_to_strike}% of call strike — protect upside")
+        if earn_risk and dist_to_strike <= 3:
+            return R("CLOSE NOW", f"Earnings {earn_days}d, stock within {dist_to_strike}% of strike — close before event")
+        if profit_pct >= 95:
+            return R("CLOSE NOW", f"{profit_pct}% profit — free the shares")
 
-    if not reasons:
-        reasons = [f"{profit_pct}% profit, {dte} DTE, {distance_to_strike:.1f}% from strike"]
+        # OPTIONAL CLOSE
+        if profit_pct >= 85 and dist_to_strike >= 5:
+            return R("OPTIONAL CLOSE", f"{profit_pct}% profit, far from strike — good exit window")
 
-    return _mgmt_result(action, " · ".join(reasons),
-                        profit_pct, dte, distance_to_strike, extrinsic_remaining, earn_zone)
+        # DEFENSIVE
+        if not in_safe_zone and dist_to_strike <= 2 and (is_fast_rally or earn_risk):
+            return R("DEFENSIVE", f"Stock pressing strike" + (" + earnings " + str(earn_days) + "d" if earn_risk else " + rallying fast"))
 
-
-def _mgmt_result(action, reason, profit_pct, dte, distance, extrinsic, earn_zone):
-    """Helper to build consistent management engine output dict."""
-    priority = {"DEFENSIVE": 0, "CLOSE NOW": 1, "REDUCE": 2, "HOLD": 3}
-    return {
-        "action":        action,
-        "reason":        reason,
-        "profit_pct":    profit_pct,
-        "dte":           dte,
-        "distance_pct":  distance,
-        "extrinsic_pct": extrinsic,
-        "earn_zone":     earn_zone,
-        "sort_priority": priority.get(action, 3),
-    }
+        # HOLD
+        return R("HOLD", f"{profit_pct}% profit, DTE {dte}, {dist_to_strike}% below strike")
 
 
 def score_leaps(opp: dict) -> int:
@@ -5093,28 +5086,31 @@ def run_scanner():
             mkt, PORTFOLIO_SIZE, _total_cso, _spy_day
         )
         _pos_actions.append({
-            "account":       _pos.get("account",""),
-            "ticker":        _ticker,
-            "tier":          _tier,
-            "type":          "CSP",
-            "contracts":     _pos.get("contracts",1),
-            "strike":        _strike,
-            "expiry":        str(_expiry)[:10],
-            "dte":           _result["dte"],
-            "underlying":    round(mkt.get(_ticker,{}).get("price",0),2),
-            "mark":          round(_mark,2),
+            "account":        _pos.get("account",""),
+            "ticker":         _ticker,
+            "tier":           _tier,
+            "type":           "CSP",
+            "contracts":      _pos.get("contracts",1),
+            "strike":         _strike,
+            "expiry":         str(_expiry)[:10],
+            "dte":            _result["dte"],
+            "underlying":     round(mkt.get(_ticker,{}).get("price",0),2),
+            "mark":           round(_mark,2),
             "premium_received": round(_pos.get("premium_received",0),2),
-            "profit_pct":    _result["profit_pct"],
-            "distance_pct":  _result["distance_pct"],
-            "extrinsic_pct": _result["extrinsic_pct"],
-            "day_chg_pct":   round(mkt.get(_ticker,{}).get("day_change_pct",0)*100,2),
-            "chg_3d_pct":    round(mkt.get(_ticker,{}).get("change_3d_pct",0)*100,2),
-            "cso":           _pos.get("cso",0),
-            "earn_days":     _earn_days,
-            "earn_zone":     _result["earn_zone"],
-            "action":        _result["action"],
-            "reason":        _result["reason"],
-            "sort_priority": _result["sort_priority"],
+            "profit_pct":     _result["profit_pct"],
+            "pnl_dollar":     _result["pnl_dollar"],
+            "breakeven":      _result["breakeven"],
+            "dist_to_be_pct": _result["dist_to_be_pct"],
+            "dist_to_strike": _result["dist_to_strike"],
+            "remaining_prem": _result["remaining_prem"],
+            "day_chg_pct":    round(mkt.get(_ticker,{}).get("day_change_pct",0)*100,2),
+            "chg_3d_pct":     round(mkt.get(_ticker,{}).get("change_3d_pct",0)*100,2),
+            "cso":            _pos.get("cso",0),
+            "earn_days":      _result["earn_days"],
+            "earn_zone":      _result["earn_zone"],
+            "action":         _result["action"],
+            "reason":         _result["reason"],
+            "sort_priority":  _result["sort_priority"],
         })
 
     for _pos in portfolio_exposure.get("cc_positions", []):
@@ -5146,28 +5142,31 @@ def run_scanner():
             mkt, PORTFOLIO_SIZE, _total_cso, _spy_day
         )
         _pos_actions.append({
-            "account":       _pos.get("account",""),
-            "ticker":        _ticker,
-            "tier":          _tier,
-            "type":          "CC",
-            "contracts":     _pos.get("contracts",1),
-            "strike":        _strike,
-            "expiry":        str(_expiry)[:10],
-            "dte":           _result["dte"],
-            "underlying":    round(mkt.get(_ticker,{}).get("price",0),2),
-            "mark":          round(_mark_cc,2),
+            "account":        _pos.get("account",""),
+            "ticker":         _ticker,
+            "tier":           _tier,
+            "type":           "CC",
+            "contracts":      _pos.get("contracts",1),
+            "strike":         _strike,
+            "expiry":         str(_expiry)[:10],
+            "dte":            _result["dte"],
+            "underlying":     round(mkt.get(_ticker,{}).get("price",0),2),
+            "mark":           round(_mark_cc,2),
             "premium_received": round(_pos.get("premium_received",0),2),
-            "profit_pct":    _result["profit_pct"],
-            "distance_pct":  _result["distance_pct"],
-            "extrinsic_pct": _result["extrinsic_pct"],
-            "day_chg_pct":   round(mkt.get(_ticker,{}).get("day_change_pct",0)*100,2),
-            "chg_3d_pct":    round(mkt.get(_ticker,{}).get("change_3d_pct",0)*100,2),
-            "shares_covered":_pos.get("shares_covered",0),
-            "earn_days":     _earn_days,
-            "earn_zone":     _result["earn_zone"],
-            "action":        _result["action"],
-            "reason":        _result["reason"],
-            "sort_priority": _result["sort_priority"],
+            "profit_pct":     _result["profit_pct"],
+            "pnl_dollar":     _result["pnl_dollar"],
+            "breakeven":      _result["breakeven"],
+            "dist_to_be_pct": _result["dist_to_be_pct"],
+            "dist_to_strike": _result["dist_to_strike"],
+            "remaining_prem": _result["remaining_prem"],
+            "day_chg_pct":    round(mkt.get(_ticker,{}).get("day_change_pct",0)*100,2),
+            "chg_3d_pct":     round(mkt.get(_ticker,{}).get("change_3d_pct",0)*100,2),
+            "shares_covered": _pos.get("shares_covered",0),
+            "earn_days":      _result["earn_days"],
+            "earn_zone":      _result["earn_zone"],
+            "action":         _result["action"],
+            "reason":         _result["reason"],
+            "sort_priority":  _result["sort_priority"],
         })
 
     _pos_actions.sort(key=lambda x: x.get("sort_priority", 3))
