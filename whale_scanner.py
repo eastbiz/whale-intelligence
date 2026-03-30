@@ -747,8 +747,21 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
 
         if side == "Short" and put_call == "P":
             cso      = round(strike * 100 * qty, 0)
-            avg_cost_opt = abs(float(pos.get("avg_cost", 0) or pos.get("averagePrice", 0) or pos.get("costBasisPrice", 0) or 0))
+            # avg_cost for IBKR short options: negative = credit received (e.g. -4.95 = received $4.95)
+            # costBasisPrice for Schwab: positive premium received
+            _raw_avg = float(pos.get("avg_cost", 0) or pos.get("averagePrice", 0) or pos.get("costBasisPrice", 0) or 0)
+            # For short positions IBKR stores negative avg_cost = credit received
+            # We want the absolute value of what was received per share
+            avg_cost_opt = abs(_raw_avg)
+            # IBKR stores avg_cost in per-contract terms (×100), not per-share
+            # If value > 50 it's almost certainly per-contract — divide by 100
+            if avg_cost_opt > 50:
+                avg_cost_opt = avg_cost_opt / 100
+            # Cross-check with market_value to derive current mark
+            _mv  = float(pos.get("market_value", 0) or 0)
+            _mark_from_mv = abs(_mv / (qty * 100)) if qty > 0 else 0
             acct_lbl = pos.get("account_type", "") or ("IBKR" if source == "ibkr" else source)
+            print(f"   CSP pos {underlying}: avg_cost_raw={_raw_avg:.4f} premium_received={avg_cost_opt:.4f} mark_from_mv={_mark_from_mv:.4f}")
             csp_positions.append({
                 "ticker":              underlying,
                 "strike":              strike,
@@ -757,7 +770,8 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
                 "expiry":              expiry,
                 "source":              source,
                 "account":             acct_lbl,
-                "premium_received":    round(avg_cost_opt, 4),  # avg cost = net credit per share
+                "premium_received":    round(avg_cost_opt, 4),  # abs(avg_cost) = credit received per share
+                "mark_from_mv":        round(_mark_from_mv, 4),
             })
         elif side == "Short" and put_call == "C":
             # BCS short leg: DTE >= 400 days — exclude from CC coverage
@@ -788,6 +802,7 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
                 nva = round(strike * 100 * qty, 0)
                 shares_covered = int(qty * 100)
                 avg_cost_cc  = abs(float(pos.get("avg_cost", 0) or pos.get("averagePrice", 0) or pos.get("costBasisPrice", 0) or 0))
+                if avg_cost_cc > 50: avg_cost_cc = avg_cost_cc / 100
                 acct_lbl_cc  = pos.get("account_type", "") or ("IBKR" if source == "ibkr" else source)
                 mv_cc        = float(pos.get("market_value", 0) or 0)
                 mark_cc      = abs(mv_cc / (qty * 100)) if qty > 0 else 0
@@ -5076,6 +5091,9 @@ def run_scanner():
                 _b = float(_c.get("nbbo_bid",0) or 0)
                 _a = float(_c.get("nbbo_ask",0) or 0)
                 _mark = (_b + _a) / 2 if (_b > 0 or _a > 0) else 0
+        # Final fallback: use mark derived from IBKR market_value
+        if _mark == 0:
+            _mark = _pos.get("mark_from_mv", 0)
         # Earnings
         _earn = get_earnings_date(_ticker)
         _earn_days = (_earn - datetime.now()).days if _earn else 999
