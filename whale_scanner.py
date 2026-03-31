@@ -3575,6 +3575,8 @@ def run_scanner():
     schwab_total = sum(a.get("net_liquidation", 0) for a in schwab_accounts)
     ibkr_total   = sum(v.get("market_value", 0) for v in ibkr.values()
                        if v.get("asset_class") == "STK")
+    _ibkr_stk_count = sum(1 for v in ibkr.values() if v.get("asset_class") == "STK")
+    print(f"   Portfolio calc: Schwab NLV=${schwab_total:,.0f} | IBKR STK count={_ibkr_stk_count} total MV=${ibkr_total:,.0f}")
     live_total   = schwab_total + ibkr_total
     if live_total >= 100_000:  # sanity check — must be at least $100k to trust
         PORTFOLIO_SIZE = round(live_total, -3)  # round to nearest $1000
