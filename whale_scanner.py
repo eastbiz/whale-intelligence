@@ -1515,6 +1515,13 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
         if profit_pct >= 70 and dist_to_breakeven >= 8:
             return R("OPTIONAL CLOSE", f"{profit_pct}% profit, {dist_to_breakeven}% above breakeven — good exit window")
 
+        # BELOW BREAKEVEN — stock has passed through breakeven (no cushion left)
+        if dist_to_breakeven < 0:
+            if dte <= 21:
+                return R("CLOSE NOW", f"Stock ${underlying:.2f} is below breakeven ${breakeven:.2f} with {dte} DTE — assignment likely")
+            else:
+                return R("REDUCE", f"Stock ${underlying:.2f} below breakeven ${breakeven:.2f} — consider reducing size")
+
         # REDUCE — §7
         if dte <= 21 and profit_pct >= 40 and dist_to_breakeven <= 5:
             return R("REDUCE", f"DTE {dte}, {profit_pct}% profit, only {dist_to_breakeven}% above breakeven — reduce size")
