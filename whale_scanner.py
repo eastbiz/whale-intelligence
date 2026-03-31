@@ -706,6 +706,13 @@ def get_ibkr_positions() -> dict:
         lopt = sum(1 for v in positions.values() if v["asset_class"]=="OPT" and v.get("side")=="Long")
         sopt = sum(1 for v in positions.values() if v["asset_class"]=="OPT" and v.get("side")=="Short")
         print(f"   IBKR: {stk} stocks, {lopt} long options, {sopt} short options loaded")
+        # Debug: show unique asset categories found
+        cats = set(v.get("asset_class","?") for v in positions.values())
+        print(f"   IBKR asset categories: {cats}")
+        # Show first 3 STK positions for verification
+        stk_pos = [(k,v) for k,v in positions.items() if v.get("asset_class")=="STK"][:3]
+        for k,v in stk_pos:
+            print(f"   IBKR STK: {k} qty={v.get('quantity')} mv={v.get('market_value')}")
     except Exception as e:
         print(f"   IBKR error: {e}")
     return positions
