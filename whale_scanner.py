@@ -4767,7 +4767,8 @@ def run_scanner():
             mv = float(pos.get("market_value", 0) or 0)
             if mv > 0 and PORTFOLIO_SIZE > 0:
                 t = ticker.replace("BRK B","BRK-B").strip()
-                exposure_map[t] = round(mv / PORTFOLIO_SIZE * 100, 1)
+                _exp = round(mv / PORTFOLIO_SIZE * 100, 2)
+                exposure_map[t] = max(_exp, 0.01)  # min 0.01% so small positions show as Owned
                 mv_map_total[t] = mv
                 mv_map_acct[t]  = dict(schwab_mv_by_acct[t]) if t in schwab_mv_by_acct else {"IBKR": mv}
 
