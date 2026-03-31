@@ -713,6 +713,12 @@ def get_ibkr_positions() -> dict:
         stk_pos = [(k,v) for k,v in positions.items() if v.get("asset_class")=="STK"][:3]
         for k,v in stk_pos:
             print(f"   IBKR STK: {k} qty={v.get('quantity')} mv={v.get('market_value')}")
+        # Show MU specifically
+        if "MU" in positions:
+            print(f"   IBKR MU found: {positions['MU']}")
+        else:
+            mu_keys = [k for k in positions if "MU" in k.upper()]
+            print(f"   IBKR MU keys: {mu_keys}")
     except Exception as e:
         print(f"   IBKR error: {e}")
     return positions
