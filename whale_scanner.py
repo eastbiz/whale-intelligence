@@ -1216,6 +1216,11 @@ def score_cc(opp: dict) -> int:
     if 15 <= ann <= 35:     s += 2
     elif 8 <= ann < 15:     s += 1
     elif ann > 35:          s += 1   # high return is ok but not +3
+    # Rebound boost: stock up strongly today = ideal CC timing
+    day_chg = opp.get("day_change_pct", 0)
+    if day_chg >= 0.07:     s += 3   # strong rally — prioritize CC
+    elif day_chg >= 0.05:   s += 2   # solid rebound — boost CC
+    elif day_chg >= 0.03:   s += 1   # moderate up day — slight boost
     return max(0, s)
 
 def csp_engine(opp: dict, spy_day_chg: float = 0) -> dict:
@@ -1263,6 +1268,23 @@ def csp_engine(opp: dict, spy_day_chg: float = 0) -> dict:
 
     if spy_downgrade and action == "BUY":
         action = "WAIT"; flags.append("HIGH VOLATILITY")
+
+    # ── Rebound suppression: avoid CSPs on sharp up days ──────────────
+    # A strong rebound day means premium spike + likely reversal risk
+    # Use relative rebound: how much of the 5d drop was recovered today
+    rebound_relative = drop_1d / abs(drop_5d) if drop_5d < -0.01 else 0
+    if drop_1d >= 0.07:
+        # Skip CSP entirely — strong rally day, sell CC instead
+        return {"action": "SKIP", "drop_type": drop_type, "yield_30d": 0,
+                "flags": ["REBOUND DAY — use CC"], "sort_key": 0}
+    elif drop_1d >= 0.05 or rebound_relative >= 0.6:
+        # Downgrade one level — moderate rally or recovered most of 5d drop
+        if action == "BUY":
+            action = "WAIT"
+        elif action == "WATCH":
+            action = "SKIP"
+            return {"action": "SKIP", "drop_type": drop_type, "yield_30d": 0,
+                    "flags": ["REBOUND DAY — use CC"], "sort_key": 0}
 
     # ── Step 2: Trend penalties — MAX 2, priority ordered ─────
     # Priority: 1=below200DMA (strongest), 2=at_lows, 3=below50DMA (weakest)
@@ -3858,7 +3880,8 @@ def run_scanner():
                       "delta": spike_cc.get("delta",0), "ivp": base.get("ivp",50),
                       "annualized_return": spike_cc.get("annualized_return",0),
                       "strike": spike_cc.get("strike",0),
-                      "breakeven": spike_cc.get("avg_cost",0)})})
+                      "breakeven": spike_cc.get("avg_cost",0),
+                      "day_change_pct": base.get("day_change_pct",0)})})
                 print(f"  [{tier}] {ticker}: ⚡ SPIKE CC ${spike_cc['strike']} "
                       f"{spike_cc['annualized_return']}% ann | "
                       f"{spike_info['today_change']:+.1f}% move")
@@ -4506,6 +4529,7 @@ def run_scanner():
                     "signal":f"{pos_status} | {'⚠️ Overweight — reduce via CC' if is_overweight else 'Income'} | IVP {ivp_d:.0f}%",
                     "risk_note":"Overweight position — delta up to 0.50 allowed" if is_overweight else None,
                 }
+                cc_entry["day_change_pct"] = md.get("day_change_pct", 0)
                 cc_entry["score"] = score_cc(cc_entry)
                 cc_entry["normalized"] = normalized_score(cc_entry["score"], "CC")
                 cc_entry["quality_label"] = quality_label(cc_entry["score"], SCORE_MAX["CC"])
