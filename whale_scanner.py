@@ -855,16 +855,18 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
                     _exp_str = _exp_dt.strftime("%b %Y")
                 except:
                     _exp_str = str(expiry)[:7]
+                _leaps_mv = float(pos.get("market_value", 0) or 0)
                 leaps_positions.append({
-                    "ticker":    underlying,
-                    "strike":    _strike_f,
-                    "contracts": int(qty),
-                    "expiry":    str(expiry),
-                    "expiry_fmt":_exp_str,
-                    "dte":       _dte,
-                    "avg_cost":  avg_cost,
-                    "breakeven": breakeven,
-                    "source":    source,
+                    "ticker":       underlying,
+                    "strike":       _strike_f,
+                    "contracts":    int(qty),
+                    "expiry":       str(expiry),
+                    "expiry_fmt":   _exp_str,
+                    "dte":          _dte,
+                    "avg_cost":     avg_cost,
+                    "breakeven":    breakeven,
+                    "market_value": round(_leaps_mv, 0),
+                    "source":       source,
                 })
 
     total_cso     = sum(p["cso"] for p in csp_positions)
