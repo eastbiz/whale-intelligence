@@ -108,6 +108,32 @@ OPP_CC_DELTA_MAX      = 0.40  # post-spike hard max per doc
 OPP_IVP_MIN           = 40
 OPP_EARNINGS_MIN      = 7
 
+# ── Per-symbol income trade settings ────────────────────────────────────────
+# Source: Income Trades worksheet (Positions_Buy_Sell_Delta.xlsx).
+# Keys: buy_under   — max effective entry for CSP (strike - premium <= buy_under)
+#       sell_above  — min effective exit for CC (strike + premium >= sell_above)
+#       csp_delta_min/max — hard delta range for CSP candidates
+#       cc_delta_min/max  — hard delta range for CC candidates
+# Tickers NOT listed use global delta constants and skip price-alignment filters.
+SYMBOL_SETTINGS = {
+    "AAPL": {"buy_under":  200, "sell_above":  280, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28},
+    "AMZN": {"buy_under":  185, "sell_above":  230, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28},
+    "CLS":  {"buy_under":  220, "sell_above":  340, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
+    "CRDO": {"buy_under":   80, "sell_above":  140, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
+    "FIX":  {"buy_under": 1000, "sell_above": 1600, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
+    "GOOGL":{"buy_under":  250, "sell_above":  340, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28},
+    "GRBK": {"buy_under":   55, "sell_above":   80, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
+    "IBIT": {"buy_under":   34, "sell_above":   47, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
+    "MELI": {"buy_under": 1480, "sell_above": 1900, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
+    "NBIS": {"buy_under":   70, "sell_above":  135, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
+    "NFLX": {"buy_under":   65, "sell_above":  107, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.32},
+    "NVDA": {"buy_under":  155, "sell_above":  205, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28},
+    "PLTR": {"buy_under":   80, "sell_above":  195, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
+    "TSLA": {"buy_under":  335, "sell_above":  440, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
+    "TSM":  {"buy_under":  270, "sell_above":  380, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
+    "IBKR": {"buy_under":   50, "sell_above":   74, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28},
+}
+
 # Mode 3: Post-Drop CSP — triggered BY downward drops
 DROP_TRIGGER_MIN      = 0.08  # minimum drop to trigger (8-12%+)
 DROP_CSP_DTE_MIN      = 25    # DTE range
@@ -1225,11 +1251,15 @@ def score_cc(opp: dict) -> int:
     elif day_chg >= 0.03:   s += 1   # moderate up day — slight boost
     return max(0, s)
 
-def csp_engine(opp: dict, spy_day_chg: float = 0) -> dict:
+def csp_engine(opp: dict, spy_day_chg: float = 0,
+               buy_under: float = 0, csp_delta_min: float = 0, csp_delta_max: float = 0) -> dict:
     """
     CSP Entry Engine v3 — price-first, risk-aware.
     Actions: BUY_SAFE, BUY_RISKY, WAIT, SKIP
     Penalty stacking limited to top 2 strongest.
+    buy_under:     per-symbol max effective entry (strike - premium). 0 = no restriction.
+    csp_delta_min: per-symbol delta floor. 0 = use global default.
+    csp_delta_max: per-symbol delta ceiling. 0 = use global default.
     """
     tier      = opp.get("tier", "Opportunistic")
     delta     = abs(opp.get("delta", 0))
@@ -1330,12 +1360,34 @@ def csp_engine(opp: dict, spy_day_chg: float = 0) -> dict:
                 "yield_30d": round(yield_30d*100, 2),
                 "flags": ["PREMIUM < $500"], "sort_key": 0}
 
-    # ── Step 4: Delta check ────────────────────────────────────
-    max_delta = 0.30 if ivp > 50 else 0.25
-    if delta > max_delta:
+    # ── Step 3b: Buy Under — effective entry alignment ─────────
+    # effective_entry = strike - premium (what we'd pay if assigned)
+    # Only applies when buy_under is set for this symbol.
+    if buy_under > 0 and strike > 0:
+        effective_entry = round(strike - premium, 2)
+        overshoot_pct = (effective_entry - buy_under) / buy_under * 100
+        if overshoot_pct > 10:
+            # More than 10% above buy_under — hard skip
+            return {"action": "SKIP", "drop_type": drop_type,
+                    "yield_30d": round(yield_30d*100, 2),
+                    "flags": [f"ENTRY ${effective_entry:.2f} > BUY UNDER ${buy_under:.2f}"], "sort_key": 0}
+        elif overshoot_pct > 0:
+            # Effective entry above buy_under — downgrade one level
+            flags.append(f"ENTRY ${effective_entry:.2f} > BUY UNDER ${buy_under:.2f}")
+            if action == "BUY":
+                action = "WAIT"
+
+    # ── Step 4: Delta check (uses per-symbol range when provided) ──
+    _delta_max = csp_delta_max if csp_delta_max > 0 else (0.30 if ivp > 50 else 0.25)
+    _delta_min = csp_delta_min if csp_delta_min > 0 else 0.0
+    if delta > _delta_max:
         return {"action": "SKIP", "drop_type": drop_type,
                 "yield_30d": round(yield_30d*100, 2),
-                "flags": [f"DELTA > {max_delta}"], "sort_key": 0}
+                "flags": [f"DELTA {delta:.2f} > MAX {_delta_max:.2f}"], "sort_key": 0}
+    if _delta_min > 0 and delta < _delta_min:
+        return {"action": "SKIP", "drop_type": drop_type,
+                "yield_30d": round(yield_30d*100, 2),
+                "flags": [f"DELTA {delta:.2f} < MIN {_delta_min:.2f}"], "sort_key": 0}
 
     # ── Step 5: Portfolio context ──────────────────────────────
     if opp.get("over_allocation"):      flags.append("OVER ALLOCATION")
@@ -4366,6 +4418,12 @@ def run_scanner():
         # off_low_5d from trend state
         _off_low_5d = _trend_cached.get("off_low_5d", 5.0) if _trend_cached else 5.0
 
+        # ── Per-symbol settings for CSP ──────────────────────
+        _sym_s = SYMBOL_SETTINGS.get(ticker, {})
+        _buy_under     = _sym_s.get("buy_under", 0)
+        _csp_delta_min = _sym_s.get("csp_delta_min", 0)
+        _csp_delta_max = _sym_s.get("csp_delta_max", 0)
+
         best_csp = None; best_csp_score = -1
         for c in puts_30_60:
             try:
@@ -4389,7 +4447,7 @@ def run_scanner():
                 _target_cso = _sizes.get(tier, 12500)
                 _contracts = max(1, round(_target_cso / (strike * 100)))
 
-                # Run new CSP engine
+                # Run new CSP engine — passes buy_under + per-symbol delta range
                 _pullback = round(pullback_from_high(price, md.get("week52_high", price)) * 100, 1)
                 _eng_opp = {
                     "tier": tier, "delta": delta, "dte": dte, "strike": strike,
@@ -4402,7 +4460,10 @@ def run_scanner():
                     "over_allocation": False,
                     "csp_exposure_pct": 0,
                 }
-                _result = csp_engine(_eng_opp, spy_day_chg=spy_regime.get("day_change", 0))
+                _result = csp_engine(_eng_opp, spy_day_chg=spy_regime.get("day_change", 0),
+                                     buy_under=_buy_under,
+                                     csp_delta_min=_csp_delta_min,
+                                     csp_delta_max=_csp_delta_max)
                 if _result["action"] == "SKIP":
                     print(f"   DBG CSP SKIP {ticker}: dte={dte} d={delta:.2f} flags={_result['flags']} drop1d={_drop_1d:.2%} drop5d={_drop_5d:.2%} yield={_result['yield_30d']:.2f}% contracts={_contracts}")
                     continue
@@ -4420,6 +4481,8 @@ def run_scanner():
                         "csp_flags": _result["flags"],
                         "sort_key": sort_key,
                         "contracts": _contracts,
+                        "effective_entry": round(strike - mid, 2),
+                        "buy_under": _buy_under if _buy_under > 0 else None,
                     }
             except: continue
         if best_csp:
@@ -4450,13 +4513,15 @@ def run_scanner():
                 "signal":f"{pullback:.0f}% off highs",  # IVP shown in header
                 "risk_note":", ".join(warnings) if warnings else None,
             }
-            csp_entry["market_weak"]  = spy_regime.get("market_weak", False)
-            csp_entry["action"]       = best_csp.get("action", "WATCH")
-            csp_entry["drop_type"]    = best_csp.get("drop_type", "")
-            csp_entry["yield_30d"]    = best_csp.get("yield_30d", 0)
-            csp_entry["csp_flags"]    = best_csp.get("csp_flags", [])
-            csp_entry["sort_key"]     = best_csp.get("sort_key", 0)
-            csp_entry["contracts"]    = best_csp.get("contracts", 1)
+            csp_entry["market_weak"]      = spy_regime.get("market_weak", False)
+            csp_entry["action"]           = best_csp.get("action", "WATCH")
+            csp_entry["drop_type"]        = best_csp.get("drop_type", "")
+            csp_entry["yield_30d"]        = best_csp.get("yield_30d", 0)
+            csp_entry["csp_flags"]        = best_csp.get("csp_flags", [])
+            csp_entry["sort_key"]         = best_csp.get("sort_key", 0)
+            csp_entry["contracts"]        = best_csp.get("contracts", 1)
+            csp_entry["effective_entry"]  = best_csp.get("effective_entry")   # strike - premium
+            csp_entry["buy_under"]        = best_csp.get("buy_under")         # None if no setting
             csp_entry["score"]        = score_csp(csp_entry)  # kept for display score badge
             csp_entry["normalized"]   = normalized_score(csp_entry["score"], "CSP")
             csp_entry["quality_label"] = quality_label(csp_entry["score"], SCORE_MAX["CSP"])
@@ -4468,11 +4533,19 @@ def run_scanner():
         #   Overweight pos:   allow up to 0.50 (happy to be called away)
         # Strike: must be above cost basis
         if qty_d >= 100:
+            # Per-symbol settings for CC
+            _sym_cc     = SYMBOL_SETTINGS.get(ticker, {})
+            _sell_above = _sym_cc.get("sell_above", 0)
+            _cc_dmin    = _sym_cc.get("cc_delta_min", 0)
+            _cc_dmax    = _sym_cc.get("cc_delta_max", 0)
+
             # Determine if overweight to set delta range
             global_pct_d = (qty_d * price / PORTFOLIO_SIZE * 100) if PORTFOLIO_SIZE > 0 else 0
             tier_max = {"Core":10,"Growth":6,"Cyclical":5,"Opportunistic":3}.get(tier,3)
             is_overweight = global_pct_d > tier_max
-            d_min = 0.20; d_max = 0.50 if is_overweight else 0.35  # overweight: closer strikes ok
+            # Use per-symbol cc_delta range when available, else fall back to global defaults
+            d_min = _cc_dmin if _cc_dmin > 0 else 0.20
+            d_max = 0.50 if is_overweight else (_cc_dmax if _cc_dmax > 0 else 0.35)
             d_target = 0.40 if is_overweight else 0.25  # scoring target
 
             _already_cc  = portfolio_exposure.get("cc_shares_covered",{}).get(ticker, 0)
@@ -4498,6 +4571,12 @@ def run_scanner():
                     if delta == 0: delta = abs(estimate_delta(price,strike,dte,0.30,"C") or 0)
                     # Delta is a FILTER not optimization target — hard max enforced
                     if not (d_min <= delta <= d_max): continue
+                    # Sell Above: effective sale (strike + premium) must be >= sell_above.
+                    # Prevents locking in a CC that caps gains below our desired exit price.
+                    if _sell_above > 0:
+                        effective_sale = strike + mid
+                        if effective_sale < _sell_above:
+                            continue  # hard skip — effective exit below target
                     if int(c.get("open_interest",0) or 0) < 50: continue
                     ann = (mid/strike)*(365/dte)*100
                     if ann < 3 or ann > 300: continue
@@ -4512,7 +4591,9 @@ def run_scanner():
                         best_cc = {"strike":strike,"expiry":c["expiry"],"dte":dte,
                                    "bid":round(bid,2),"ask":round(ask,2),"premium":round(mid,2),
                                    "delta":round(delta,2),"annualized_return":round(ann,1),
-                                   "avg_cost":round(avg_d,2),"below_min":ann<CC_MIN_ANNUALIZED,"ivp":ivp_d}
+                                   "avg_cost":round(avg_d,2),"below_min":ann<CC_MIN_ANNUALIZED,"ivp":ivp_d,
+                                   "effective_sale": round(strike + mid, 2),
+                                   "sell_above": _sell_above if _sell_above > 0 else None}
                 except: continue
             if best_cc:
                 pnl_pct_cc = (price - avg_d)/avg_d*100 if avg_d > 0 else 0
@@ -4530,6 +4611,8 @@ def run_scanner():
                     "premium_per_day":ppd_cc,"position_status":pos_status,
                     "signal":f"{pos_status} | {'⚠️ Overweight — reduce via CC' if is_overweight else 'Income'} | IVP {ivp_d:.0f}%",
                     "risk_note":"Overweight position — delta up to 0.50 allowed" if is_overweight else None,
+                    "effective_sale": best_cc.get("effective_sale"),  # strike + premium
+                    "sell_above":     best_cc.get("sell_above"),      # None if no setting
                 }
                 cc_entry["day_change_pct"] = md.get("day_change_pct", 0)
                 cc_entry["score"] = score_cc(cc_entry)
@@ -4601,6 +4684,8 @@ def run_scanner():
 
         # ── LEAPS: all with decent timing ────────────────────
         if ticker not in LEAPS_ONLY:
+            _sym_leaps  = SYMBOL_SETTINGS.get(ticker, {})
+            _leaps_buy_under = _sym_leaps.get("buy_under", 0)
             leaps_calls = [c for c in contracts_d
                            if c.get("option_type") == "C"
                            and (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days >= LEAPS_DTE_MIN]
@@ -4628,6 +4713,11 @@ def run_scanner():
                     elif ext_pct < 25: ext_lbl = f"🔶 Expensive ({ext_pct:.1f}%)"
                     else:              ext_lbl = f"❌ Very expensive ({ext_pct:.1f}%)"
                     score = delta * (30 - ext_pct) * (dte/365)
+                    # Buy Under alignment boost: stock at or below target buy price
+                    if _leaps_buy_under > 0 and price <= _leaps_buy_under:
+                        score *= 1.15  # 15% boost — good entry timing
+                    elif _leaps_buy_under > 0 and price > _leaps_buy_under * 1.20:
+                        score *= 0.85  # 15% penalty — well above buy target
                     if score > best_leaps_score:
                         best_leaps_score = score
                         best_leaps = {"strike":strike,"expiry":c["expiry"],"dte":dte,
@@ -4656,6 +4746,7 @@ def run_scanner():
                 leaps_entry["score"] = score_leaps(leaps_entry)
                 leaps_entry["normalized"] = normalized_score(leaps_entry["score"], "LEAPS")
                 leaps_entry["quality_label"] = quality_label(leaps_entry["score"], SCORE_MAX["LEAPS"])
+                leaps_entry["buy_under"] = _leaps_buy_under if _leaps_buy_under > 0 else None
                 # Add trend classifier to dashboard LEAPS entry
                 try:
                     _trend_d  = leaps_trend_state(ticker, price)
