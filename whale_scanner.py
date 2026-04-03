@@ -1362,20 +1362,20 @@ def csp_engine(opp: dict, spy_day_chg: float = 0,
 
     # ── Step 3b: Buy Under — effective entry alignment ─────────
     # effective_entry = strike - premium (what we'd pay if assigned)
-    # Only applies when buy_under is set for this symbol.
+    # Hard rule: if effective entry exceeds buy_under, skip entirely.
+    # "Buy Under" is a strict intent — no point selling a CSP if assignment
+    # would land above the target acquisition price.
+    # Only a 3% grace margin is allowed for rounding / premium variance.
     if buy_under > 0 and strike > 0:
         effective_entry = round(strike - premium, 2)
-        overshoot_pct = (effective_entry - buy_under) / buy_under * 100
-        if overshoot_pct > 10:
-            # More than 10% above buy_under — hard skip
+        if effective_entry > buy_under * 1.03:
+            # Effective entry more than 3% above buy_under — hard skip
             return {"action": "SKIP", "drop_type": drop_type,
                     "yield_30d": round(yield_30d*100, 2),
                     "flags": [f"ENTRY ${effective_entry:.2f} > BUY UNDER ${buy_under:.2f}"], "sort_key": 0}
-        elif overshoot_pct > 0:
-            # Effective entry above buy_under — downgrade one level
-            flags.append(f"ENTRY ${effective_entry:.2f} > BUY UNDER ${buy_under:.2f}")
-            if action == "BUY":
-                action = "WAIT"
+        elif effective_entry > buy_under:
+            # Within 3% — allow but flag it
+            flags.append(f"ENTRY ${effective_entry:.2f} ~= BUY UNDER ${buy_under:.2f}")
 
     # ── Step 4: Delta check (uses per-symbol range when provided) ──
     _delta_max = csp_delta_max if csp_delta_max > 0 else (0.30 if ivp > 50 else 0.25)
