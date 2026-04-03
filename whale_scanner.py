@@ -4423,6 +4423,8 @@ def run_scanner():
         _buy_under     = _sym_s.get("buy_under", 0)
         _csp_delta_min = _sym_s.get("csp_delta_min", 0)
         _csp_delta_max = _sym_s.get("csp_delta_max", 0)
+        if _buy_under > 0:
+            print(f"   SYM_SETTINGS {ticker}: buy_under={_buy_under} csp_delta={_csp_delta_min}-{_csp_delta_max}")
 
         best_csp = None; best_csp_score = -1
         for c in puts_30_60:
