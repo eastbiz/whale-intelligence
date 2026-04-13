@@ -200,6 +200,7 @@ def get_schwab_py_client():
         return None
 
 _schwab_cache = {"access_token": "", "expires_at": 0}
+_schwab_chain_live = True   # set False on first option chain 401; written to results.json
 
 
 def schwab_get_token() -> str:
@@ -316,6 +317,8 @@ def schwab_get_option_chain(ticker: str, from_date: str, to_date: str) -> list:
             timeout=15
         )
         if r.status_code != 200:
+            global _schwab_chain_live
+            _schwab_chain_live = False
             print(f"   Schwab chain {ticker}: {r.status_code}")
             return []
         data      = r.json()
@@ -5352,6 +5355,7 @@ def run_scanner():
     results = {
         "scan_time":      now_et().strftime("%Y-%m-%d %H:%M ET"),
         "scan_date":      now_et().strftime("%Y-%m-%d"),
+        "schwab_live":    _schwab_chain_live,
         "execution_candidates": execution_candidates,   # strict — Telegram quality
         "review_candidates":    review_candidates,      # relaxed — dashboard review
         "dashboard_opportunities": review_candidates,   # alias for dashboard compat
