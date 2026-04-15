@@ -4900,30 +4900,9 @@ def run_scanner():
                 mv_map_total[t] = mv
                 mv_map_acct[t]  = dict(schwab_mv_by_acct[t]) if t in schwab_mv_by_acct else {"IBKR": mv}
 
-    # ── Apply grouped ticker rule (Spec §6) ──
-    # GOOG + GOOGL → combined exposure under GOOGL
-    for alias, canonical in GROUPED_TICKERS.items():
-        if alias in exposure_map:
-            exposure_map[canonical] = round(
-                exposure_map.get(canonical, 0) + exposure_map.pop(alias), 1)
-        # Also merge account_map so IBKR GOOG shares appear under GOOGL filter
-        if alias in account_map:
-            alias_accts  = account_map_all.get(alias, [account_map[alias]])
-            canon_accts  = account_map_all.get(canonical, [])
-            merged       = list(dict.fromkeys(canon_accts + alias_accts))
-            account_map_all[canonical] = merged
-            if canonical not in account_map:
-                account_map[canonical] = account_map[alias]
-            account_map.pop(alias, None)
-            account_map_all.pop(alias, None)
-
-    # ── Exclusion rule (Spec §4) ──
-    for sym in list(exposure_map.keys()):
-        if sym in EXCLUDED_SYMBOLS:
-            exposure_map.pop(sym)
-
     # -- Build account_map: IBKR first, then Schwab overrides --
     # IBKR stocks default to "IBKR". schwab_account_map overrides with IRA/CRT/Personal.
+    # Must be built BEFORE the grouped-ticker merge below which references it.
     account_map      = {}  # ticker -> primary account label
     account_map_all  = {}  # ticker -> list of ALL accounts (for multi-account filtering)
     for _t in ibkr:
@@ -4951,6 +4930,28 @@ def run_scanner():
                         break
             if _tk not in account_map:
                 account_map[_tk] = "IBKR"
+
+    # ── Apply grouped ticker rule (Spec §6) ──
+    # GOOG + GOOGL → combined exposure under GOOGL
+    for alias, canonical in GROUPED_TICKERS.items():
+        if alias in exposure_map:
+            exposure_map[canonical] = round(
+                exposure_map.get(canonical, 0) + exposure_map.pop(alias), 1)
+        # Also merge account_map so IBKR GOOG shares appear under GOOGL filter
+        if alias in account_map:
+            alias_accts  = account_map_all.get(alias, [account_map[alias]])
+            canon_accts  = account_map_all.get(canonical, [])
+            merged       = list(dict.fromkeys(canon_accts + alias_accts))
+            account_map_all[canonical] = merged
+            if canonical not in account_map:
+                account_map[canonical] = account_map[alias]
+            account_map.pop(alias, None)
+            account_map_all.pop(alias, None)
+
+    # ── Exclusion rule (Spec §4) ──
+    for sym in list(exposure_map.keys()):
+        if sym in EXCLUDED_SYMBOLS:
+            exposure_map.pop(sym)
 
 
     # ── Ownership precedence rule (Spec §5) ──
