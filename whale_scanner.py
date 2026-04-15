@@ -653,6 +653,9 @@ def get_market_data(tickers: list) -> dict:
                 "change_3d_pct":  round(change_3d, 4),
                 "change_5d_pct":  round(change_5d, 4),
                 "change_30d_pct": round(change_30d, 4),
+                # Raw closes for support level analysis — 21d (1M) and 63d (3M)
+                "closes_21d":  closes_clean[-22:] if len(closes_clean) >= 22 else closes_clean[:],
+                "closes_63d":  closes_clean[-64:] if len(closes_clean) >= 64 else closes_clean[:],
             }
         except Exception as e:
             data[ticker] = {"price":0,"week52_high":0,"week52_low":0,
@@ -1218,6 +1221,96 @@ def calculate_ivp(contracts: list, ticker: str = "") -> dict:
         "iv_high":    round(atm_iv * 2.00, 3),
         "ivp":        ivp,
     }
+
+def calc_support_levels(closes_21d: list, closes_63d: list, tier: str) -> dict:
+    """
+    Detect repeated price support zones from 1M and 3M closes.
+    Returns starter / main / aggressive levels + confidence score.
+
+    Algorithm:
+      1. Find swing lows in each window (local minima with rebound)
+      2. Cluster lows within 3% — most-touched cluster = main support
+      3. Define starter (shallow, above main) and aggressive (panic low)
+
+    Used as a scoring signal only. Manual buy_under in SYMBOL_SETTINGS
+    remains the hard gate for CSP/LEAPS qualification.
+    """
+    # Tier-specific volatility spacing between levels
+    _spread = {"Core": 0.03, "Growth": 0.05, "Cyclical": 0.04, "Opportunistic": 0.07}.get(tier, 0.05)
+
+    def _swing_lows(closes, window=3):
+        """Local minima: closes[i] is lowest in a 2*window+1 band and preceded by a decline."""
+        lows = []
+        for i in range(window, len(closes) - window):
+            segment = closes[i - window: i + window + 1]
+            if closes[i] == min(segment) and closes[i] < closes[i - 1]:
+                lows.append(closes[i])
+        return lows
+
+    def _cluster(lows, tol=0.03):
+        """Group lows within tol% of the running cluster centre."""
+        clusters = []
+        for low in sorted(lows):
+            placed = False
+            for cl in clusters:
+                if cl['centre'] > 0 and abs(low - cl['centre']) / cl['centre'] <= tol:
+                    cl['lows'].append(low)
+                    cl['centre'] = sum(cl['lows']) / len(cl['lows'])
+                    placed = True
+                    break
+            if not placed:
+                clusters.append({'centre': low, 'lows': [low]})
+        return sorted(clusters, key=lambda x: len(x['lows']), reverse=True)
+
+    try:
+        lows_21 = _swing_lows(closes_21d) if len(closes_21d) >= 8 else []
+        lows_63 = _swing_lows(closes_63d) if len(closes_63d) >= 8 else []
+        if not lows_21 and not lows_63:
+            return {}
+
+        # 1M lows weighted 2× — more recent structure matters more
+        all_lows = lows_21 * 2 + lows_63
+        clusters = _cluster(all_lows)
+        if not clusters:
+            return {}
+
+        main     = clusters[0]
+        main_mid = round(main['centre'], 2)
+        main_low = round(min(main['lows']), 2)
+        main_hi  = round(max(main['lows']), 2)
+
+        # Starter: nearest cluster above main, or vol-adjusted offset above
+        above = [c for c in clusters[1:] if c['centre'] > main_mid * 1.01]
+        if above:
+            sc         = min(above, key=lambda x: x['centre'])
+            start_low  = round(min(sc['lows']), 2)
+            start_hi   = round(max(sc['lows']), 2)
+        else:
+            start_low  = round(main_mid * (1 + _spread * 0.6), 2)
+            start_hi   = round(main_mid * (1 + _spread * 1.2), 2)
+
+        # Aggressive: absolute lowest swing low from combined set
+        abs_low = min(all_lows)
+        agg_low = round(abs_low, 2)
+        agg_hi  = round(main_low * 0.99, 2)   # just under main cluster floor
+
+        touches    = len(main['lows'])
+        confidence = min(10, touches * 2)      # 0–10 scale
+
+        return {
+            "starter_buy_low":    start_low,
+            "starter_buy_high":   start_hi,
+            "main_buy_low":       main_low,
+            "main_buy_high":      main_hi,
+            "main_buy_under":     main_mid,    # single value used in scoring
+            "aggressive_buy_low": agg_low,
+            "aggressive_buy_high": agg_hi,
+            "support_touches":    touches,
+            "confidence":         confidence,
+        }
+    except Exception:
+        return {}
+
 
 def tier_weight(tier: str) -> int:
     """Quality points by tier. Used in all strategy scores."""
@@ -3764,6 +3857,19 @@ def run_scanner():
 
     # ── Price zone analysis — buy side (CSP) and sell side (CC) ──
     # Stored in results.json and used by both Telegram and the dashboard.
+    # support_cache: ticker → calc_support_levels() result — used in CSP/LEAPS scoring.
+    support_cache = {}
+    for _stk in SYMBOL_SETTINGS:
+        _smd = mkt.get(_stk, {})
+        _sc21 = _smd.get("closes_21d", [])
+        _sc63 = _smd.get("closes_63d", [])
+        if _sc21 or _sc63:
+            _tier = ("Core" if _stk in CORE_STOCKS else "Growth" if _stk in GROWTH_STOCKS
+                     else "Cyclical" if _stk in CYCLICAL_STOCKS else "Opportunistic")
+            _sl = calc_support_levels(_sc21, _sc63, _tier)
+            if _sl:
+                support_cache[_stk] = _sl
+
     price_watch_list = []
     for _tk, _ss in SYMBOL_SETTINGS.items():
         _bu = _ss.get("buy_under", 0)
@@ -3800,6 +3906,7 @@ def run_scanner():
             _cc_status     = None
 
         _pw_md = mkt.get(_tk, {})
+        _pw_sl = support_cache.get(_tk, {})
         price_watch_list.append({
             "ticker":       _tk,
             "price":        round(_p, 2),
@@ -3812,6 +3919,8 @@ def run_scanner():
             "chg_1d_pct":   round(_pw_md.get("day_change_pct",  0) * 100, 1),
             "chg_5d_pct":   round(_pw_md.get("change_5d_pct",   0) * 100, 1),
             "chg_30d_pct":  round(_pw_md.get("change_30d_pct",  0) * 100, 1),
+            # Dynamic support levels (calc_support_levels) — display + scoring signal
+            "support_levels": _pw_sl if _pw_sl else None,
         })
 
     # Sort: IN_ZONE → APPROACHING → WATCHLIST (by distance) → FAR
@@ -3885,20 +3994,26 @@ def run_scanner():
         if abs(_c30) >= 5.0: _parts.append(f"{_c30:+.1f}% (30d)")
         _move_str = " · ".join(_parts) if _parts else f"{_c1:+.1f}%"
 
-        # Zone context
+        # Zone context — only mention what's actionable
         _zone_parts = []
+        _pct_buy = _pw.get("pct_from_buy", 999) or 999
         if _pw["csp_status"] == "IN_ZONE":
             _zone_parts.append(f"IN CSP ZONE at ${_bu} — check options now")
         elif _pw["csp_status"] == "APPROACHING" and _bu:
-            _pct = _pw.get("pct_from_buy", 0)
-            _zone_parts.append(f"CSP zone ${_bu} ({_pct:.1f}% away)")
-        elif _bu:
-            _pct = _pw.get("pct_from_buy", 0)
-            _zone_parts.append(f"CSP zone ${_bu} ({_pct:.1f}% away — watch)")
+            _zone_parts.append(f"CSP zone ${_bu} ({_pct_buy:.1f}% away)")
+        elif _pw["csp_status"] == "WATCHLIST" and _bu and _pct_buy <= 20:
+            # Only mention if realistically close; silent when very far
+            _zone_parts.append(f"CSP zone ${_bu} ({_pct_buy:.1f}% away)")
+        # CSP zone > 20% away: say nothing — CC alert says enough
 
-        if _pw.get("cc_status") in ("IN_ZONE", "APPROACHING") and _sa:
+        if _pw.get("cc_status") == "IN_ZONE" and _sa:
+            # Price already above sell target — just say so, no confusing negative distance
+            _zone_parts.append(f"above CC target ${_sa} — write calls")
+        elif _pw.get("cc_status") == "APPROACHING" and _sa:
             _pct_s = _pw.get("pct_from_sell", 0)
-            _zone_parts.append(f"CC target ${_sa} ({_pct_s:.1f}% away)")
+            if 0 < _pct_s <= 20:
+                _zone_parts.append(f"CC target ${_sa} ({_pct_s:.1f}% away)")
+        # cc_status WAIT or > 20% away: say nothing
 
         _action = ""
         if _trigger_drop:
@@ -4695,6 +4810,7 @@ def run_scanner():
             csp_entry["contracts"]        = best_csp.get("contracts", 1)
             csp_entry["effective_entry"]  = best_csp.get("effective_entry")   # strike - premium
             csp_entry["buy_under"]        = best_csp.get("buy_under")         # None if no setting
+            csp_entry["support_levels"]   = support_cache.get(ticker, {}) or {}
             csp_entry["score"]        = score_csp(csp_entry)  # kept for display score badge
             csp_entry["normalized"]   = normalized_score(csp_entry["score"], "CSP")
             csp_entry["quality_label"] = quality_label(csp_entry["score"], SCORE_MAX["CSP"])
@@ -4886,11 +5002,23 @@ def run_scanner():
                     elif ext_pct < 25: ext_lbl = f"🔶 Expensive ({ext_pct:.1f}%)"
                     else:              ext_lbl = f"❌ Very expensive ({ext_pct:.1f}%)"
                     score = delta * (30 - ext_pct) * (dte/365)
-                    # Buy Under alignment boost: stock at or below target buy price
+                    # Manual buy_under alignment
                     if _leaps_buy_under > 0 and price <= _leaps_buy_under:
-                        score *= 1.15  # 15% boost — good entry timing
+                        score *= 1.15  # manual target met — good entry
                     elif _leaps_buy_under > 0 and price > _leaps_buy_under * 1.20:
-                        score *= 0.85  # 15% penalty — well above buy target
+                        score *= 0.85  # well above manual target
+                    # Dynamic support zone overlay (from calc_support_levels)
+                    _sl_l = support_cache.get(ticker, {})
+                    if _sl_l:
+                        _main_sup  = _sl_l.get("main_buy_under", 0)
+                        _start_hi  = _sl_l.get("starter_buy_high", 0)
+                        _agg_lo    = _sl_l.get("aggressive_buy_low", 0)
+                        if _main_sup > 0 and price <= _main_sup:
+                            score *= 1.10  # at repeated support cluster
+                        elif _start_hi > 0 and price <= _start_hi:
+                            score *= 1.05  # shallow starter zone
+                        if _agg_lo > 0 and price <= _agg_lo:
+                            score *= 1.08  # deep panic low — highest conviction
                     if score > best_leaps_score:
                         best_leaps_score = score
                         best_leaps = {"strike":strike,"expiry":c["expiry"],"dte":dte,
