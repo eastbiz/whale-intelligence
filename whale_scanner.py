@@ -632,9 +632,13 @@ def get_market_data(tickers: list) -> dict:
                 day_change_pct = 0.0
                 prev_close = price
 
-            # 3-day price change from history
-            p3d = closes_clean[-4] if len(closes_clean) >= 4 else price
-            change_3d = (price - p3d) / p3d if p3d > 0 else 0
+            # Multi-timeframe price changes — all computed from already-fetched closes
+            p3d  = closes_clean[-4]  if len(closes_clean) >= 4  else price
+            p5d  = closes_clean[-6]  if len(closes_clean) >= 6  else price
+            p30d = closes_clean[-31] if len(closes_clean) >= 31 else price
+            change_3d  = (price - p3d)  / p3d  if p3d  > 0 else 0
+            change_5d  = (price - p5d)  / p5d  if p5d  > 0 else 0
+            change_30d = (price - p30d) / p30d if p30d > 0 else 0
 
             data[ticker] = {
                 "price":          round(price, 2),
@@ -647,6 +651,8 @@ def get_market_data(tickers: list) -> dict:
                 "pct_above_ma50": (price - ma50) / ma50 if ma50 > 0 else 0,
                 "day_change_pct": round(day_change_pct, 4),
                 "change_3d_pct":  round(change_3d, 4),
+                "change_5d_pct":  round(change_5d, 4),
+                "change_30d_pct": round(change_30d, 4),
             }
         except Exception as e:
             data[ticker] = {"price":0,"week52_high":0,"week52_low":0,
@@ -1230,6 +1236,10 @@ def tier_position_status(tier: str, exposure_pct: float) -> str:
 
 # Max scores per strategy (for normalization)
 SCORE_MAX = {"CSP": 12, "CC": 13, "LEAPS": 13, "PIO": 13, "PMCC": 13}
+
+# Telegram green-light threshold — only trades scoring ≥ this % of SCORE_MAX get sent.
+# Dashboard always shows everything. Raise to reduce Telegram noise; lower to see more.
+TELEGRAM_MIN_SCORE_PCT = 0.75  # 75% = at least 9/12 for CSP, 10/13 for CC/LEAPS
 
 def quality_label(score: int, max_score: int) -> str:
     """Convert score to Strong / Acceptable / Weak."""
@@ -3752,29 +3762,166 @@ def run_scanner():
 
 
 
-    # ── Price alerts — stocks near buy_under ──────────────────
-    price_alerts = []
+    # ── Price zone analysis — buy side (CSP) and sell side (CC) ──
+    # Stored in results.json and used by both Telegram and the dashboard.
+    price_watch_list = []
     for _tk, _ss in SYMBOL_SETTINGS.items():
         _bu = _ss.get("buy_under", 0)
-        if _bu <= 0: continue
-        _p = mkt.get(_tk, {}).get("price", 0)
+        _sa = _ss.get("sell_above", 0)
+        _p  = mkt.get(_tk, {}).get("price", 0)
         if _p <= 0: continue
-        _pct_above = (_p - _bu) / _bu * 100
-        if _pct_above <= 5:
-            if _pct_above <= 0:
-                price_alerts.append(f"🚨 *{_tk}* ${_p:.2f} — BELOW buy target ${_bu} ({abs(_pct_above):.1f}% under)")
+
+        # Buy side — CSP entry zone
+        if _bu > 0:
+            _pct_from_buy = (_p - _bu) / _bu * 100   # negative = below (in zone)
+            if _pct_from_buy <= 0:
+                _csp_status = "IN_ZONE"
+            elif _pct_from_buy <= 5:
+                _csp_status = "APPROACHING"
+            elif _pct_from_buy <= 15:
+                _csp_status = "WATCHLIST"
             else:
-                price_alerts.append(f"🎯 *{_tk}* ${_p:.2f} — {_pct_above:.1f}% above buy target ${_bu}")
+                _csp_status = "FAR"
+        else:
+            _pct_from_buy = None
+            _csp_status   = None
+
+        # Sell side — CC opportunity zone
+        if _sa > 0:
+            _pct_from_sell = (_sa - _p) / _sa * 100  # positive = below sell_above (normal), negative = above
+            if _pct_from_sell <= 0:
+                _cc_status = "IN_ZONE"       # at or above sell_above
+            elif _pct_from_sell <= 8:
+                _cc_status = "APPROACHING"   # within 8% below
+            else:
+                _cc_status = "WAIT"
+        else:
+            _pct_from_sell = None
+            _cc_status     = None
+
+        _pw_md = mkt.get(_tk, {})
+        price_watch_list.append({
+            "ticker":       _tk,
+            "price":        round(_p, 2),
+            "buy_under":    _bu,
+            "sell_above":   _sa,
+            "pct_from_buy":  round(_pct_from_buy,  1) if _pct_from_buy  is not None else None,
+            "pct_from_sell": round(_pct_from_sell, 1) if _pct_from_sell is not None else None,
+            "csp_status":   _csp_status,
+            "cc_status":    _cc_status,
+            "chg_1d_pct":   round(_pw_md.get("day_change_pct",  0) * 100, 1),
+            "chg_5d_pct":   round(_pw_md.get("change_5d_pct",   0) * 100, 1),
+            "chg_30d_pct":  round(_pw_md.get("change_30d_pct",  0) * 100, 1),
+        })
+
+    # Sort: IN_ZONE → APPROACHING → WATCHLIST (by distance) → FAR
+    _csp_ord = {"IN_ZONE": 0, "APPROACHING": 1, "WATCHLIST": 2, "FAR": 3, None: 4}
+    price_watch_list.sort(key=lambda x: (
+        _csp_ord.get(x["csp_status"], 4),
+        x["pct_from_buy"] if x["pct_from_buy"] is not None else 999
+    ))
+
+    # ── Build Telegram briefing sections from price_watch_list ──
+    _alerts_csp = []   # IN_ZONE + APPROACHING on buy side
+    _alerts_cc  = []   # IN_ZONE + APPROACHING on sell side
+    _watchlist  = []   # WATCHLIST (5–15% from buy_under)
+
+    for _pw in price_watch_list:
+        _tk = _pw["ticker"]; _p = _pw["price"]
+        _bu = _pw["buy_under"]; _sa = _pw["sell_above"]
+        _pb = _pw.get("pct_from_buy"); _ps = _pw.get("pct_from_sell")
+
+        if _pw["csp_status"] == "IN_ZONE" and _pb is not None:
+            _alerts_csp.append(f"🚨 *{_tk}* ${_p:.2f} — BELOW buy target ${_bu} ({abs(_pb):.1f}% under) — check options now")
+        elif _pw["csp_status"] == "APPROACHING" and _pb is not None:
+            _alerts_csp.append(f"🎯 *{_tk}* ${_p:.2f} — {_pb:.1f}% above buy target ${_bu} — approaching zone")
+        elif _pw["csp_status"] == "WATCHLIST" and _pb is not None:
+            _watchlist.append((_pb, f"   {_tk} ${_p:.2f} → CSP zone at ${_bu} ({_pb:.1f}% away)"))
+
+        if _sa > 0 and _pw["cc_status"] == "IN_ZONE":
+            _alerts_cc.append(f"💰 *{_tk}* ${_p:.2f} — AT/ABOVE sell target ${_sa} — write covered calls")
+        elif _pw["cc_status"] == "APPROACHING" and _ps is not None:
+            _alerts_cc.append(f"📈 *{_tk}* ${_p:.2f} — {_ps:.1f}% below CC target ${_sa} — approaching")
 
     briefing = (
         f"📡 *MARKET BRIEFING — {now_et().strftime('%b %d, %Y %H:%M')} ET*\n"
         f"\n"
         f"*VIX: {vix}*  {vix_data['label']}\n"
     )
-    if price_alerts:
-        briefing += "\n━━━ PRICE ALERTS ━━━\n"
-        for alert in price_alerts:
-            briefing += f"{alert}\n"
+    if _alerts_csp:
+        briefing += "\n━━━ CSP ENTRY ALERTS ━━━\n"
+        for _a in _alerts_csp:
+            briefing += f"{_a}\n"
+    if _alerts_cc:
+        briefing += "\n━━━ CC OPPORTUNITY ALERTS ━━━\n"
+        for _a in _alerts_cc:
+            briefing += f"{_a}\n"
+    if _watchlist:
+        briefing += "\n⏳ *WATCHING FOR ENTRY* (5–15% from zone)\n"
+        for _, _line in _watchlist:   # already sorted by distance
+            briefing += f"{_line}\n"
+    # ── Notable price moves on tracked tickers ──────────────
+    # Triggers: 1d ≥ |5%|  OR  5d ≥ |10%|  (30d shown as context)
+    _move_alerts = []
+    for _pw in price_watch_list:
+        _tk  = _pw["ticker"]
+        _p   = _pw["price"]
+        _bu  = _pw.get("buy_under", 0)
+        _sa  = _pw.get("sell_above", 0)
+        _md  = mkt.get(_tk, {})
+        _c1  = _md.get("day_change_pct", 0) * 100
+        _c5  = _md.get("change_5d_pct",  0) * 100
+        _c30 = _md.get("change_30d_pct", 0) * 100
+
+        _trigger_drop = _c1 <= -5.0 or _c5 <= -10.0
+        _trigger_rise = _c1 >=  6.0 or _c5 >=  10.0
+        if not (_trigger_drop or _trigger_rise):
+            continue
+
+        # Build move line: show all timeframes that are non-trivial
+        _parts = []
+        if abs(_c1) >= 1.0:  _parts.append(f"{_c1:+.1f}% today")
+        if abs(_c5) >= 2.0:  _parts.append(f"{_c5:+.1f}% (5d)")
+        if abs(_c30) >= 5.0: _parts.append(f"{_c30:+.1f}% (30d)")
+        _move_str = " · ".join(_parts) if _parts else f"{_c1:+.1f}%"
+
+        # Zone context
+        _zone_parts = []
+        if _pw["csp_status"] == "IN_ZONE":
+            _zone_parts.append(f"IN CSP ZONE at ${_bu} — check options now")
+        elif _pw["csp_status"] == "APPROACHING" and _bu:
+            _pct = _pw.get("pct_from_buy", 0)
+            _zone_parts.append(f"CSP zone ${_bu} ({_pct:.1f}% away)")
+        elif _bu:
+            _pct = _pw.get("pct_from_buy", 0)
+            _zone_parts.append(f"CSP zone ${_bu} ({_pct:.1f}% away — watch)")
+
+        if _pw.get("cc_status") in ("IN_ZONE", "APPROACHING") and _sa:
+            _pct_s = _pw.get("pct_from_sell", 0)
+            _zone_parts.append(f"CC target ${_sa} ({_pct_s:.1f}% away)")
+
+        _action = ""
+        if _trigger_drop:
+            _action = "→ consider CSP/LEAPS"
+        elif _trigger_rise:
+            _action = "→ consider CC"
+
+        _icon = "📉" if _trigger_drop else "📈"
+        _zone_txt = " · ".join(_zone_parts)
+        _line = f"{_icon} *{_tk}* {_move_str}"
+        if _zone_txt:
+            _line += f"\n   {_zone_txt}"
+        if _action:
+            _line += f" {_action}"
+        _move_alerts.append((_c1, _trigger_drop, _line))
+
+    if _move_alerts:
+        # Sort: big drops first, then big rises
+        _move_alerts.sort(key=lambda x: (0 if x[1] else 1, x[0]))
+        briefing += "\n━━━ NOTABLE MOVES ━━━\n"
+        for _, _, _line in _move_alerts:
+            briefing += f"{_line}\n"
+
     send_telegram(briefing)
     time.sleep(2)
 
@@ -4145,49 +4292,73 @@ def run_scanner():
     analysis = claude_analyze(top_csps,top_ccs,top_leaps,top_pmccs,top_bcss,[],top_spikes,top_drops,top_pio)
     if analysis: print(f"\n{analysis}")
 
+    # ── Telegram green-light filter ───────────────────────
+    # Philosophy: Telegram = take action NOW. Only high-conviction trades get a ping.
+    # Dashboard always shows everything (review + execution). PMCC/BCS are dashboard-only.
+    # Spikes and drops skip the score gate — they are time-sensitive by nature.
+    def _tg_green(opps: list, mode: str) -> list:
+        """Return only trades scoring >= TELEGRAM_MIN_SCORE_PCT of SCORE_MAX[mode]."""
+        mx  = SCORE_MAX.get(mode, 12)
+        thr = math.ceil(TELEGRAM_MIN_SCORE_PCT * mx)
+        return [o for o in opps if o.get("score", 0) >= thr]
+
+    tg_csps   = _tg_green(top_csps,  "CSP")
+    tg_ccs    = _tg_green(top_ccs,   "CC")
+    tg_leaps  = _tg_green(top_leaps, "LEAPS")
+    tg_spikes = top_spikes   # time-sensitive — no score gate
+    tg_drops  = top_drops    # time-sensitive — no score gate
+    # PMCC and BCS: dashboard only — too complex/optional for a ping
+
+    has_real_opps = any([top_csps, top_ccs, top_leaps, top_pmccs, top_bcss, top_drops, top_spikes])
+    tg_any        = any([tg_csps, tg_ccs, tg_leaps, tg_spikes, tg_drops, opp_opps])
+
+    print(f"   Telegram filter: {len(tg_csps)} CSPs | {len(tg_ccs)} CCs | "
+          f"{len(tg_leaps)} LEAPS | {len(tg_spikes)} Spikes | {len(tg_drops)} Drops "
+          f"(from {len(top_csps)}+{len(top_ccs)}+{len(top_leaps)} before filter)")
+
     # ── Telegram — ORDER: Summary → Trades ───────────────
     print("\n📱 Sending...")
 
-    # 1. Claude summary — only when there are actual trade opportunities (no clutter on quiet days)
-    has_real_opps = any([top_csps, top_ccs, top_leaps, top_pmccs, top_bcss, top_drops, top_spikes])
+    # 1. Claude summary — only when there are actual opportunities
     if analysis and has_real_opps:
         send_telegram(f"🧠 *CLAUDE SUMMARY*\n\n{analysis}")
         time.sleep(2)
 
-    # 2. Opportunistic volatility spike alerts (before regular trades)
+    # 2. Opportunistic volatility spike alerts (time-sensitive — always send)
     if opp_opps:
         send_telegram("━━━ *⚡ VOLATILITY SPIKE OPPORTUNITIES* ━━━")
-        send_telegram(
-            "_These triggered because of recent sharp price spikes.\n"
-            "IV is elevated — good time to sell calls if you hold shares._"
-        )
+        send_telegram("_Sharp price spike detected — IV elevated, sell calls now if you hold shares._")
         time.sleep(1)
         for o in opp_opps:
             send_telegram(fmt_opp_cc(o))
             time.sleep(2)
 
-    # 3. Individual trade alerts — PIO excluded from Telegram (too many, use dashboard)
-    if top_drops:
-        send_telegram("━━━ *🔻 POST-DROP CSP OPPORTUNITIES* ━━━"); time.sleep(1)
-        for o in top_drops: send_telegram(fmt_drop_csp(o)); time.sleep(2)
-    if top_spikes:
-        send_telegram("━━━ *⚡ VOLATILITY SPIKE CC OPPORTUNITIES* ━━━"); time.sleep(1)
-        for o in top_spikes: send_telegram(fmt_spike_cc(o)); time.sleep(2)
-    if top_csps:
-        send_telegram("━━━ *CSP OPPORTUNITIES* ━━━"); time.sleep(1)
-        for o in top_csps: send_telegram(fmt_csp(o)); time.sleep(2)
-    if top_ccs:
-        send_telegram("━━━ *COVERED CALL OPPORTUNITIES* ━━━"); time.sleep(1)
-        for o in top_ccs: send_telegram(fmt_cc(o)); time.sleep(2)
-    if top_leaps:
-        send_telegram("━━━ *LEAPS OPPORTUNITIES* ━━━"); time.sleep(1)
-        for o in top_leaps: send_telegram(fmt_leaps(o)); time.sleep(2)
-    if top_pmccs:
-        send_telegram("━━━ *PMCC — SELL AGAINST YOUR LEAPS* ━━━"); time.sleep(1)
-        for o in top_pmccs: send_telegram(fmt_pmcc(o)); time.sleep(2)
-    if top_bcss:
-        send_telegram("━━━ *BULL CALL SPREADS* ━━━"); time.sleep(1)
-        for o in top_bcss: send_telegram(fmt_bcs(o)); time.sleep(2)
+    # 3. Green-light trade alerts only (>= 75% score)
+    if tg_drops:
+        send_telegram("━━━ *🔻 POST-DROP CSP* ━━━"); time.sleep(1)
+        for o in tg_drops: send_telegram(fmt_drop_csp(o)); time.sleep(2)
+    if tg_spikes:
+        send_telegram("━━━ *⚡ SPIKE CC* ━━━"); time.sleep(1)
+        for o in tg_spikes: send_telegram(fmt_spike_cc(o)); time.sleep(2)
+    if tg_csps:
+        send_telegram("━━━ *✅ CSP* ━━━"); time.sleep(1)
+        for o in tg_csps: send_telegram(fmt_csp(o)); time.sleep(2)
+    if tg_ccs:
+        send_telegram("━━━ *✅ COVERED CALL* ━━━"); time.sleep(1)
+        for o in tg_ccs: send_telegram(fmt_cc(o)); time.sleep(2)
+    if tg_leaps:
+        send_telegram("━━━ *✅ LEAPS* ━━━"); time.sleep(1)
+        for o in tg_leaps: send_telegram(fmt_leaps(o)); time.sleep(2)
+
+    # 4. Quiet day note: items exist on dashboard but nothing cleared the bar
+    if not tg_any:
+        _dash_count = sum(len(x) for x in [top_csps, top_ccs, top_leaps, top_pmccs, top_bcss])
+        if _dash_count > 0:
+            send_telegram(
+                f"📋 *{_dash_count} idea{'s' if _dash_count != 1 else ''} on dashboard "
+                f"— none cleared the high-conviction bar today.*"
+            )
+    # PMCC / BCS — dashboard only (never sent to Telegram)
 
     # ── Save results.json for dashboard ─────────────────────
     def opp_to_dict(o, strategy_key):
@@ -5380,6 +5551,7 @@ def run_scanner():
         "position_actions": _pos_actions,
         "analysis":       analysis,
         "total_opps":     len(all_opps),
+        "price_watch":    price_watch_list,
     }
 
     # Debug: print trend fields for all LEAPS in review_candidates
