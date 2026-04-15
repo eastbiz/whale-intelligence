@@ -3718,29 +3718,29 @@ def run_scanner():
 
 
 
+# ── Price alerts — stocks near buy_under ─────────────────
+    price_alerts = []
+    for _tk, _ss in SYMBOL_SETTINGS.items():
+        _bu = _ss.get("buy_under", 0)
+        if _bu <= 0: continue
+        _p = mkt.get(_tk, {}).get("price", 0)
+        if _p <= 0: continue
+        _pct_above = (_p - _bu) / _bu * 100
+        if _pct_above <= 5:
+            if _pct_above <= 0:
+                price_alerts.append(f"🚨 *{_tk}* ${_p:.2f} — BELOW buy target ${_bu} ({abs(_pct_above):.1f}% under)")
+            else:
+                price_alerts.append(f"🎯 *{_tk}* ${_p:.2f} — {_pct_above:.1f}% above buy target ${_bu} — approaching zone")
+
     briefing = (
         f"📡 *MARKET BRIEFING — {now_et().strftime('%b %d, %Y %H:%M')} ET*\n"
         f"\n"
-        f"━━━ MARKET CONDITIONS ━━━\n"
-        f"\n"
-        f"*VIX: {vix}*\n"
-        f"{vix_data['label']}\n"
-        f"_VIX measures market fear. Above 25 = high volatility."
-        f" Higher VIX = fatter premiums = better CSP/CC income._\n"
-        f"\n"
-
-
-        f"\n"
-        f"*S&P 500:* {spy_regime['label']}\n"
-        f"_S&P below 200MA = reduce size, lower delta._\n"
-        f"\n"
-        f"━━━ TODAY'S CONTEXT ━━━\n"
-        f"\n"
-        f"{gng['quality']}\n"
-        f"\n"
-        f"_Individual trades filtered by per-stock IV Percentile (IVP ≥ 30)._\n"
-        f"_Trading opportunities follow below ↓_"
+        f"*VIX: {vix}*  {vix_data['label']}\n"
     )
+    if price_alerts:
+        briefing += f"\n━━━ PRICE ALERTS ━━━\n"
+        for alert in price_alerts:
+            briefing += f"{alert}\n"
     send_telegram(briefing)
     time.sleep(2)
 
