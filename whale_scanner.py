@@ -109,33 +109,29 @@ OPP_IVP_MIN           = 40
 OPP_EARNINGS_MIN      = 7
 
 # ── Per-symbol income trade settings ────────────────────────────────────────
-# Source: Positions_Buy_Sell_Delta.xlsx (Income Trades sheet)
-# Keys: buy_under         — max effective entry for CSP (strike - premium <= buy_under * 1.03)
-#       sell_above        — min effective exit for CC (strike + premium >= sell_above)
+# Source: Income Trades worksheet (Positions_Buy_Sell_Delta.xlsx).
+# Keys: buy_under   — max effective entry for CSP (strike - premium <= buy_under)
+#       sell_above  — min effective exit for CC (strike + premium >= sell_above)
 #       csp_delta_min/max — hard delta range for CSP candidates
 #       cc_delta_min/max  — hard delta range for CC candidates
-#       leaps_delta_min/max — per-symbol LEAPS delta range
 # Tickers NOT listed use global delta constants and skip price-alignment filters.
 SYMBOL_SETTINGS = {
-    "AAPL": {"buy_under":  200, "sell_above":  280, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
-    "AMZN": {"buy_under":  185, "sell_above":  230, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
-    "CLS":  {"buy_under":  220, "sell_above":  340, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "CRDO": {"buy_under":   80, "sell_above":  140, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "DDOG": {"buy_under":   95, "sell_above":  160, "csp_delta_min": 0.20, "csp_delta_max": 0.25, "cc_delta_min": 0.20, "cc_delta_max": 0.25, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "FIX":  {"buy_under": 1000, "sell_above": 1600, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "GOOGL":{"buy_under":  250, "sell_above":  340, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
-    "GRBK": {"buy_under":   55, "sell_above":   80, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "IBIT": {"buy_under":   34, "sell_above":   47, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "IBKR": {"buy_under":   50, "sell_above":   74, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "MELI": {"buy_under": 1480, "sell_above": 1900, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
-    "MU":   {"buy_under":  290, "sell_above":  450, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "NBIS": {"buy_under":   70, "sell_above":  135, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "NFLX": {"buy_under":   65, "sell_above":  107, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.32, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "NOW":  {"buy_under":   85, "sell_above":  130, "csp_delta_min": 0.20, "csp_delta_max": 0.25, "cc_delta_min": 0.20, "cc_delta_max": 0.25, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "NVDA": {"buy_under":  155, "sell_above":  205, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
-    "PLTR": {"buy_under":   80, "sell_above":  195, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "TSLA": {"buy_under":  335, "sell_above":  440, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "TSM":  {"buy_under":  270, "sell_above":  380, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "AAPL": {"buy_under":  200, "sell_above":  280, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28},
+    "AMZN": {"buy_under":  185, "sell_above":  230, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28},
+    "CLS":  {"buy_under":  220, "sell_above":  340, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
+    "CRDO": {"buy_under":   80, "sell_above":  140, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
+    "FIX":  {"buy_under": 1000, "sell_above": 1600, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
+    "GOOGL":{"buy_under":  250, "sell_above":  340, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28},
+    "GRBK": {"buy_under":   55, "sell_above":   80, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
+    "IBIT": {"buy_under":   34, "sell_above":   47, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
+    "MELI": {"buy_under": 1480, "sell_above": 1900, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
+    "NBIS": {"buy_under":   70, "sell_above":  135, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
+    "NFLX": {"buy_under":   65, "sell_above":  107, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.32},
+    "NVDA": {"buy_under":  155, "sell_above":  205, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28},
+    "PLTR": {"buy_under":   80, "sell_above":  195, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
+    "TSLA": {"buy_under":  335, "sell_above":  440, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
+    "TSM":  {"buy_under":  270, "sell_above":  380, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
+    "IBKR": {"buy_under":   50, "sell_above":   74, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28},
 }
 
 # Mode 3: Post-Drop CSP — triggered BY downward drops
@@ -200,7 +196,6 @@ def get_schwab_py_client():
         return None
 
 _schwab_cache = {"access_token": "", "expires_at": 0}
-_schwab_chain_live = True   # set False on first option chain 401; written to results.json
 
 
 def schwab_get_token() -> str:
@@ -317,8 +312,6 @@ def schwab_get_option_chain(ticker: str, from_date: str, to_date: str) -> list:
             timeout=15
         )
         if r.status_code != 200:
-            global _schwab_chain_live
-            _schwab_chain_live = False
             print(f"   Schwab chain {ticker}: {r.status_code}")
             return []
         data      = r.json()
@@ -770,7 +763,6 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
     bcs_positions  = []  # long calls that are part of bull call spreads (DTE >= 500)
     cc_shares      = {}  # shares already covered per ticker — used for CC sizing
     seen           = set()
-    leaps_accum    = {}  # accumulate LEAPS quantities across accounts: key=(underlying,strike,expiry)
 
     for sym, pos in ibkr.items():
         if pos.get("asset_class") != "OPT": continue
@@ -890,28 +882,18 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
                 except:
                     _exp_str = str(expiry)[:7]
                 _leaps_mv = float(pos.get("market_value", 0) or 0)
-                _lkey = (underlying, _strike_f, str(expiry))
-                if _lkey in leaps_accum:
-                    # Accumulate quantity and market value across accounts
-                    leaps_accum[_lkey]["contracts"]    += int(qty)
-                    leaps_accum[_lkey]["market_value"] += round(_leaps_mv, 0)
-                    # Keep avg_cost/breakeven from first entry (most complete)
-                else:
-                    leaps_accum[_lkey] = {
-                        "ticker":       underlying,
-                        "strike":       _strike_f,
-                        "contracts":    int(qty),
-                        "expiry":       str(expiry),
-                        "expiry_fmt":   _exp_str,
-                        "dte":          _dte,
-                        "avg_cost":     avg_cost,
-                        "breakeven":    breakeven,
-                        "market_value": round(_leaps_mv, 0),
-                        "source":       source,
-                    }
-
-    # Flush accumulated LEAPS quantities into leaps_positions list
-    leaps_positions = list(leaps_accum.values())
+                leaps_positions.append({
+                    "ticker":       underlying,
+                    "strike":       _strike_f,
+                    "contracts":    int(qty),
+                    "expiry":       str(expiry),
+                    "expiry_fmt":   _exp_str,
+                    "dte":          _dte,
+                    "avg_cost":     avg_cost,
+                    "breakeven":    breakeven,
+                    "market_value": round(_leaps_mv, 0),
+                    "source":       source,
+                })
 
     total_cso     = sum(p["cso"] for p in csp_positions)
     total_nva     = sum(p["nva"] for p in cc_positions)
@@ -5353,9 +5335,10 @@ def run_scanner():
     print(f"   📋 Position actions: {len(_pos_actions)} total | {_def_count} DEFENSIVE | {_close_count} CLOSE NOW")
 
     results = {
-        "scan_time":      now_et().strftime("%Y-%m-%d %H:%M ET"),
-        "scan_date":      now_et().strftime("%Y-%m-%d"),
-        "schwab_live":    _schwab_chain_live,
+        "scan_time":           now_et().strftime("%Y-%m-%d %H:%M ET"),
+        "scan_date":           now_et().strftime("%Y-%m-%d"),
+        "schwab_live":         len(schwab_quotes) > 0,
+        "schwab_last_success": now_et().strftime("%Y-%m-%d %H:%M ET") if len(schwab_quotes) > 0 else None,
         "execution_candidates": execution_candidates,   # strict — Telegram quality
         "review_candidates":    review_candidates,      # relaxed — dashboard review
         "dashboard_opportunities": review_candidates,   # alias for dashboard compat
