@@ -4308,13 +4308,15 @@ def run_scanner():
     tg_spikes = top_spikes   # time-sensitive — no score gate
     tg_drops  = top_drops    # time-sensitive — no score gate
     # PMCC and BCS: dashboard only — too complex/optional for a ping
+    # Spike CCs (opp_opps + tg_spikes): dashboard only — NOTABLE MOVES briefing already signals them
 
     has_real_opps = any([top_csps, top_ccs, top_leaps, top_pmccs, top_bcss, top_drops, top_spikes])
-    tg_any        = any([tg_csps, tg_ccs, tg_leaps, tg_spikes, tg_drops, opp_opps])
+    tg_any        = any([tg_csps, tg_ccs, tg_leaps, tg_drops])
 
     print(f"   Telegram filter: {len(tg_csps)} CSPs | {len(tg_ccs)} CCs | "
-          f"{len(tg_leaps)} LEAPS | {len(tg_spikes)} Spikes | {len(tg_drops)} Drops "
-          f"(from {len(top_csps)}+{len(top_ccs)}+{len(top_leaps)} before filter)")
+          f"{len(tg_leaps)} LEAPS | {len(tg_drops)} Drops "
+          f"(from {len(top_csps)}+{len(top_ccs)}+{len(top_leaps)} before filter) | "
+          f"{len(opp_opps)} spike opps + {len(tg_spikes)} spike CCs → dashboard only")
 
     # ── Telegram — ORDER: Summary → Trades ───────────────
     print("\n📱 Sending...")
@@ -4324,22 +4326,11 @@ def run_scanner():
         send_telegram(f"🧠 *CLAUDE SUMMARY*\n\n{analysis}")
         time.sleep(2)
 
-    # 2. Opportunistic volatility spike alerts (time-sensitive — always send)
-    if opp_opps:
-        send_telegram("━━━ *⚡ VOLATILITY SPIKE OPPORTUNITIES* ━━━")
-        send_telegram("_Sharp price spike detected — IV elevated, sell calls now if you hold shares._")
-        time.sleep(1)
-        for o in opp_opps:
-            send_telegram(fmt_opp_cc(o))
-            time.sleep(2)
-
-    # 3. Green-light trade alerts only (>= 75% score)
+    # 2. Green-light trade alerts only (>= 75% score)
+    #    Spikes and drops: drops kept (direct entry signal), spikes removed (briefing covers them)
     if tg_drops:
         send_telegram("━━━ *🔻 POST-DROP CSP* ━━━"); time.sleep(1)
         for o in tg_drops: send_telegram(fmt_drop_csp(o)); time.sleep(2)
-    if tg_spikes:
-        send_telegram("━━━ *⚡ SPIKE CC* ━━━"); time.sleep(1)
-        for o in tg_spikes: send_telegram(fmt_spike_cc(o)); time.sleep(2)
     if tg_csps:
         send_telegram("━━━ *✅ CSP* ━━━"); time.sleep(1)
         for o in tg_csps: send_telegram(fmt_csp(o)); time.sleep(2)
@@ -4350,7 +4341,7 @@ def run_scanner():
         send_telegram("━━━ *✅ LEAPS* ━━━"); time.sleep(1)
         for o in tg_leaps: send_telegram(fmt_leaps(o)); time.sleep(2)
 
-    # 4. Quiet day note: items exist on dashboard but nothing cleared the bar
+    # 3. Quiet day note: items exist on dashboard but nothing cleared the bar
     if not tg_any:
         _dash_count = sum(len(x) for x in [top_csps, top_ccs, top_leaps, top_pmccs, top_bcss])
         if _dash_count > 0:
