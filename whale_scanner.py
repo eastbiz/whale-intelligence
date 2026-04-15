@@ -109,6 +109,32 @@ OPP_IVP_MIN           = 40
 OPP_EARNINGS_MIN      = 7
 
 # ── Per-symbol income trade settings ────────────────────────────────────────
+# Source: Positions_Buy_Sell_Delta.xlsx (Income Trades sheet)
+# buy_under: max effective entry for CSP (strike - premium <= buy_under * 1.03)
+# sell_above: min effective exit for CC (strike + premium >= sell_above)
+SYMBOL_SETTINGS = {
+    "AAPL": {"buy_under":  200, "sell_above":  280, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
+    "AMZN": {"buy_under":  185, "sell_above":  230, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
+    "CLS":  {"buy_under":  220, "sell_above":  340, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "CRDO": {"buy_under":   80, "sell_above":  140, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "DDOG": {"buy_under":   95, "sell_above":  160, "csp_delta_min": 0.20, "csp_delta_max": 0.25, "cc_delta_min": 0.20, "cc_delta_max": 0.25, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "FIX":  {"buy_under": 1000, "sell_above": 1600, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "GOOGL":{"buy_under":  250, "sell_above":  340, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
+    "GRBK": {"buy_under":   55, "sell_above":   80, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "IBIT": {"buy_under":   34, "sell_above":   47, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "IBKR": {"buy_under":   50, "sell_above":   74, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "MELI": {"buy_under": 1480, "sell_above": 1900, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
+    "MU":   {"buy_under":  290, "sell_above":  450, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "NBIS": {"buy_under":   70, "sell_above":  135, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "NFLX": {"buy_under":   65, "sell_above":  107, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.32, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "NOW":  {"buy_under":   85, "sell_above":  130, "csp_delta_min": 0.20, "csp_delta_max": 0.25, "cc_delta_min": 0.20, "cc_delta_max": 0.25, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "NVDA": {"buy_under":  155, "sell_above":  205, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
+    "PLTR": {"buy_under":   80, "sell_above":  195, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "TSLA": {"buy_under":  335, "sell_above":  440, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "TSM":  {"buy_under":  270, "sell_above":  380, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+}
+
+# ── Per-symbol income trade settings ────────────────────────────────────────
 # Source: Income Trades worksheet (Positions_Buy_Sell_Delta.xlsx).
 # Keys: buy_under   — max effective entry for CSP (strike - premium <= buy_under)
 #       sell_above  — min effective exit for CC (strike + premium >= sell_above)
@@ -761,8 +787,9 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
     cc_positions   = []
     leaps_positions= []  # long calls with DTE >= 500
     bcs_positions  = []  # long calls that are part of bull call spreads (DTE >= 500)
-    cc_shares      = {}  # shares already covered per ticker — used for CC sizing
+    cc_shares      = {}
     seen           = set()
+    leaps_accum    = {}  # accumulate LEAPS quantities across accounts: key=(underlying,strike,expiry)
 
     for sym, pos in ibkr.items():
         if pos.get("asset_class") != "OPT": continue
@@ -778,11 +805,13 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
         )
         if qty == 0 or strike == 0: continue
 
-        # Deduplicate — same position sometimes in both IBKR and Schwab feeds
-        dedup_key = (underlying, put_call, strike, expiry, side)
-        if dedup_key in seen:
-            continue
-        seen.add(dedup_key)
+        # Deduplicate — same position sometimes in both IBKR and Schwab feeds.
+        # Long Calls excluded — leaps_accum aggregates them across all accounts.
+        if not (side == "Long" and put_call == "C"):
+            dedup_key = (underlying, put_call, strike, expiry, side)
+            if dedup_key in seen:
+                continue
+            seen.add(dedup_key)
 
         if side == "Short" and put_call == "P":
             cso      = round(strike * 100 * qty, 0)
@@ -882,18 +911,26 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
                 except:
                     _exp_str = str(expiry)[:7]
                 _leaps_mv = float(pos.get("market_value", 0) or 0)
-                leaps_positions.append({
-                    "ticker":       underlying,
-                    "strike":       _strike_f,
-                    "contracts":    int(qty),
-                    "expiry":       str(expiry),
-                    "expiry_fmt":   _exp_str,
-                    "dte":          _dte,
-                    "avg_cost":     avg_cost,
-                    "breakeven":    breakeven,
-                    "market_value": round(_leaps_mv, 0),
-                    "source":       source,
-                })
+                _lkey = (underlying, _strike_f, str(expiry))
+                if _lkey in leaps_accum:
+                    leaps_accum[_lkey]["contracts"]    += int(qty)
+                    leaps_accum[_lkey]["market_value"] += round(_leaps_mv, 0)
+                else:
+                    leaps_accum[_lkey] = {
+                        "ticker":       underlying,
+                        "strike":       _strike_f,
+                        "contracts":    int(qty),
+                        "expiry":       str(expiry),
+                        "expiry_fmt":   _exp_str,
+                        "dte":          _dte,
+                        "avg_cost":     avg_cost,
+                        "breakeven":    breakeven,
+                        "market_value": round(_leaps_mv, 0),
+                        "source":       source,
+                    }
+
+    # Flush accumulated LEAPS into leaps_positions
+    leaps_positions = list(leaps_accum.values())
 
     total_cso     = sum(p["cso"] for p in csp_positions)
     total_nva     = sum(p["nva"] for p in cc_positions)
@@ -3279,7 +3316,6 @@ Bull Call Spreads: {json.dumps(bcss,indent=2)}
 Post-Drop CSPs (Sell Fear Mode): {json.dumps(drops,indent=2) if drops else 'None'}
 Post-Spike CCs (Sell Strength Mode): {json.dumps(spikes,indent=2) if spikes else 'None'}
 Position Income CCs (Existing Holdings): {json.dumps(pio,indent=2) if pio else 'None'}
-Peter Lynch Discoveries: {json.dumps(discoveries,indent=2) if discoveries else 'None'}
 
 CRITICAL FORMAT RULE: Always use EXACT expiry dates in YYYY-MM-DD format.
 Never write "Apr-26" or "April expiry" — always write the full date like "2026-04-17".
@@ -3290,11 +3326,9 @@ Give:
 2. Best CC — same format (if any)
 3. Best LEAPS or PMCC — same format (if any)
 4. Best Bull Call Spread — long strike / short strike, EXACT expiry (YYYY-MM-DD), debit, max profit, ROR%
-5. Any Peter Lynch discovery worth investigating
-6. One-line IVP environment summary
-7. Hard pass on anything that fails quality check
+5. One-line IVP environment summary
 
-Direct, specific, no fluff. Every trade must include the full YYYY-MM-DD expiry date."""
+Only list items that actually have qualifying trades. Skip any category with nothing. Be concise. Every trade must include the full YYYY-MM-DD expiry date."""
 
     try:
         r = requests.post(
@@ -3718,7 +3752,7 @@ def run_scanner():
 
 
 
-# ── Price alerts — stocks near buy_under ─────────────────
+    # ── Price alerts — stocks near buy_under ──────────────────
     price_alerts = []
     for _tk, _ss in SYMBOL_SETTINGS.items():
         _bu = _ss.get("buy_under", 0)
@@ -3730,7 +3764,7 @@ def run_scanner():
             if _pct_above <= 0:
                 price_alerts.append(f"🚨 *{_tk}* ${_p:.2f} — BELOW buy target ${_bu} ({abs(_pct_above):.1f}% under)")
             else:
-                price_alerts.append(f"🎯 *{_tk}* ${_p:.2f} — {_pct_above:.1f}% above buy target ${_bu} — approaching zone")
+                price_alerts.append(f"🎯 *{_tk}* ${_p:.2f} — {_pct_above:.1f}% above buy target ${_bu}")
 
     briefing = (
         f"📡 *MARKET BRIEFING — {now_et().strftime('%b %d, %Y %H:%M')} ET*\n"
@@ -3738,7 +3772,7 @@ def run_scanner():
         f"*VIX: {vix}*  {vix_data['label']}\n"
     )
     if price_alerts:
-        briefing += f"\n━━━ PRICE ALERTS ━━━\n"
+        briefing += "\n━━━ PRICE ALERTS ━━━\n"
         for alert in price_alerts:
             briefing += f"{alert}\n"
     send_telegram(briefing)
@@ -4037,25 +4071,7 @@ def run_scanner():
     print(f"\n🏆 {len(top_csps)} CSPs | {len(top_ccs)} CCs | {len(top_leaps)} LEAPS | "
           f"{len(top_pmccs)} PMCCs | {len(top_bcss)} Spreads")
 
-    # If LEAPS recommended but none found — explain why
-    if gng["buy_leaps"] and len(top_leaps) == 0:
-        leaps_msg = (
-            "🚀 *LEAPS — No qualifying trades today*\n\n"
-            "System recommended buying LEAPS but none passed all filters.\n\n"
-            "Most likely reason: IVP is above 50% on most stocks, making options "
-            "too expensive to buy. LEAPS are best when IVP < 40%.\n\n"
-            "_Wait for a volatility spike followed by a quick reversal — "
-            "that's when LEAPS become cheapest on quality stocks._"
-        )
-        send_telegram(leaps_msg)
-
-    # ── Peter Lynch ───────────────────────────────────────
-    print("🔬 Peter Lynch screen...")
-    discoveries = peter_lynch_screen(set(ALL_TICKERS), flow)
-    if discoveries:
-        print(f"   Found: {[d['ticker'] for d in discoveries]}")
-
-    if total == 0 and not discoveries:
+    if total == 0:
         print("✅ No qualifying opportunities today.")
         return
 
@@ -4126,26 +4142,19 @@ def run_scanner():
 
     # ── Claude analysis ───────────────────────────────────
     print("\n🧠 Claude analysis...")
-    analysis = claude_analyze(top_csps,top_ccs,top_leaps,top_pmccs,top_bcss,discoveries,top_spikes,top_drops,top_pio)
+    analysis = claude_analyze(top_csps,top_ccs,top_leaps,top_pmccs,top_bcss,[],top_spikes,top_drops,top_pio)
     if analysis: print(f"\n{analysis}")
 
     # ── Telegram — ORDER: Summary → Trades ───────────────
     print("\n📱 Sending...")
 
-    # 1. Claude summary FIRST (before individual trades)
-    if analysis:
+    # 1. Claude summary — only when there are actual trade opportunities (no clutter on quiet days)
+    has_real_opps = any([top_csps, top_ccs, top_leaps, top_pmccs, top_bcss, top_drops, top_spikes])
+    if analysis and has_real_opps:
         send_telegram(f"🧠 *CLAUDE SUMMARY*\n\n{analysis}")
         time.sleep(2)
 
-    # 2. Peter Lynch discoveries (context before trades)
-    if discoveries:
-        msg = "🔬 *Peter Lynch Discoveries*\n_Not on watchlist — quality fundamentals + whale flow_\n\n"
-        for d in discoveries:
-            msg += f"*{d['ticker']}* — PEG {d['peg_ratio']} | EPS +{d['eps_growth']}% | Flow {d['whale_flow']}\n"
-        send_telegram(msg)
-        time.sleep(2)
-
-    # 2b. Opportunistic volatility spike alerts (before regular trades)
+    # 2. Opportunistic volatility spike alerts (before regular trades)
     if opp_opps:
         send_telegram("━━━ *⚡ VOLATILITY SPIKE OPPORTUNITIES* ━━━")
         send_telegram(
@@ -4897,6 +4906,16 @@ def run_scanner():
         if alias in exposure_map:
             exposure_map[canonical] = round(
                 exposure_map.get(canonical, 0) + exposure_map.pop(alias), 1)
+        # Also merge account_map so IBKR GOOG shares appear under GOOGL filter
+        if alias in account_map:
+            alias_accts  = account_map_all.get(alias, [account_map[alias]])
+            canon_accts  = account_map_all.get(canonical, [])
+            merged       = list(dict.fromkeys(canon_accts + alias_accts))
+            account_map_all[canonical] = merged
+            if canonical not in account_map:
+                account_map[canonical] = account_map[alias]
+            account_map.pop(alias, None)
+            account_map_all.pop(alias, None)
 
     # ── Exclusion rule (Spec §4) ──
     for sym in list(exposure_map.keys()):
@@ -5015,16 +5034,14 @@ def run_scanner():
         _shares_owned  = int(float(_stk_pos.get("quantity", 0) or _stk_pos.get("qty", 0) or 0))
         _price_t       = md_t.get("price", 0)
         # CC data
-        _cc_covered    = portfolio_exposure.get("cc_shares_covered", {}).get(ticker, 0)
-        _cc_contracts  = sum(p["contracts"] for p in portfolio_exposure.get("cc_positions", []) if p["ticker"] == ticker)
-        # LEAPS contracts count as synthetic coverage (each contract covers 100 shares)
+        _cc_covered      = portfolio_exposure.get("cc_shares_covered", {}).get(ticker, 0)
+        _cc_contracts    = sum(p["contracts"] for p in portfolio_exposure.get("cc_positions", []) if p["ticker"] == ticker)
         _leaps_contracts = sum(p["contracts"] for p in portfolio_exposure.get("leaps_positions", []) if p["ticker"] == ticker)
-        _leaps_coverage  = _leaps_contracts * 100  # synthetic shares via LEAPS
-        # Total effective shares for coverage denominator = stock + LEAPS synthetic
-        _effective_shares = _shares_owned + _leaps_coverage
-        _uncovered     = max(0, _effective_shares - _cc_covered)
-        _cov_pct       = round(_cc_covered / _effective_shares * 100, 1) if _effective_shares > 0 else 0
-        _add_cc        = int(_uncovered / 100)
+        _leaps_coverage  = _leaps_contracts * 100  # each LEAPS contract covers 100 shares
+        _effective_shares= _shares_owned + _leaps_coverage
+        _uncovered       = max(0, _effective_shares - _cc_covered)
+        _cov_pct         = round(_cc_covered / _effective_shares * 100, 1) if _effective_shares > 0 else 0
+        _add_cc          = int(_uncovered / 100)
         # CSP data
         _csp_contracts = sum(p["contracts"] for p in portfolio_exposure.get("csp_positions", []) if p["ticker"] == ticker)
         _csp_obligation= sum(p["cso"]       for p in portfolio_exposure.get("csp_positions", []) if p["ticker"] == ticker)
@@ -5039,10 +5056,9 @@ def run_scanner():
         _has_stock = _shares_owned > 0
         _has_cc    = _cc_contracts > 0
         _has_csp   = _csp_contracts > 0
-        _has_leaps = _leaps_contracts > 0
         if _has_stock and _has_cc and _has_csp:   _exp_status = "Stock + CC + CSP"
         elif _has_stock and _has_cc:
-            if _cov_pct >= 100:                   _exp_status = "Fully Covered" + (" (incl. LEAPS)" if _has_leaps and _leaps_coverage > 0 else "")
+            if _cov_pct >= 100:                   _exp_status = "Fully Covered"
             elif _cov_pct >= 50:                  _exp_status = f"{round(_cov_pct/25)*25}% Covered"
             else:                                 _exp_status = f"{int(_cov_pct)}% Covered"
         elif _has_stock and _has_csp:             _exp_status = "Stock + CSP"
@@ -5341,8 +5357,10 @@ def run_scanner():
     print(f"   📋 Position actions: {len(_pos_actions)} total | {_def_count} DEFENSIVE | {_close_count} CLOSE NOW")
 
     results = {
-        "scan_time":      now_et().strftime("%Y-%m-%d %H:%M ET"),
-        "scan_date":      now_et().strftime("%Y-%m-%d"),
+        "scan_time":           now_et().strftime("%Y-%m-%d %H:%M ET"),
+        "scan_date":           now_et().strftime("%Y-%m-%d"),
+        "schwab_live":         len(schwab_quotes) > 0,
+        "schwab_last_success": now_et().strftime("%Y-%m-%d %H:%M ET") if len(schwab_quotes) > 0 else None,
         "execution_candidates": execution_candidates,   # strict — Telegram quality
         "review_candidates":    review_candidates,      # relaxed — dashboard review
         "dashboard_opportunities": review_candidates,   # alias for dashboard compat
