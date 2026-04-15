@@ -3279,6 +3279,7 @@ Bull Call Spreads: {json.dumps(bcss,indent=2)}
 Post-Drop CSPs (Sell Fear Mode): {json.dumps(drops,indent=2) if drops else 'None'}
 Post-Spike CCs (Sell Strength Mode): {json.dumps(spikes,indent=2) if spikes else 'None'}
 Position Income CCs (Existing Holdings): {json.dumps(pio,indent=2) if pio else 'None'}
+Peter Lynch Discoveries: {json.dumps(discoveries,indent=2) if discoveries else 'None'}
 
 CRITICAL FORMAT RULE: Always use EXACT expiry dates in YYYY-MM-DD format.
 Never write "Apr-26" or "April expiry" — always write the full date like "2026-04-17".
@@ -3289,9 +3290,11 @@ Give:
 2. Best CC — same format (if any)
 3. Best LEAPS or PMCC — same format (if any)
 4. Best Bull Call Spread — long strike / short strike, EXACT expiry (YYYY-MM-DD), debit, max profit, ROR%
-5. One-line IVP environment summary
+5. Any Peter Lynch discovery worth investigating
+6. One-line IVP environment summary
+7. Hard pass on anything that fails quality check
 
-Direct, specific, no fluff. Only mention trades that genuinely qualify. Every trade must include the full YYYY-MM-DD expiry date."""
+Direct, specific, no fluff. Every trade must include the full YYYY-MM-DD expiry date."""
 
     try:
         r = requests.post(
@@ -3715,29 +3718,29 @@ def run_scanner():
 
 
 
-    # ── Price alerts — stocks near buy_under ─────────────────
-    price_alerts = []
-    for _tk, _ss in SYMBOL_SETTINGS.items():
-        _bu = _ss.get("buy_under", 0)
-        if _bu <= 0: continue
-        _p = mkt.get(_tk, {}).get("price", 0)
-        if _p <= 0: continue
-        _pct_above = (_p - _bu) / _bu * 100
-        if _pct_above <= 5:   # within 5% of buy_under
-            if _pct_above <= 0:
-                price_alerts.append(f"🚨 *{_tk}* ${_p:.2f} — BELOW buy target ${_bu} ({abs(_pct_above):.1f}% under)")
-            else:
-                price_alerts.append(f"🎯 *{_tk}* ${_p:.2f} — {_pct_above:.1f}% above buy target ${_bu} — approaching zone")
-
     briefing = (
         f"📡 *MARKET BRIEFING — {now_et().strftime('%b %d, %Y %H:%M')} ET*\n"
         f"\n"
-        f"*VIX: {vix}*  {vix_data['label']}\n"
+        f"━━━ MARKET CONDITIONS ━━━\n"
+        f"\n"
+        f"*VIX: {vix}*\n"
+        f"{vix_data['label']}\n"
+        f"_VIX measures market fear. Above 25 = high volatility."
+        f" Higher VIX = fatter premiums = better CSP/CC income._\n"
+        f"\n"
+
+
+        f"\n"
+        f"*S&P 500:* {spy_regime['label']}\n"
+        f"_S&P below 200MA = reduce size, lower delta._\n"
+        f"\n"
+        f"━━━ TODAY'S CONTEXT ━━━\n"
+        f"\n"
+        f"{gng['quality']}\n"
+        f"\n"
+        f"_Individual trades filtered by per-stock IV Percentile (IVP ≥ 30)._\n"
+        f"_Trading opportunities follow below ↓_"
     )
-    if price_alerts:
-        briefing += f"\n━━━ PRICE ALERTS ━━━\n"
-        for alert in price_alerts:
-            briefing += f"{alert}\n"
     send_telegram(briefing)
     time.sleep(2)
 
@@ -4034,7 +4037,25 @@ def run_scanner():
     print(f"\n🏆 {len(top_csps)} CSPs | {len(top_ccs)} CCs | {len(top_leaps)} LEAPS | "
           f"{len(top_pmccs)} PMCCs | {len(top_bcss)} Spreads")
 
-    if total == 0:
+    # If LEAPS recommended but none found — explain why
+    if gng["buy_leaps"] and len(top_leaps) == 0:
+        leaps_msg = (
+            "🚀 *LEAPS — No qualifying trades today*\n\n"
+            "System recommended buying LEAPS but none passed all filters.\n\n"
+            "Most likely reason: IVP is above 50% on most stocks, making options "
+            "too expensive to buy. LEAPS are best when IVP < 40%.\n\n"
+            "_Wait for a volatility spike followed by a quick reversal — "
+            "that's when LEAPS become cheapest on quality stocks._"
+        )
+        send_telegram(leaps_msg)
+
+    # ── Peter Lynch ───────────────────────────────────────
+    print("🔬 Peter Lynch screen...")
+    discoveries = peter_lynch_screen(set(ALL_TICKERS), flow)
+    if discoveries:
+        print(f"   Found: {[d['ticker'] for d in discoveries]}")
+
+    if total == 0 and not discoveries:
         print("✅ No qualifying opportunities today.")
         return
 
@@ -4105,7 +4126,7 @@ def run_scanner():
 
     # ── Claude analysis ───────────────────────────────────
     print("\n🧠 Claude analysis...")
-    analysis = claude_analyze(top_csps,top_ccs,top_leaps,top_pmccs,top_bcss,[],top_spikes,top_drops,top_pio)
+    analysis = claude_analyze(top_csps,top_ccs,top_leaps,top_pmccs,top_bcss,discoveries,top_spikes,top_drops,top_pio)
     if analysis: print(f"\n{analysis}")
 
     # ── Telegram — ORDER: Summary → Trades ───────────────
@@ -4116,7 +4137,15 @@ def run_scanner():
         send_telegram(f"🧠 *CLAUDE SUMMARY*\n\n{analysis}")
         time.sleep(2)
 
-    # 2. Opportunistic volatility spike alerts (before regular trades)
+    # 2. Peter Lynch discoveries (context before trades)
+    if discoveries:
+        msg = "🔬 *Peter Lynch Discoveries*\n_Not on watchlist — quality fundamentals + whale flow_\n\n"
+        for d in discoveries:
+            msg += f"*{d['ticker']}* — PEG {d['peg_ratio']} | EPS +{d['eps_growth']}% | Flow {d['whale_flow']}\n"
+        send_telegram(msg)
+        time.sleep(2)
+
+    # 2b. Opportunistic volatility spike alerts (before regular trades)
     if opp_opps:
         send_telegram("━━━ *⚡ VOLATILITY SPIKE OPPORTUNITIES* ━━━")
         send_telegram(
@@ -4988,8 +5017,13 @@ def run_scanner():
         # CC data
         _cc_covered    = portfolio_exposure.get("cc_shares_covered", {}).get(ticker, 0)
         _cc_contracts  = sum(p["contracts"] for p in portfolio_exposure.get("cc_positions", []) if p["ticker"] == ticker)
-        _uncovered     = max(0, _shares_owned - _cc_covered)
-        _cov_pct       = round(_cc_covered / _shares_owned * 100, 1) if _shares_owned > 0 else 0
+        # LEAPS contracts count as synthetic coverage (each contract covers 100 shares)
+        _leaps_contracts = sum(p["contracts"] for p in portfolio_exposure.get("leaps_positions", []) if p["ticker"] == ticker)
+        _leaps_coverage  = _leaps_contracts * 100  # synthetic shares via LEAPS
+        # Total effective shares for coverage denominator = stock + LEAPS synthetic
+        _effective_shares = _shares_owned + _leaps_coverage
+        _uncovered     = max(0, _effective_shares - _cc_covered)
+        _cov_pct       = round(_cc_covered / _effective_shares * 100, 1) if _effective_shares > 0 else 0
         _add_cc        = int(_uncovered / 100)
         # CSP data
         _csp_contracts = sum(p["contracts"] for p in portfolio_exposure.get("csp_positions", []) if p["ticker"] == ticker)
@@ -5005,9 +5039,10 @@ def run_scanner():
         _has_stock = _shares_owned > 0
         _has_cc    = _cc_contracts > 0
         _has_csp   = _csp_contracts > 0
+        _has_leaps = _leaps_contracts > 0
         if _has_stock and _has_cc and _has_csp:   _exp_status = "Stock + CC + CSP"
         elif _has_stock and _has_cc:
-            if _cov_pct >= 100:                   _exp_status = "Fully Covered"
+            if _cov_pct >= 100:                   _exp_status = "Fully Covered" + (" (incl. LEAPS)" if _has_leaps and _leaps_coverage > 0 else "")
             elif _cov_pct >= 50:                  _exp_status = f"{round(_cov_pct/25)*25}% Covered"
             else:                                 _exp_status = f"{int(_cov_pct)}% Covered"
         elif _has_stock and _has_csp:             _exp_status = "Stock + CSP"
