@@ -109,55 +109,39 @@ OPP_IVP_MIN           = 40
 OPP_EARNINGS_MIN      = 7
 
 # ── Per-symbol income trade settings ────────────────────────────────────────
-# Source: Positions_Buy_Sell_Delta.xlsx (Income Trades sheet)
-# buy_under: max effective entry for CSP (strike - premium <= buy_under * 1.03)
-# sell_above: min effective exit for CC (strike + premium >= sell_above)
+# Source: Positions_Buy_Sell_Delta.xlsx (Income Trades sheet) — updated Apr 15 2026
+# buy_under:  max effective entry for CSP (effective_entry <= buy_under * 1.03 hard gate)
+# sell_above: min effective exit for CC  (strike + premium >= sell_above hard gate)
+# Delta ranges are hard filters applied per strategy.
+# Tickers marked REMOVE in spreadsheet are kept here until positions are wound down.
 SYMBOL_SETTINGS = {
+    # ── CORE ─────────────────────────────────────────────────────────────────
     "AAPL": {"buy_under":  200, "sell_above":  280, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
-    "AMZN": {"buy_under":  185, "sell_above":  230, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
-    "CLS":  {"buy_under":  220, "sell_above":  340, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "CRDO": {"buy_under":   80, "sell_above":  140, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "DDOG": {"buy_under":   95, "sell_above":  160, "csp_delta_min": 0.20, "csp_delta_max": 0.25, "cc_delta_min": 0.20, "cc_delta_max": 0.25, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "FIX":  {"buy_under": 1000, "sell_above": 1600, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "GOOGL":{"buy_under":  250, "sell_above":  340, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
+    "AMZN": {"buy_under":  200, "sell_above":  260, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
+    "GOOGL":{"buy_under":  250, "sell_above":  395, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
+    "IBKR": {"buy_under":   50, "sell_above":   95, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "MELI": {"buy_under": 1480, "sell_above": 2100, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
+    "MSFT": {"buy_under":  355, "sell_above":  500, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
+    "NOW":  {"buy_under":   75, "sell_above":  130, "csp_delta_min": 0.20, "csp_delta_max": 0.25, "cc_delta_min": 0.20, "cc_delta_max": 0.25, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "NVDA": {"buy_under":  155, "sell_above":  240, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
+    "TSM":  {"buy_under":  270, "sell_above":  440, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    # ── TRADING ──────────────────────────────────────────────────────────────
+    "CRDO": {"buy_under":   80, "sell_above":  200, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "FIX":  {"buy_under": 1000, "sell_above": 1900, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "MU":   {"buy_under":  290, "sell_above":  550, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "NFLX": {"buy_under":   65, "sell_above":  125, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.32, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "PLTR": {"buy_under":   80, "sell_above":  175, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "TSLA": {"buy_under":  335, "sell_above":  490, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    # ── REMOVE (winding down — kept until positions closed) ──────────────────
+    "CLS":  {"buy_under":  280, "sell_above":  440, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
     "GRBK": {"buy_under":   55, "sell_above":   80, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
     "IBIT": {"buy_under":   34, "sell_above":   47, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "IBKR": {"buy_under":   50, "sell_above":   74, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "MELI": {"buy_under": 1480, "sell_above": 1900, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
-    "MU":   {"buy_under":  290, "sell_above":  450, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "NBIS": {"buy_under":   70, "sell_above":  135, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "NFLX": {"buy_under":   65, "sell_above":  107, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.32, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "NOW":  {"buy_under":   85, "sell_above":  130, "csp_delta_min": 0.20, "csp_delta_max": 0.25, "cc_delta_min": 0.20, "cc_delta_max": 0.25, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "NVDA": {"buy_under":  155, "sell_above":  205, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
-    "PLTR": {"buy_under":   80, "sell_above":  195, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "TSLA": {"buy_under":  335, "sell_above":  440, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "TSM":  {"buy_under":  270, "sell_above":  380, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-}
-
-# ── Per-symbol income trade settings ────────────────────────────────────────
-# Source: Income Trades worksheet (Positions_Buy_Sell_Delta.xlsx).
-# Keys: buy_under   — max effective entry for CSP (strike - premium <= buy_under)
-#       sell_above  — min effective exit for CC (strike + premium >= sell_above)
-#       csp_delta_min/max — hard delta range for CSP candidates
-#       cc_delta_min/max  — hard delta range for CC candidates
-# Tickers NOT listed use global delta constants and skip price-alignment filters.
-SYMBOL_SETTINGS = {
-    "AAPL": {"buy_under":  200, "sell_above":  280, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28},
-    "AMZN": {"buy_under":  185, "sell_above":  230, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28},
-    "CLS":  {"buy_under":  220, "sell_above":  340, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
-    "CRDO": {"buy_under":   80, "sell_above":  140, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
-    "FIX":  {"buy_under": 1000, "sell_above": 1600, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
-    "GOOGL":{"buy_under":  250, "sell_above":  340, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28},
-    "GRBK": {"buy_under":   55, "sell_above":   80, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
-    "IBIT": {"buy_under":   34, "sell_above":   47, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
-    "MELI": {"buy_under": 1480, "sell_above": 1900, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
-    "NBIS": {"buy_under":   70, "sell_above":  135, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
-    "NFLX": {"buy_under":   65, "sell_above":  107, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.32},
-    "NVDA": {"buy_under":  155, "sell_above":  205, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28},
-    "PLTR": {"buy_under":   80, "sell_above":  195, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
-    "TSLA": {"buy_under":  335, "sell_above":  440, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
-    "TSM":  {"buy_under":  270, "sell_above":  380, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30},
-    "IBKR": {"buy_under":   50, "sell_above":   74, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28},
+    "KNX":  {"buy_under":   64, "sell_above":   75, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "LULU": {"buy_under":  145, "sell_above":  195, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "NBIS": {"buy_under":   90, "sell_above":  190, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "NVO":  {"buy_under":   33, "sell_above":   48, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "PATH": {"buy_under":   11, "sell_above":    0, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "POWL": {"buy_under":  233, "sell_above":  275, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
 }
 
 # Mode 3: Post-Drop CSP — triggered BY downward drops
@@ -1962,7 +1946,7 @@ CORE_STOCKS = {
     "MELI", "NVO", "VRTX", "IBKR", "CPRT", "BRK-B",
 }
 GROWTH_STOCKS = {
-    "META", "NOW", "DDOG", "UBER", "NFLX", "PLTR",
+    "META", "NOW", "UBER", "NFLX", "PLTR",
 }
 CYCLICAL_STOCKS = {
     "MU", "KNX", "POWL",
