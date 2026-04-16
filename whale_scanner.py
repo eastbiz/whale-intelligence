@@ -2780,7 +2780,7 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality, sizing=None, m
     return best, best["timing"]
 
 
-def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir, already_covered=0):
+def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir, already_covered=0, sell_above=0):
     timing = timing_score("CC", pir, ivdata["ivp"])
     if not contracts or price <= 0 or qty < 100: return None, timing
     # Note: timing["recommend"] is advisory only — dashboard shows all
@@ -2809,6 +2809,9 @@ def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir, already_c
         ask = float(c.get("nbbo_ask",0) or 0)
         mid = (bid + ask) / 2
         if mid < 1.0: continue
+        # Hard skip: effective sale (strike + premium) must reach sell_above target
+        if sell_above > 0 and (strike + mid) < sell_above:
+            continue
         # Liquidity filter
         oi_val  = int(c.get("open_interest", 0) or 0)
         vol_val = int(c.get("volume", 0) or 0)
@@ -4244,7 +4247,8 @@ def run_scanner():
                 and not quality["hard_stop"]
                 and ticker not in LEAPS_ONLY):
             cc, _ = find_best_cc(ticker, price, qty, avg, contracts, ivdata, pir,
-                               already_covered=portfolio_exposure.get("cc_shares_covered",{}).get(ticker, 0))
+                               already_covered=portfolio_exposure.get("cc_shares_covered",{}).get(ticker, 0),
+                               sell_above=SYMBOL_SETTINGS.get(ticker, {}).get("sell_above", 0))
             if cc:
                 cc_opps.append({**base,"cc":cc,
                     "score":score_cc({"tier":base.get("tier","Opportunistic"),
