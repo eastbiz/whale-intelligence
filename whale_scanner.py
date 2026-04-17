@@ -63,6 +63,40 @@ TIER_ALLOCATIONS = {
 # Keep TIER_MAX_PCT as alias for backward compat
 TIER_MAX_PCT = {k: v[1] for k, v in TIER_ALLOCATIONS.items()}
 
+# ── Per-ticker allocation targets (updated Apr 17 2026) ──────
+# target_pct: desired portfolio weight
+# On Target zone: 80%–120% of target_pct (±20% tolerance band)
+# Speculative tickers at 0% show "Not Held" rather than "Underweight"
+TICKER_TARGETS = {
+    # Core
+    "AAPL":  {"target_pct":  8.0, "speculative": False},
+    "AMZN":  {"target_pct": 10.0, "speculative": False},
+    "GOOGL": {"target_pct": 10.0, "speculative": False},
+    "IBKR":  {"target_pct":  5.0, "speculative": False},
+    "MELI":  {"target_pct":  5.0, "speculative": False},
+    "MSFT":  {"target_pct":  6.0, "speculative": False},
+    "NOW":   {"target_pct":  4.0, "speculative": False},
+    "NVDA":  {"target_pct": 12.0, "speculative": False},
+    "TSM":   {"target_pct":  6.0, "speculative": False},
+    # Trading
+    "CRDO":  {"target_pct":  3.0, "speculative": False},
+    "FIX":   {"target_pct":  3.0, "speculative": False},
+    "MU":    {"target_pct":  4.0, "speculative": False},
+    "NFLX":  {"target_pct":  4.0, "speculative": False},
+    "PLTR":  {"target_pct":  4.0, "speculative": False},
+    "TSLA":  {"target_pct":  3.0, "speculative": False},
+    # Speculative — "Not Held" when at 0%, no BUY pressure
+    "CLS":   {"target_pct":  1.0, "speculative": True},
+    "GRBK":  {"target_pct":  1.0, "speculative": True},
+    "IBIT":  {"target_pct":  1.0, "speculative": True},
+    "KNX":   {"target_pct":  2.0, "speculative": True},
+    "LULU":  {"target_pct":  2.0, "speculative": True},
+    "NBIS":  {"target_pct":  2.0, "speculative": True},
+    "NVO":   {"target_pct":  2.0, "speculative": True},
+    "POWL":  {"target_pct":  2.0, "speculative": True},
+}
+TICKER_TOLERANCE = 0.20  # ±20% relative band around target_pct
+
 # ── Strategy parameters (from framework doc) ────────────────
 CSP_DTE_MIN           = 30;   CSP_DTE_MAX     = 45
 CSP_MIN_DTE           = 30;   CSP_MAX_DTE     = 45   # aliases
@@ -1312,11 +1346,32 @@ def tier_weight(tier: str) -> int:
     return {"Core": 3, "Growth": 2, "Cyclical": 1, "Opportunistic": 0}.get(tier, 0)
 
 def tier_target_range(tier: str) -> tuple:
-    """Target allocation range (low%, high%) by tier."""
+    """Target allocation range (low%, high%) by tier — used as fallback."""
     return TARGET_RANGES.get(tier, (1.0, 3.0))
 
+def ticker_target_range(ticker: str, tier: str) -> tuple:
+    """Per-ticker target range using ±20% tolerance band around target_pct.
+    Falls back to tier range if ticker not in TICKER_TARGETS."""
+    tt = TICKER_TARGETS.get(ticker)
+    if tt:
+        mid = tt["target_pct"]
+        lo  = round(mid * (1 - TICKER_TOLERANCE), 2)
+        hi  = round(mid * (1 + TICKER_TOLERANCE), 2)
+        return (lo, hi)
+    return tier_target_range(tier)
+
+def ticker_position_status(ticker: str, tier: str, exposure_pct: float) -> str:
+    """Underweight / On Target / Overweight / Not Held using per-ticker targets."""
+    tt = TICKER_TARGETS.get(ticker)
+    if tt and tt.get("speculative") and exposure_pct == 0:
+        return "Not Held"
+    lo, hi = ticker_target_range(ticker, tier)
+    if exposure_pct == 0 or exposure_pct < lo:   return "Underweight"
+    elif exposure_pct <= hi:                      return "On Target"
+    else:                                         return "Overweight"
+
 def tier_position_status(tier: str, exposure_pct: float) -> str:
-    """Underweight / On Target / Overweight relative to tier target."""
+    """Legacy shim — prefer ticker_position_status for new code."""
     lo, hi = tier_target_range(tier)
     if exposure_pct == 0 or exposure_pct < lo:   return "Underweight"
     elif exposure_pct <= hi:                      return "On Target"
@@ -1830,7 +1885,8 @@ def score_allocation(pos: dict) -> int:
 
     # Position status vs tier target
     ps = pos.get("pos_status","")
-    if ps == "Underweight":   s += 3   # strong buy signal
+    if ps == "Not Held":      s += 0   # neutral — speculative, no automatic buy pressure
+    elif ps == "Underweight": s += 3   # strong buy signal
     elif ps == "On Target":   s += 1   # hold/add at current level
     elif ps == "Overweight":  s -= 3   # reduce
 
@@ -1953,46 +2009,40 @@ def score_unified(opp: dict, mode: str = "CSP") -> float:
 
 # ── Stock universe ────────────────────────────────────────────────────────────
 CORE_STOCKS = {
-    "AAPL", "AMZN", "GOOGL", "MSFT", "NVDA", "TSM", "ASML",
-    "MELI", "NVO", "VRTX", "IBKR", "CPRT", "BRK-B",
+    "AAPL", "AMZN", "GOOGL", "MSFT", "NVDA", "TSM",
+    "MELI", "IBKR",
 }
 GROWTH_STOCKS = {
-    "META", "NOW", "UBER", "NFLX", "PLTR",
+    "NOW", "NFLX", "PLTR",
 }
 CYCLICAL_STOCKS = {
-    "MU", "KNX", "POWL",
+    "MU", "FIX", "CRDO", "TSLA",
 }
 OPPORTUNISTIC_STOCKS = {
-    "CLS", "CRDO", "FIX", "VRT", "LULU", "TSLA", "BABA", "IBIT", "NBIS", "MSTR",
+    "CLS", "GRBK", "IBIT", "KNX", "LULU", "NBIS", "NVO", "POWL",
 }
 
 ALL_TICKERS = sorted(
     CORE_STOCKS | GROWTH_STOCKS | CYCLICAL_STOCKS | OPPORTUNISTIC_STOCKS
 )
 
-TARGET_RANGES = {
-    "Core":          (5.0, 10.0),
-    "Growth":        (3.0,  6.0),
-    "Cyclical":      (2.0,  5.0),
-    "Opportunistic": (1.0,  3.0),
-    "Other":         (0.0,  0.0),
-}
+# TARGET_RANGES defined at top of file
 
 # Speculative — wider OTM buffers required
-SPECULATIVE = {"IBIT", "BABA", "CRDO", "LULU", "NBIS"}
+SPECULATIVE = {"IBIT", "CLS", "GRBK", "KNX", "LULU", "NBIS", "NVO", "POWL"}
 
 # LEAPS/CSP only — no CC income generation
-LEAPS_ONLY = {"BABA", "IBIT"}
+LEAPS_ONLY = {"IBIT"}
 
 # Volatility spike CC candidates — sell calls when stock spikes 8%+ upward
-SPIKE_CC_CANDIDATES = {"NBIS", "IBIT", "PLTR"}
+SPIKE_CC_CANDIDATES = {"IBIT", "PLTR"}
 
 # Positions dashboard exclusion list — non-tradable, synthetic, or explicitly excluded
 # Per spec section 4: excluded symbols must not appear in rankings, actions, or summaries
 EXCLUDED_SYMBOLS = {
     "XIOR.CP27",   # Non-tradable synthetic/warrant — excluded per user spec
     "HOM.U",       # Income trust — not actively traded options
-    "EDEN", "SHUR", "VNA", "HTWS", "SGRO", "SVI", "GRBK",  # GRAB removed — user holds LEAPS
+    "EDEN", "SHUR", "VNA", "HTWS", "SGRO", "SVI",  # non-tradable / synthetic
     # Add any other non-US or non-tradable holdings here
 }
 
@@ -2006,7 +2056,6 @@ GROUPED_TICKERS = {
 STRICT_DELTA = {
     "PLTR": (0.20, 0.25),   # Extreme valuation, stricter
     "TSLA": (0.20, 0.28),   # High volatility, be selective
-    "BABA": (0.15, 0.25),   # Geopolitical risk
 }
 
 # IVP minimums by strategy (overrides global defaults for specific stocks)
@@ -4463,14 +4512,6 @@ def run_scanner():
         send_telegram("━━━ *✅ LEAPS* ━━━"); time.sleep(1)
         for o in tg_leaps: send_telegram(fmt_leaps(o)); time.sleep(2)
 
-    # 3. Quiet day note: items exist on dashboard but nothing cleared the bar
-    if not tg_any:
-        _dash_count = sum(len(x) for x in [top_csps, top_ccs, top_leaps, top_pmccs, top_bcss])
-        if _dash_count > 0:
-            send_telegram(
-                f"📋 *{_dash_count} idea{'s' if _dash_count != 1 else ''} on dashboard "
-                f"— none cleared the high-conviction bar today.*"
-            )
     # PMCC / BCS — dashboard only (never sent to Telegram)
 
     # ── Save results.json for dashboard ─────────────────────
@@ -4500,6 +4541,11 @@ def run_scanner():
             max_cso         = portfolio_exposure.get("max_csp_allocation_usd", PORTFOLIO_SIZE * MAX_CSP_ALLOCATION_PCT)
             resulting_cso   = current_cso + cso
             remaining_after = max(0, portfolio_exposure.get("remaining_csp_capacity", 0) - cso)
+            # 80% profit target: close at 20% of original premium
+            _dte            = s.get("dte", 30)
+            _profit_target_price = round(premium * 0.20, 2)  # buyback at 20% of premium
+            # Days estimate: theta decay is front-loaded; ~50-60% of time captures ~80% of decay
+            _profit_target_days  = max(1, round(_dte * 0.55))
             sizing = {
                 "suggested_contracts":  contracts,
                 "capital_required":     cso,
@@ -4511,6 +4557,8 @@ def run_scanner():
                 "resulting_pct":        round(resulting_cso / PORTFOLIO_SIZE * 100, 1) if PORTFOLIO_SIZE > 0 else 0,
                 "remaining_after":      round(remaining_after, 0),
                 "within_limit":         resulting_cso <= max_cso,
+                "profit_target_price":  _profit_target_price,   # close at this price = 80% profit
+                "profit_target_days":   _profit_target_days,    # ~days to reach (estimate)
             }
         elif mode in ("CC", "PIO", "SPIKE_CC"):
             sizing = {
@@ -4980,8 +5028,10 @@ def run_scanner():
 
         # ── LEAPS: all with decent timing ────────────────────
         if ticker not in LEAPS_ONLY:
-            _sym_leaps  = SYMBOL_SETTINGS.get(ticker, {})
+            _sym_leaps       = SYMBOL_SETTINGS.get(ticker, {})
             _leaps_buy_under = _sym_leaps.get("buy_under", 0)
+            _leaps_delta_min = _sym_leaps.get("leaps_delta_min", LEAPS_DELTA_MIN)
+            _leaps_delta_max = _sym_leaps.get("leaps_delta_max", LEAPS_DELTA_MAX)
             leaps_calls = [c for c in contracts_d
                            if c.get("option_type") == "C"
                            and (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days >= LEAPS_DTE_MIN]
@@ -4998,7 +5048,7 @@ def run_scanner():
                     if not (-5 <= itm_pct <= 40): continue
                     delta = abs(float(c.get("delta",0) or 0))
                     if delta == 0: delta = abs(estimate_delta(price,strike,dte,0.30,"C") or 0)
-                    if not (LEAPS_DELTA_MIN <= delta <= 0.98): continue
+                    if not (_leaps_delta_min <= delta <= _leaps_delta_max): continue
                     intrinsic = max(0, price-strike)
                     extrinsic = max(0, mid-intrinsic)
                     ext_pct = (extrinsic/mid*100) if mid > 0 else 100
@@ -5279,8 +5329,11 @@ def run_scanner():
         On target + Neutral      → HOLD
         On target + Near High    → TRIM
         Above target + any       → TRIM
+        Not Held (speculative)   → WATCH (no automatic buy pressure)
         """
-        if pos_status == "Overweight":
+        if pos_status == "Not Held":
+            return "WATCH"
+        elif pos_status == "Overweight":
             return "TRIM"
         elif pos_status == "On Target":
             if price_opp == "Pullback":   return "ADD"
@@ -5303,12 +5356,12 @@ def run_scanner():
                 "Cyclical" if ticker in CYCLICAL_STOCKS else
                 "Opportunistic" if ticker in OPPORTUNISTIC_STOCKS else "Other")
 
-        target_low, target_high = TARGET_RANGES.get(tier, (0.0, 0.0))
+        target_low, target_high = ticker_target_range(ticker, tier)
         exposure = exposure_map.get(ticker, 0.0)
 
         # Ownership precedence (Spec §5): any exposure > 0 = Owned
         status = "Owned" if exposure > 0 else "Watchlist"
-        pos_status = tier_position_status(tier, exposure)
+        pos_status = ticker_position_status(ticker, tier, exposure)
 
         # Price opportunity
         md_t = mkt.get(ticker, {})
@@ -5369,7 +5422,7 @@ def run_scanner():
             "tier":            tier,
             "status":          status,
             "exposure_pct":    exposure,
-            "target_range":    f"{target_low:.0f}–{target_high:.0f}%",
+            "target_range":    f"{target_low:.1f}–{target_high:.1f}%",
             "pos_status":      pos_status,
             "price_opp":       price_opp,
             "action":          action,
