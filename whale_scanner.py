@@ -109,15 +109,14 @@ OPP_IVP_MIN           = 40
 OPP_EARNINGS_MIN      = 7
 
 # ── Per-symbol income trade settings ────────────────────────────────────────
-# Source: Positions_Buy_Sell_Delta.xlsx (Income Trades sheet) — updated Apr 15 2026
+# Source: Positions_Buy_Sell_Delta.xlsx (Income Trades sheet) — updated Apr 17 2026
 # buy_under:  max effective entry for CSP (effective_entry <= buy_under * 1.03 hard gate)
 # sell_above: min effective exit for CC  (strike + premium >= sell_above hard gate)
 # Delta ranges are hard filters applied per strategy.
-# Tickers marked REMOVE in spreadsheet are kept here until positions are wound down.
 SYMBOL_SETTINGS = {
     # ── CORE ─────────────────────────────────────────────────────────────────
-    "AAPL": {"buy_under":  200, "sell_above":  280, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
-    "AMZN": {"buy_under":  200, "sell_above":  260, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
+    "AAPL": {"buy_under":  200, "sell_above":  330, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
+    "AMZN": {"buy_under":  200, "sell_above":  300, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
     "GOOGL":{"buy_under":  250, "sell_above":  395, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
     "IBKR": {"buy_under":   50, "sell_above":   95, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
     "MELI": {"buy_under": 1480, "sell_above": 2100, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.85, "leaps_delta_max": 0.90},
@@ -132,17 +131,21 @@ SYMBOL_SETTINGS = {
     "NFLX": {"buy_under":   65, "sell_above":  125, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.32, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
     "PLTR": {"buy_under":   80, "sell_above":  175, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
     "TSLA": {"buy_under":  335, "sell_above":  490, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    # ── REMOVE (winding down — kept until positions closed) ──────────────────
+    # ── SPECULATIVE ──────────────────────────────────────────────────────────
     "CLS":  {"buy_under":  280, "sell_above":  440, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
     "GRBK": {"buy_under":   55, "sell_above":   80, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
     "IBIT": {"buy_under":   34, "sell_above":   47, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "KNX":  {"buy_under":   64, "sell_above":   75, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "KNX":  {"buy_under":   52, "sell_above":   75, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
     "LULU": {"buy_under":  145, "sell_above":  195, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
     "NBIS": {"buy_under":   90, "sell_above":  190, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
     "NVO":  {"buy_under":   33, "sell_above":   48, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "PATH": {"buy_under":   11, "sell_above":    0, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
-    "POWL": {"buy_under":  233, "sell_above":  275, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
+    "POWL": {"buy_under":  163, "sell_above":  275, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.80, "leaps_delta_max": 0.90},
 }
+
+# Speculative tickers — smaller position sizing, wider OTM buffers.
+# Suppressed from Telegram CSP entry alerts (entries only on deliberate decision).
+# CC alerts still sent when approaching sell_above (useful for existing positions).
+SPECULATIVE_TICKERS = {"CLS", "GRBK", "IBIT", "KNX", "LULU", "NBIS", "NVO", "POWL"}
 
 # Mode 3: Post-Drop CSP — triggered BY downward drops
 DROP_TRIGGER_MIN      = 0.08  # minimum drop to trigger (8-12%+)
@@ -972,6 +975,14 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
         # LEAPS and BCS positions for Positions tab
         "leaps_positions":         leaps_positions,
         "bcs_positions":           bcs_positions,
+        # LEAPS totals — for footer display
+        "total_leaps_market_value": round(sum(
+            float(lp.get("market_value", 0) or 0) for lp in leaps_positions), 0),
+        "total_leaps_cost_basis":   round(sum(
+            lp.get("avg_cost", 0) * lp.get("contracts", 0) * 100
+            for lp in leaps_positions), 0),
+        "total_leaps_contracts":    sum(lp.get("contracts", 0) for lp in leaps_positions),
+        "total_leaps_positions":    len(leaps_positions),
     }
 
 
@@ -3927,12 +3938,16 @@ def run_scanner():
         _bu = _pw["buy_under"]; _sa = _pw["sell_above"]
         _pb = _pw.get("pct_from_buy"); _ps = _pw.get("pct_from_sell")
 
-        if _pw["csp_status"] == "IN_ZONE" and _pb is not None:
-            _alerts_csp.append(f"🚨 *{_tk}* ${_p:.2f} — BELOW buy target ${_bu} ({abs(_pb):.1f}% under) — check options now")
-        elif _pw["csp_status"] == "APPROACHING" and _pb is not None:
-            _alerts_csp.append(f"🎯 *{_tk}* ${_p:.2f} — {_pb:.1f}% above buy target ${_bu} — approaching zone")
-        elif _pw["csp_status"] == "WATCHLIST" and _pb is not None:
-            _watchlist.append((_pb, f"   {_tk} ${_p:.2f} → CSP zone at ${_bu} ({_pb:.1f}% away)"))
+        # REMOVE tickers: no new entry alerts — only CC alerts on existing positions
+        _is_remove = _tk in SPECULATIVE_TICKERS
+
+        if not _is_remove:
+            if _pw["csp_status"] == "IN_ZONE" and _pb is not None:
+                _alerts_csp.append(f"🚨 *{_tk}* ${_p:.2f} — BELOW buy target ${_bu} ({abs(_pb):.1f}% under) — check options now")
+            elif _pw["csp_status"] == "APPROACHING" and _pb is not None:
+                _alerts_csp.append(f"🎯 *{_tk}* ${_p:.2f} — {_pb:.1f}% above buy target ${_bu} — approaching zone")
+            elif _pw["csp_status"] == "WATCHLIST" and _pb is not None:
+                _watchlist.append((_pb, f"   {_tk} ${_p:.2f} → CSP zone at ${_bu} ({_pb:.1f}% away)"))
 
         if _sa > 0 and _pw["cc_status"] == "IN_ZONE":
             _alerts_cc.append(f"💰 *{_tk}* ${_p:.2f} — AT/ABOVE sell target ${_sa} — write covered calls")
@@ -3971,6 +3986,10 @@ def run_scanner():
 
         _trigger_drop = _c1 <= -5.0 or _c5 <= -10.0
         _trigger_rise = _c1 >=  6.0 or _c5 >=  10.0
+
+        # REMOVE tickers: skip drop alerts (no new entries), keep rise alerts (may want to write CCs)
+        if _tk in SPECULATIVE_TICKERS and _trigger_drop and not _trigger_rise:
+            continue
         if not (_trigger_drop or _trigger_rise):
             continue
 
