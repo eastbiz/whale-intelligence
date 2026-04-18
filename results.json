@@ -1,8 +1,8 @@
 {
-  "scan_time": "2026-04-18 16:19 ET",
+  "scan_time": "2026-04-18 16:24 ET",
   "scan_date": "2026-04-18",
   "schwab_live": true,
-  "schwab_last_success": "2026-04-18 16:19 ET",
+  "schwab_last_success": "2026-04-18 16:24 ET",
   "execution_candidates": [
     {
       "ticker": "IBIT",
@@ -65,22 +65,6 @@
       "annualized_return": 21.2,
       "delta": 0.38,
       "signal": "profit",
-      "below_min": false,
-      "risk_note": null
-    },
-    {
-      "ticker": "IBIT",
-      "tier": "Opportunistic",
-      "price": 43.73,
-      "ivp": 16.6,
-      "mode": "PIO",
-      "strike": 51.0,
-      "expiry": "2026-06-18",
-      "dte": 60,
-      "premium": 1.06,
-      "annualized_return": 14.7,
-      "delta": 0.24,
-      "signal": "breakeven",
       "below_min": false,
       "risk_note": null
     },
@@ -354,41 +338,41 @@
       "price": 43.73,
       "ivp": 16.6,
       "mode": "CC",
-      "strike": 48.0,
-      "expiry": "2026-05-15",
-      "dte": 26,
-      "premium": 0.8,
-      "annualized_return": 23.3,
-      "delta": 0.26,
+      "strike": 50.0,
+      "expiry": "2026-06-18",
+      "dte": 60,
+      "premium": 1.25,
+      "annualized_return": 15.3,
+      "delta": 0.28,
       "below_min": false,
       "warnings": [
         "Overweight \u2014 higher delta allowed"
       ],
       "passes_quality": false,
       "risk_level": "Medium",
-      "breakeven": 43.4,
-      "premium_per_day": 0.03,
-      "position_status": "Break-even",
-      "signal": "Break-even | \u26a0\ufe0f Overweight \u2014 reduce via CC | IVP 17%",
+      "breakeven": 47.08,
+      "premium_per_day": 0.02,
+      "position_status": "Loss",
+      "signal": "Loss | \u26a0\ufe0f Overweight \u2014 reduce via CC | IVP 17%",
       "risk_note": "Overweight position \u2014 delta up to 0.50 allowed",
-      "effective_sale": 48.8,
+      "effective_sale": 51.26,
       "sell_above": 47,
       "day_change_pct": 0.023402761525860055,
-      "score": 5,
-      "normalized": 0.385,
+      "score": 4,
+      "normalized": 0.308,
       "quality_label": "Weak",
       "action_label": "INCREASE COVERAGE",
       "sizing": {
-        "suggested_contracts": 71,
+        "suggested_contracts": 81,
         "capital_required": 0,
-        "premium_received": 5680.0,
-        "nva": 340800.0,
-        "shares_covered": 7100,
-        "already_covered": 6000,
+        "premium_received": 10125.0,
+        "nva": 405000.0,
+        "shares_covered": 8100,
+        "already_covered": 5000,
         "total_shares": 13105,
         "action_label": "INCREASE COVERAGE"
       },
-      "unified_score": 5.12,
+      "unified_score": 4.62,
       "candidate_type": "review"
     },
     {
@@ -406,7 +390,7 @@
       "below_min": false,
       "warnings": [],
       "passes_quality": true,
-      "signal": "\ud83d\udcc8 Profit | Above cost basis $22 | IVP 48%",
+      "signal": "\ud83d\udcc8 Profit | Above cost basis $26 | IVP 48%",
       "risk_note": null,
       "unified_score": 6.23,
       "candidate_type": "execution"
@@ -517,18 +501,18 @@
       "price": 43.73,
       "ivp": 16.6,
       "mode": "PIO",
-      "strike": 48.0,
-      "expiry": "2026-05-15",
-      "dte": 26,
-      "premium": 0.8,
-      "annualized_return": 23.3,
-      "delta": 0.26,
+      "strike": 53.0,
+      "expiry": "2026-06-18",
+      "dte": 60,
+      "premium": 0.74,
+      "annualized_return": 8.6,
+      "delta": 0.18,
       "below_min": false,
       "warnings": [],
       "passes_quality": true,
-      "signal": "\u27a1\ufe0f Break-even | Above cost basis $43 | IVP 17%",
+      "signal": "\ud83d\udcc9 Loss | Above cost basis $47 | IVP 17%",
       "risk_note": null,
-      "unified_score": 3.0,
+      "unified_score": 2.5,
       "candidate_type": "execution"
     },
     {
@@ -921,10 +905,10 @@
       "warnings": [],
       "passes_quality": true,
       "risk_level": "Low",
-      "breakeven": 21.9,
+      "breakeven": 26.23,
       "premium_per_day": 0.13,
       "position_status": "Profit",
-      "signal": "Profit position | Above cost basis $22",
+      "signal": "Profit position | Above cost basis $26",
       "risk_note": null,
       "candidate_type": "execution"
     },
@@ -975,29 +959,6 @@
       "candidate_type": "execution"
     },
     {
-      "ticker": "IBIT",
-      "tier": "Opportunistic",
-      "price": 43.73,
-      "ivp": 16.6,
-      "mode": "PIO",
-      "strike": 51.0,
-      "expiry": "2026-06-18",
-      "dte": 60,
-      "premium": 1.06,
-      "annualized_return": 14.7,
-      "delta": 0.24,
-      "below_min": false,
-      "warnings": [],
-      "passes_quality": true,
-      "risk_level": "Low",
-      "breakeven": 43.4,
-      "premium_per_day": 0.02,
-      "position_status": "Breakeven",
-      "signal": "Breakeven position | Above cost basis $43",
-      "risk_note": null,
-      "candidate_type": "execution"
-    },
-    {
       "ticker": "NBIS",
       "tier": "Opportunistic",
       "price": 156.2,
@@ -1017,6 +978,29 @@
       "premium_per_day": 0.27,
       "position_status": "Profit",
       "signal": "Profit position | Above cost basis $23",
+      "risk_note": null,
+      "candidate_type": "execution"
+    },
+    {
+      "ticker": "NFLX",
+      "tier": "Growth",
+      "price": 97.285,
+      "ivp": 55.5,
+      "mode": "PIO",
+      "strike": 102.0,
+      "expiry": "2026-06-18",
+      "dte": 60,
+      "premium": 3.1,
+      "annualized_return": 19.4,
+      "delta": 0.38,
+      "below_min": false,
+      "warnings": [],
+      "passes_quality": true,
+      "risk_level": "Low",
+      "breakeven": 9.7,
+      "premium_per_day": 0.05,
+      "position_status": "Profit",
+      "signal": "Profit position | Above cost basis $10",
       "risk_note": null,
       "candidate_type": "execution"
     }
@@ -1194,41 +1178,41 @@
       "price": 43.73,
       "ivp": 16.6,
       "mode": "CC",
-      "strike": 48.0,
-      "expiry": "2026-05-15",
-      "dte": 26,
-      "premium": 0.8,
-      "annualized_return": 23.3,
-      "delta": 0.26,
+      "strike": 50.0,
+      "expiry": "2026-06-18",
+      "dte": 60,
+      "premium": 1.25,
+      "annualized_return": 15.3,
+      "delta": 0.28,
       "below_min": false,
       "warnings": [
         "Overweight \u2014 higher delta allowed"
       ],
       "passes_quality": false,
       "risk_level": "Medium",
-      "breakeven": 43.4,
-      "premium_per_day": 0.03,
-      "position_status": "Break-even",
-      "signal": "Break-even | \u26a0\ufe0f Overweight \u2014 reduce via CC | IVP 17%",
+      "breakeven": 47.08,
+      "premium_per_day": 0.02,
+      "position_status": "Loss",
+      "signal": "Loss | \u26a0\ufe0f Overweight \u2014 reduce via CC | IVP 17%",
       "risk_note": "Overweight position \u2014 delta up to 0.50 allowed",
-      "effective_sale": 48.8,
+      "effective_sale": 51.26,
       "sell_above": 47,
       "day_change_pct": 0.023402761525860055,
-      "score": 5,
-      "normalized": 0.385,
+      "score": 4,
+      "normalized": 0.308,
       "quality_label": "Weak",
       "action_label": "INCREASE COVERAGE",
       "sizing": {
-        "suggested_contracts": 71,
+        "suggested_contracts": 81,
         "capital_required": 0,
-        "premium_received": 5680.0,
-        "nva": 340800.0,
-        "shares_covered": 7100,
-        "already_covered": 6000,
+        "premium_received": 10125.0,
+        "nva": 405000.0,
+        "shares_covered": 8100,
+        "already_covered": 5000,
         "total_shares": 13105,
         "action_label": "INCREASE COVERAGE"
       },
-      "unified_score": 5.12,
+      "unified_score": 4.62,
       "candidate_type": "review"
     },
     {
@@ -1246,7 +1230,7 @@
       "below_min": false,
       "warnings": [],
       "passes_quality": true,
-      "signal": "\ud83d\udcc8 Profit | Above cost basis $22 | IVP 48%",
+      "signal": "\ud83d\udcc8 Profit | Above cost basis $26 | IVP 48%",
       "risk_note": null,
       "unified_score": 6.23,
       "candidate_type": "execution"
@@ -1357,18 +1341,18 @@
       "price": 43.73,
       "ivp": 16.6,
       "mode": "PIO",
-      "strike": 48.0,
-      "expiry": "2026-05-15",
-      "dte": 26,
-      "premium": 0.8,
-      "annualized_return": 23.3,
-      "delta": 0.26,
+      "strike": 53.0,
+      "expiry": "2026-06-18",
+      "dte": 60,
+      "premium": 0.74,
+      "annualized_return": 8.6,
+      "delta": 0.18,
       "below_min": false,
       "warnings": [],
       "passes_quality": true,
-      "signal": "\u27a1\ufe0f Break-even | Above cost basis $43 | IVP 17%",
+      "signal": "\ud83d\udcc9 Loss | Above cost basis $47 | IVP 17%",
       "risk_note": null,
-      "unified_score": 3.0,
+      "unified_score": 2.5,
       "candidate_type": "execution"
     },
     {
@@ -1761,10 +1745,10 @@
       "warnings": [],
       "passes_quality": true,
       "risk_level": "Low",
-      "breakeven": 21.9,
+      "breakeven": 26.23,
       "premium_per_day": 0.13,
       "position_status": "Profit",
-      "signal": "Profit position | Above cost basis $22",
+      "signal": "Profit position | Above cost basis $26",
       "risk_note": null,
       "candidate_type": "execution"
     },
@@ -1815,29 +1799,6 @@
       "candidate_type": "execution"
     },
     {
-      "ticker": "IBIT",
-      "tier": "Opportunistic",
-      "price": 43.73,
-      "ivp": 16.6,
-      "mode": "PIO",
-      "strike": 51.0,
-      "expiry": "2026-06-18",
-      "dte": 60,
-      "premium": 1.06,
-      "annualized_return": 14.7,
-      "delta": 0.24,
-      "below_min": false,
-      "warnings": [],
-      "passes_quality": true,
-      "risk_level": "Low",
-      "breakeven": 43.4,
-      "premium_per_day": 0.02,
-      "position_status": "Breakeven",
-      "signal": "Breakeven position | Above cost basis $43",
-      "risk_note": null,
-      "candidate_type": "execution"
-    },
-    {
       "ticker": "NBIS",
       "tier": "Opportunistic",
       "price": 156.2,
@@ -1857,6 +1818,29 @@
       "premium_per_day": 0.27,
       "position_status": "Profit",
       "signal": "Profit position | Above cost basis $23",
+      "risk_note": null,
+      "candidate_type": "execution"
+    },
+    {
+      "ticker": "NFLX",
+      "tier": "Growth",
+      "price": 97.285,
+      "ivp": 55.5,
+      "mode": "PIO",
+      "strike": 102.0,
+      "expiry": "2026-06-18",
+      "dte": 60,
+      "premium": 3.1,
+      "annualized_return": 19.4,
+      "delta": 0.38,
+      "below_min": false,
+      "warnings": [],
+      "passes_quality": true,
+      "risk_level": "Low",
+      "breakeven": 9.7,
+      "premium_per_day": 0.05,
+      "position_status": "Profit",
+      "signal": "Profit position | Above cost basis $10",
       "risk_note": null,
       "candidate_type": "execution"
     }
@@ -1900,7 +1884,7 @@
         "mark_from_mv": 2.625
       }
     ],
-    "total_cc_notional": 1374000.0,
+    "total_cc_notional": 1325000.0,
     "cc_shares_covered": {
       "CLS": 400,
       "GRAB": 2000,
@@ -1910,10 +1894,10 @@
       "MU": 100,
       "NBIS": 1800,
       "POWL": 100,
-      "IBIT": 6000,
+      "OWL": 6100,
       "MSTR": 500,
-      "NFLX": 1000,
-      "OWL": 6100
+      "IBIT": 5000,
+      "NFLX": 1000
     },
     "cc_coverage_pct": {
       "CLS": 100.0,
@@ -1924,10 +1908,10 @@
       "MU": 500.0,
       "NBIS": 49.2,
       "POWL": 35.6,
-      "IBIT": 45.8,
+      "OWL": 80.3,
       "MSTR": 100.0,
-      "NFLX": 16.7,
-      "OWL": 80.3
+      "IBIT": 38.2,
+      "NFLX": 16.7
     },
     "cc_positions": [
       {
@@ -2051,52 +2035,16 @@
         "mark": 20.5272
       },
       {
-        "ticker": "IBIT",
-        "strike": 49.0,
-        "contracts": 20,
-        "nva": 98000.0,
-        "shares_covered": 2000,
-        "expiry": "20260522",
-        "source": "schwab",
-        "account": "CRT",
-        "premium_received": 0.8433,
-        "mark": 0.79
-      },
-      {
-        "ticker": "IBIT",
-        "strike": 47.0,
-        "contracts": 10,
-        "nva": 47000.0,
-        "shares_covered": 1000,
+        "ticker": "OWL",
+        "strike": 10.0,
+        "contracts": 61,
+        "nva": 61000.0,
+        "shares_covered": 6100,
         "expiry": "20260515",
         "source": "schwab",
-        "account": "IRA",
-        "premium_received": 0.6933,
-        "mark": 1.05
-      },
-      {
-        "ticker": "NBIS",
-        "strike": 140.0,
-        "contracts": 2,
-        "nva": 28000.0,
-        "shares_covered": 200,
-        "expiry": "20260515",
-        "source": "schwab",
-        "account": "IRA",
-        "premium_received": 7.7432,
-        "mark": 24.775
-      },
-      {
-        "ticker": "IBIT",
-        "strike": 44.0,
-        "contracts": 10,
-        "nva": 44000.0,
-        "shares_covered": 1000,
-        "expiry": "20260515",
-        "source": "schwab",
-        "account": "IRA",
-        "premium_received": 1.0133,
-        "mark": 2.2
+        "account": "Personal",
+        "premium_received": 0.6687,
+        "mark": 0.65
       },
       {
         "ticker": "MSTR",
@@ -2109,6 +2057,18 @@
         "account": "CRT",
         "premium_received": 4.3932,
         "mark": 3.8
+      },
+      {
+        "ticker": "IBIT",
+        "strike": 49.0,
+        "contracts": 10,
+        "nva": 49000.0,
+        "shares_covered": 1000,
+        "expiry": "20260522",
+        "source": "schwab",
+        "account": "IRA",
+        "premium_received": 0.8433,
+        "mark": 0.79
       },
       {
         "ticker": "NFLX",
@@ -2147,23 +2107,47 @@
         "mark": 3.575
       },
       {
-        "ticker": "OWL",
-        "strike": 10.0,
-        "contracts": 61,
-        "nva": 61000.0,
-        "shares_covered": 6100,
+        "ticker": "IBIT",
+        "strike": 47.0,
+        "contracts": 10,
+        "nva": 47000.0,
+        "shares_covered": 1000,
         "expiry": "20260515",
         "source": "schwab",
-        "account": "Personal",
-        "premium_received": 0.6687,
-        "mark": 0.65
+        "account": "IRA",
+        "premium_received": 0.6933,
+        "mark": 1.05
+      },
+      {
+        "ticker": "NBIS",
+        "strike": 140.0,
+        "contracts": 2,
+        "nva": 28000.0,
+        "shares_covered": 200,
+        "expiry": "20260515",
+        "source": "schwab",
+        "account": "IRA",
+        "premium_received": 7.7432,
+        "mark": 24.775
+      },
+      {
+        "ticker": "IBIT",
+        "strike": 44.0,
+        "contracts": 10,
+        "nva": 44000.0,
+        "shares_covered": 1000,
+        "expiry": "20260515",
+        "source": "schwab",
+        "account": "IRA",
+        "premium_received": 1.0133,
+        "mark": 2.2
       }
     ],
     "total_premium_csp": 0,
     "total_premium_cc": 0,
     "total_premium_all": 0,
     "max_assignment_exposure": 66000.0,
-    "max_shares_called_away": 19300,
+    "max_shares_called_away": 18300,
     "leaps_positions": [
       {
         "ticker": "AMZN",
@@ -2383,6 +2367,18 @@
       },
       {
         "ticker": "NVDA",
+        "strike": 100.0,
+        "contracts": 1,
+        "expiry": "20280121",
+        "expiry_fmt": "Jan 2028",
+        "dte": 642,
+        "avg_cost": 94.0566,
+        "breakeven": 194.06,
+        "market_value": 11418.0,
+        "source": "schwab"
+      },
+      {
+        "ticker": "NVDA",
         "strike": 130.0,
         "contracts": 1,
         "expiry": "20281215",
@@ -2391,18 +2387,6 @@
         "avg_cost": 90.0066,
         "breakeven": 220.01,
         "market_value": 10108.0,
-        "source": "schwab"
-      },
-      {
-        "ticker": "NVDA",
-        "strike": 100.0,
-        "contracts": 2,
-        "expiry": "20280121",
-        "expiry_fmt": "Jan 2028",
-        "dte": 642,
-        "avg_cost": 93.5066,
-        "breakeven": 193.51,
-        "market_value": 22835.0,
         "source": "schwab"
       },
       {
@@ -2464,9 +2448,9 @@
         "source": "ibkr"
       }
     ],
-    "total_leaps_market_value": 1308886.0,
-    "total_leaps_cost_basis": 1039357.0,
-    "total_leaps_contracts": 254,
+    "total_leaps_market_value": 1297469.0,
+    "total_leaps_cost_basis": 1030061.0,
+    "total_leaps_contracts": 253,
     "total_leaps_positions": 23
   },
   "opportunities": [
@@ -2531,22 +2515,6 @@
       "annualized_return": 21.2,
       "delta": 0.38,
       "signal": "profit",
-      "below_min": false,
-      "risk_note": null
-    },
-    {
-      "ticker": "IBIT",
-      "tier": "Opportunistic",
-      "price": 43.73,
-      "ivp": 16.6,
-      "mode": "PIO",
-      "strike": 51.0,
-      "expiry": "2026-06-18",
-      "dte": 60,
-      "premium": 1.06,
-      "annualized_return": 14.7,
-      "delta": 0.24,
-      "signal": "breakeven",
       "below_min": false,
       "risk_note": null
     },
@@ -2649,38 +2617,6 @@
   ],
   "positions": [
     {
-      "ticker": "MELI",
-      "tier": "Core",
-      "status": "Owned",
-      "exposure_pct": 2.41,
-      "target_range": "4.0\u20136.0%",
-      "pos_status": "Underweight",
-      "price_opp": "Pullback",
-      "action": "BUY",
-      "score": 9,
-      "pullback_pct": 29.6,
-      "above_ma200": false,
-      "shares_owned": 200,
-      "cc_contracts": 1,
-      "shares_covered": 100,
-      "coverage_pct": 50.0,
-      "uncovered_shares": 100,
-      "add_cc_contracts": 1,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "50% Covered",
-      "account": "IBKR",
-      "accounts_all": [
-        "IBKR"
-      ],
-      "market_value": 371166.0,
-      "mv_by_account": {
-        "IBKR": 371166.0
-      },
-      "leaps": [],
-      "bcs": []
-    },
-    {
       "ticker": "MSFT",
       "tier": "Core",
       "status": "Owned",
@@ -2721,6 +2657,83 @@
           "breakeven": 446.76,
           "market_value": 38745.0,
           "source": "schwab"
+        }
+      ],
+      "bcs": []
+    },
+    {
+      "ticker": "MELI",
+      "tier": "Core",
+      "status": "Owned",
+      "exposure_pct": 2.41,
+      "target_range": "4.0\u20136.0%",
+      "pos_status": "Underweight",
+      "price_opp": "Pullback",
+      "action": "BUY",
+      "score": 9,
+      "pullback_pct": 29.6,
+      "above_ma200": false,
+      "shares_owned": 200,
+      "cc_contracts": 1,
+      "shares_covered": 100,
+      "coverage_pct": 50.0,
+      "uncovered_shares": 100,
+      "add_cc_contracts": 1,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "50% Covered",
+      "account": "IBKR",
+      "accounts_all": [
+        "IBKR"
+      ],
+      "market_value": 371166.0,
+      "mv_by_account": {
+        "IBKR": 371166.0
+      },
+      "leaps": [],
+      "bcs": []
+    },
+    {
+      "ticker": "NOW",
+      "tier": "Growth",
+      "status": "Owned",
+      "exposure_pct": 0.19,
+      "target_range": "3.2\u20134.8%",
+      "pos_status": "Underweight",
+      "price_opp": "Pullback",
+      "action": "BUY",
+      "score": 7,
+      "pullback_pct": 54.0,
+      "above_ma200": false,
+      "shares_owned": 300,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0.0,
+      "uncovered_shares": 700,
+      "add_cc_contracts": 7,
+      "csp_contracts": 8,
+      "csp_obligation": 66000.0,
+      "exp_status": "Stock + CSP",
+      "account": "IBKR",
+      "accounts_all": [
+        "IBKR"
+      ],
+      "market_value": 28998.0,
+      "mv_by_account": {
+        "IBKR": 28998.0
+      },
+      "leaps": [
+        {
+          "ticker": "NOW",
+          "strike": 65.0,
+          "contracts": 4,
+          "expiry": "20280121",
+          "expiry_fmt": "Jan 2028",
+          "dte": 642,
+          "avg_cost": 40.0069795,
+          "breakeven": 105.01,
+          "market_value": 18634.0,
+          "source": "ibkr"
         }
       ],
       "bcs": []
@@ -2783,131 +2796,96 @@
       "bcs": []
     },
     {
-      "ticker": "NOW",
-      "tier": "Growth",
+      "ticker": "IBKR",
+      "tier": "Core",
       "status": "Owned",
-      "exposure_pct": 0.19,
-      "target_range": "3.2\u20134.8%",
+      "exposure_pct": 0.1,
+      "target_range": "4.0\u20136.0%",
       "pos_status": "Underweight",
-      "price_opp": "Pullback",
-      "action": "BUY",
-      "score": 7,
-      "pullback_pct": 54.0,
-      "above_ma200": false,
-      "shares_owned": 300,
+      "price_opp": "Near High",
+      "action": "HOLD",
+      "score": 6,
+      "pullback_pct": 1.2,
+      "above_ma200": true,
+      "shares_owned": 190,
       "cc_contracts": 0,
       "shares_covered": 0,
       "coverage_pct": 0.0,
-      "uncovered_shares": 700,
-      "add_cc_contracts": 7,
-      "csp_contracts": 8,
-      "csp_obligation": 66000.0,
-      "exp_status": "Stock + CSP",
+      "uncovered_shares": 690,
+      "add_cc_contracts": 6,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "Stock Only",
       "account": "IBKR",
       "accounts_all": [
         "IBKR"
       ],
-      "market_value": 28998.0,
+      "market_value": 15592.0,
       "mv_by_account": {
-        "IBKR": 28998.0
+        "IBKR": 15591.87
       },
       "leaps": [
         {
-          "ticker": "NOW",
-          "strike": 65.0,
-          "contracts": 4,
+          "ticker": "IBKR",
+          "strike": 40.0,
+          "contracts": 5,
           "expiry": "20280121",
           "expiry_fmt": "Jan 2028",
           "dte": 642,
-          "avg_cost": 40.0069795,
-          "breakeven": 105.01,
-          "market_value": 18634.0,
+          "avg_cost": 33.7569795,
+          "breakeven": 73.76,
+          "market_value": 23299.0,
           "source": "ibkr"
         }
       ],
       "bcs": []
     },
     {
-      "ticker": "NVDA",
+      "ticker": "GOOGL",
       "tier": "Core",
       "status": "Owned",
-      "exposure_pct": 1.49,
-      "target_range": "9.6\u201314.4%",
+      "exposure_pct": 6.6,
+      "target_range": "8.0\u201312.0%",
       "pos_status": "Underweight",
       "price_opp": "Near High",
       "action": "HOLD",
       "score": 6,
-      "pullback_pct": 5.3,
+      "pullback_pct": 2.4,
       "above_ma200": true,
-      "shares_owned": 1138,
+      "shares_owned": 2264,
       "cc_contracts": 0,
       "shares_covered": 0,
       "coverage_pct": 0.0,
-      "uncovered_shares": 2738,
-      "add_cc_contracts": 27,
+      "uncovered_shares": 2664,
+      "add_cc_contracts": 26,
       "csp_contracts": 0,
       "csp_obligation": 0,
       "exp_status": "Stock Only",
       "account": "CRT",
       "accounts_all": [
-        "IRA",
-        "CRT"
+        "CRT",
+        "IRA"
       ],
-      "market_value": 229568.0,
+      "market_value": 773564.0,
       "mv_by_account": {
-        "IRA": 18151.2,
-        "CRT": 35294.0
+        "CRT": 649192.0,
+        "IRA": 102504.0
       },
       "leaps": [
         {
-          "ticker": "NVDA",
-          "strike": 90.0,
-          "contracts": 13,
-          "expiry": "20280121",
-          "expiry_fmt": "Jan 2028",
-          "dte": 642,
-          "avg_cost": 94.993402577,
-          "breakeven": 184.99,
-          "market_value": 160158.0,
+          "ticker": "GOOGL",
+          "strike": 180.0,
+          "contracts": 4,
+          "expiry": "20270617",
+          "expiry_fmt": "Jun 2027",
+          "dte": 424,
+          "avg_cost": 139.1569795,
+          "breakeven": 319.16,
+          "market_value": 69555.0,
           "source": "ibkr"
-        },
-        {
-          "ticker": "NVDA",
-          "strike": 130.0,
-          "contracts": 1,
-          "expiry": "20281215",
-          "expiry_fmt": "Dec 2028",
-          "dte": 971,
-          "avg_cost": 90.0066,
-          "breakeven": 220.01,
-          "market_value": 10108.0,
-          "source": "schwab"
-        },
-        {
-          "ticker": "NVDA",
-          "strike": 100.0,
-          "contracts": 2,
-          "expiry": "20280121",
-          "expiry_fmt": "Jan 2028",
-          "dte": 642,
-          "avg_cost": 93.5066,
-          "breakeven": 193.51,
-          "market_value": 22835.0,
-          "source": "schwab"
         }
       ],
-      "bcs": [
-        {
-          "ticker": "NVDA",
-          "strike": 240.0,
-          "contracts": 4,
-          "expiry": "20280121",
-          "expiry_fmt": "Jan 2028",
-          "dte": 642,
-          "leg": "short",
-          "source": "ibkr"
-        }
-      ]
+      "bcs": []
     },
     {
       "ticker": "TSM",
@@ -2955,128 +2933,86 @@
       "bcs": []
     },
     {
-      "ticker": "GOOGL",
+      "ticker": "NVDA",
       "tier": "Core",
       "status": "Owned",
-      "exposure_pct": 6.6,
-      "target_range": "8.0\u201312.0%",
+      "exposure_pct": 1.49,
+      "target_range": "9.6\u201314.4%",
       "pos_status": "Underweight",
       "price_opp": "Near High",
       "action": "HOLD",
       "score": 6,
-      "pullback_pct": 2.4,
+      "pullback_pct": 5.3,
       "above_ma200": true,
-      "shares_owned": 2264,
+      "shares_owned": 1138,
       "cc_contracts": 0,
       "shares_covered": 0,
       "coverage_pct": 0.0,
-      "uncovered_shares": 2664,
+      "uncovered_shares": 2638,
       "add_cc_contracts": 26,
       "csp_contracts": 0,
       "csp_obligation": 0,
       "exp_status": "Stock Only",
       "account": "CRT",
       "accounts_all": [
-        "IRA",
-        "CRT"
+        "CRT",
+        "IRA"
       ],
-      "market_value": 773564.0,
+      "market_value": 229568.0,
       "mv_by_account": {
-        "IRA": 102504.0,
-        "CRT": 649192.0
+        "CRT": 35294.0,
+        "IRA": 18151.2
       },
       "leaps": [
         {
-          "ticker": "GOOGL",
-          "strike": 180.0,
-          "contracts": 4,
-          "expiry": "20270617",
-          "expiry_fmt": "Jun 2027",
-          "dte": 424,
-          "avg_cost": 139.1569795,
-          "breakeven": 319.16,
-          "market_value": 69555.0,
-          "source": "ibkr"
-        }
-      ],
-      "bcs": []
-    },
-    {
-      "ticker": "IBKR",
-      "tier": "Core",
-      "status": "Owned",
-      "exposure_pct": 0.1,
-      "target_range": "4.0\u20136.0%",
-      "pos_status": "Underweight",
-      "price_opp": "Near High",
-      "action": "HOLD",
-      "score": 6,
-      "pullback_pct": 1.2,
-      "above_ma200": true,
-      "shares_owned": 190,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0.0,
-      "uncovered_shares": 690,
-      "add_cc_contracts": 6,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "Stock Only",
-      "account": "IBKR",
-      "accounts_all": [
-        "IBKR"
-      ],
-      "market_value": 15592.0,
-      "mv_by_account": {
-        "IBKR": 15591.87
-      },
-      "leaps": [
-        {
-          "ticker": "IBKR",
-          "strike": 40.0,
-          "contracts": 5,
+          "ticker": "NVDA",
+          "strike": 90.0,
+          "contracts": 13,
           "expiry": "20280121",
           "expiry_fmt": "Jan 2028",
           "dte": 642,
-          "avg_cost": 33.7569795,
-          "breakeven": 73.76,
-          "market_value": 23299.0,
+          "avg_cost": 94.993402577,
+          "breakeven": 184.99,
+          "market_value": 160158.0,
           "source": "ibkr"
+        },
+        {
+          "ticker": "NVDA",
+          "strike": 100.0,
+          "contracts": 1,
+          "expiry": "20280121",
+          "expiry_fmt": "Jan 2028",
+          "dte": 642,
+          "avg_cost": 94.0566,
+          "breakeven": 194.06,
+          "market_value": 11418.0,
+          "source": "schwab"
+        },
+        {
+          "ticker": "NVDA",
+          "strike": 130.0,
+          "contracts": 1,
+          "expiry": "20281215",
+          "expiry_fmt": "Dec 2028",
+          "dte": 971,
+          "avg_cost": 90.0066,
+          "breakeven": 220.01,
+          "market_value": 10108.0,
+          "source": "schwab"
         }
       ],
-      "bcs": []
-    },
-    {
-      "ticker": "NFLX",
-      "tier": "Growth",
-      "status": "Owned",
-      "exposure_pct": 3.8,
-      "target_range": "3.2\u20134.8%",
-      "pos_status": "On Target",
-      "price_opp": "Pullback",
-      "action": "ADD",
-      "score": 5,
-      "pullback_pct": 27.5,
-      "above_ma200": false,
-      "shares_owned": 6000,
-      "cc_contracts": 10,
-      "shares_covered": 1000,
-      "coverage_pct": 16.7,
-      "uncovered_shares": 5000,
-      "add_cc_contracts": 50,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "16% Covered",
-      "account": "CRT",
-      "accounts_all": [
-        "CRT"
-      ],
-      "market_value": 583860.0,
-      "mv_by_account": {
-        "CRT": 583860.0
-      },
-      "leaps": [],
-      "bcs": []
+      "bcs": [
+        {
+          "ticker": "NVDA",
+          "strike": 240.0,
+          "contracts": 4,
+          "expiry": "20280121",
+          "expiry_fmt": "Jan 2028",
+          "dte": 642,
+          "leg": "short",
+          "source": "ibkr"
+        }
+      ]
     },
     {
       "ticker": "NVO",
@@ -3145,38 +3081,6 @@
           "source": "schwab"
         }
       ],
-      "bcs": []
-    },
-    {
-      "ticker": "PLTR",
-      "tier": "Growth",
-      "status": "Owned",
-      "exposure_pct": 3.7,
-      "target_range": "3.2\u20134.8%",
-      "pos_status": "On Target",
-      "price_opp": "Pullback",
-      "action": "ADD",
-      "score": 5,
-      "pullback_pct": 29.4,
-      "above_ma200": false,
-      "shares_owned": 3886,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0.0,
-      "uncovered_shares": 3886,
-      "add_cc_contracts": 38,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "Stock Only",
-      "account": "IBKR",
-      "accounts_all": [
-        "IBKR"
-      ],
-      "market_value": 568872.0,
-      "mv_by_account": {
-        "IBKR": 568871.54
-      },
-      "leaps": [],
       "bcs": []
     },
     {
@@ -3249,6 +3153,38 @@
       "bcs": []
     },
     {
+      "ticker": "NFLX",
+      "tier": "Growth",
+      "status": "Owned",
+      "exposure_pct": 3.8,
+      "target_range": "3.2\u20134.8%",
+      "pos_status": "On Target",
+      "price_opp": "Pullback",
+      "action": "ADD",
+      "score": 5,
+      "pullback_pct": 27.5,
+      "above_ma200": false,
+      "shares_owned": 6000,
+      "cc_contracts": 10,
+      "shares_covered": 1000,
+      "coverage_pct": 16.7,
+      "uncovered_shares": 5000,
+      "add_cc_contracts": 50,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "16% Covered",
+      "account": "CRT",
+      "accounts_all": [
+        "CRT"
+      ],
+      "market_value": 583860.0,
+      "mv_by_account": {
+        "CRT": 583860.0
+      },
+      "leaps": [],
+      "bcs": []
+    },
+    {
       "ticker": "GRBK",
       "tier": "Opportunistic",
       "status": "Owned",
@@ -3281,6 +3217,38 @@
       "bcs": []
     },
     {
+      "ticker": "PLTR",
+      "tier": "Growth",
+      "status": "Owned",
+      "exposure_pct": 3.7,
+      "target_range": "3.2\u20134.8%",
+      "pos_status": "On Target",
+      "price_opp": "Pullback",
+      "action": "ADD",
+      "score": 5,
+      "pullback_pct": 29.4,
+      "above_ma200": false,
+      "shares_owned": 3886,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0.0,
+      "uncovered_shares": 3886,
+      "add_cc_contracts": 38,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "Stock Only",
+      "account": "IBKR",
+      "accounts_all": [
+        "IBKR"
+      ],
+      "market_value": 568872.0,
+      "mv_by_account": {
+        "IBKR": 568871.54
+      },
+      "leaps": [],
+      "bcs": []
+    },
+    {
       "ticker": "AMZN",
       "tier": "Core",
       "status": "Owned",
@@ -3303,13 +3271,13 @@
       "exp_status": "Stock Only",
       "account": "IRA",
       "accounts_all": [
-        "IRA",
-        "CRT"
+        "CRT",
+        "IRA"
       ],
       "market_value": 1303044.0,
       "mv_by_account": {
-        "IRA": 551232.0,
-        "CRT": 461030.4
+        "CRT": 461030.4,
+        "IRA": 551232.0
       },
       "leaps": [
         {
@@ -3350,13 +3318,13 @@
       "exp_status": "Stock Only",
       "account": "IRA",
       "accounts_all": [
-        "IRA",
-        "CRT"
+        "CRT",
+        "IRA"
       ],
       "market_value": 1410601.0,
       "mv_by_account": {
-        "IRA": 1210630.4,
-        "CRT": 199970.2
+        "CRT": 199970.2,
+        "IRA": 1210630.4
       },
       "leaps": [],
       "bcs": []
@@ -3439,10 +3407,10 @@
       "bcs": []
     },
     {
-      "ticker": "MSTR",
+      "ticker": "OWL",
       "tier": "Other",
       "status": "Owned",
-      "exposure_pct": 0.54,
+      "exposure_pct": 0.49,
       "target_range": "1.0\u20133.0%",
       "pos_status": "Underweight",
       "price_opp": "Near High",
@@ -3450,22 +3418,56 @@
       "score": 2,
       "pullback_pct": 0,
       "above_ma200": true,
-      "shares_owned": 500,
-      "cc_contracts": 5,
-      "shares_covered": 500,
-      "coverage_pct": 100.0,
-      "uncovered_shares": 0,
-      "add_cc_contracts": 0,
+      "shares_owned": 7600,
+      "cc_contracts": 61,
+      "shares_covered": 6100,
+      "coverage_pct": 80.3,
+      "uncovered_shares": 1500,
+      "add_cc_contracts": 15,
       "csp_contracts": 0,
       "csp_obligation": 0,
-      "exp_status": "Fully Covered",
-      "account": "CRT",
+      "exp_status": "75% Covered",
+      "account": "Personal",
       "accounts_all": [
-        "CRT"
+        "Personal",
+        "IRA"
       ],
-      "market_value": 83260.0,
+      "market_value": 74860.0,
       "mv_by_account": {
-        "CRT": 83260.0
+        "Personal": 60085.0,
+        "IRA": 14775.0
+      },
+      "leaps": [],
+      "bcs": []
+    },
+    {
+      "ticker": "IIPR-A",
+      "tier": "Other",
+      "status": "Owned",
+      "exposure_pct": 0.14,
+      "target_range": "1.0\u20133.0%",
+      "pos_status": "Underweight",
+      "price_opp": "Near High",
+      "action": "HOLD",
+      "score": 2,
+      "pullback_pct": 0,
+      "above_ma200": true,
+      "shares_owned": 1000,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0.0,
+      "uncovered_shares": 1000,
+      "add_cc_contracts": 10,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "Stock Only",
+      "account": "IRA",
+      "accounts_all": [
+        "IRA"
+      ],
+      "market_value": 20980.0,
+      "mv_by_account": {
+        "IRA": 20980.0
       },
       "leaps": [],
       "bcs": []
@@ -3516,10 +3518,10 @@
       "bcs": []
     },
     {
-      "ticker": "OWL",
+      "ticker": "ASML",
       "tier": "Other",
       "status": "Owned",
-      "exposure_pct": 0.49,
+      "exposure_pct": 0.73,
       "target_range": "1.0\u20133.0%",
       "pos_status": "Underweight",
       "price_opp": "Near High",
@@ -3527,24 +3529,86 @@
       "score": 2,
       "pullback_pct": 0,
       "above_ma200": true,
-      "shares_owned": 7600,
-      "cc_contracts": 61,
-      "shares_covered": 6100,
-      "coverage_pct": 80.3,
-      "uncovered_shares": 1500,
-      "add_cc_contracts": 15,
+      "shares_owned": 90,
+      "cc_contracts": 0,
+      "shares_covered": 0,
+      "coverage_pct": 0.0,
+      "uncovered_shares": 90,
+      "add_cc_contracts": 0,
       "csp_contracts": 0,
       "csp_obligation": 0,
-      "exp_status": "75% Covered",
-      "account": "Personal",
+      "exp_status": "Stock Only",
+      "account": "IBKR",
       "accounts_all": [
-        "IRA",
-        "Personal"
+        "IBKR"
       ],
-      "market_value": 74860.0,
+      "market_value": 112944.0,
       "mv_by_account": {
-        "IRA": 14775.0,
-        "Personal": 60085.0
+        "IBKR": 112943.51
+      },
+      "leaps": [],
+      "bcs": []
+    },
+    {
+      "ticker": "MSTR",
+      "tier": "Other",
+      "status": "Owned",
+      "exposure_pct": 0.54,
+      "target_range": "1.0\u20133.0%",
+      "pos_status": "Underweight",
+      "price_opp": "Near High",
+      "action": "HOLD",
+      "score": 2,
+      "pullback_pct": 0,
+      "above_ma200": true,
+      "shares_owned": 500,
+      "cc_contracts": 5,
+      "shares_covered": 500,
+      "coverage_pct": 100.0,
+      "uncovered_shares": 0,
+      "add_cc_contracts": 0,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "Fully Covered",
+      "account": "CRT",
+      "accounts_all": [
+        "CRT"
+      ],
+      "market_value": 83260.0,
+      "mv_by_account": {
+        "CRT": 83260.0
+      },
+      "leaps": [],
+      "bcs": []
+    },
+    {
+      "ticker": "POWL",
+      "tier": "Opportunistic",
+      "status": "Owned",
+      "exposure_pct": 0.44,
+      "target_range": "1.6\u20132.4%",
+      "pos_status": "Underweight",
+      "price_opp": "Near High",
+      "action": "HOLD",
+      "score": 2,
+      "pullback_pct": 0.9,
+      "above_ma200": true,
+      "shares_owned": 280,
+      "cc_contracts": 1,
+      "shares_covered": 100,
+      "coverage_pct": 35.7,
+      "uncovered_shares": 180,
+      "add_cc_contracts": 1,
+      "csp_contracts": 0,
+      "csp_obligation": 0,
+      "exp_status": "35% Covered",
+      "account": "IBKR",
+      "accounts_all": [
+        "IBKR"
+      ],
+      "market_value": 67625.0,
+      "mv_by_account": {
+        "IBKR": 67625.36
       },
       "leaps": [],
       "bcs": []
@@ -3592,38 +3656,6 @@
           "source": "ibkr"
         }
       ],
-      "bcs": []
-    },
-    {
-      "ticker": "IIPR-A",
-      "tier": "Other",
-      "status": "Owned",
-      "exposure_pct": 0.14,
-      "target_range": "1.0\u20133.0%",
-      "pos_status": "Underweight",
-      "price_opp": "Near High",
-      "action": "HOLD",
-      "score": 2,
-      "pullback_pct": 0,
-      "above_ma200": true,
-      "shares_owned": 1000,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0.0,
-      "uncovered_shares": 1000,
-      "add_cc_contracts": 10,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "Stock Only",
-      "account": "IRA",
-      "accounts_all": [
-        "IRA"
-      ],
-      "market_value": 20980.0,
-      "mv_by_account": {
-        "IRA": 20980.0
-      },
-      "leaps": [],
       "bcs": []
     },
     {
@@ -3683,65 +3715,35 @@
       ]
     },
     {
-      "ticker": "ASML",
+      "ticker": "NLCP",
       "tier": "Other",
       "status": "Owned",
-      "exposure_pct": 0.73,
+      "exposure_pct": 1.43,
       "target_range": "1.0\u20133.0%",
-      "pos_status": "Underweight",
+      "pos_status": "On Target",
       "price_opp": "Near High",
-      "action": "HOLD",
-      "score": 2,
+      "action": "TRIM",
+      "score": 0,
       "pullback_pct": 0,
       "above_ma200": true,
-      "shares_owned": 90,
+      "shares_owned": 15490,
       "cc_contracts": 0,
       "shares_covered": 0,
       "coverage_pct": 0.0,
-      "uncovered_shares": 90,
-      "add_cc_contracts": 0,
+      "uncovered_shares": 15490,
+      "add_cc_contracts": 154,
       "csp_contracts": 0,
       "csp_obligation": 0,
       "exp_status": "Stock Only",
-      "account": "IBKR",
+      "account": "Personal",
       "accounts_all": [
-        "IBKR"
+        "Personal",
+        "IRA"
       ],
-      "market_value": 112944.0,
+      "market_value": 219958.0,
       "mv_by_account": {
-        "IBKR": 112943.51
-      },
-      "leaps": [],
-      "bcs": []
-    },
-    {
-      "ticker": "POWL",
-      "tier": "Opportunistic",
-      "status": "Owned",
-      "exposure_pct": 0.44,
-      "target_range": "1.6\u20132.4%",
-      "pos_status": "Underweight",
-      "price_opp": "Near High",
-      "action": "HOLD",
-      "score": 2,
-      "pullback_pct": 0.9,
-      "above_ma200": true,
-      "shares_owned": 280,
-      "cc_contracts": 1,
-      "shares_covered": 100,
-      "coverage_pct": 35.7,
-      "uncovered_shares": 180,
-      "add_cc_contracts": 1,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "35% Covered",
-      "account": "IBKR",
-      "accounts_all": [
-        "IBKR"
-      ],
-      "market_value": 67625.0,
-      "mv_by_account": {
-        "IBKR": 67625.36
+        "Personal": 169406.0,
+        "IRA": 50552.0
       },
       "leaps": [],
       "bcs": []
@@ -3811,40 +3813,6 @@
       "bcs": []
     },
     {
-      "ticker": "NLCP",
-      "tier": "Other",
-      "status": "Owned",
-      "exposure_pct": 1.43,
-      "target_range": "1.0\u20133.0%",
-      "pos_status": "On Target",
-      "price_opp": "Near High",
-      "action": "TRIM",
-      "score": 0,
-      "pullback_pct": 0,
-      "above_ma200": true,
-      "shares_owned": 15490,
-      "cc_contracts": 0,
-      "shares_covered": 0,
-      "coverage_pct": 0.0,
-      "uncovered_shares": 15490,
-      "add_cc_contracts": 154,
-      "csp_contracts": 0,
-      "csp_obligation": 0,
-      "exp_status": "Stock Only",
-      "account": "Personal",
-      "accounts_all": [
-        "IRA",
-        "Personal"
-      ],
-      "market_value": 219958.0,
-      "mv_by_account": {
-        "IRA": 50552.0,
-        "Personal": 169406.0
-      },
-      "leaps": [],
-      "bcs": []
-    },
-    {
       "ticker": "TSLA",
       "tier": "Cyclical",
       "status": "Owned",
@@ -3902,23 +3870,23 @@
       "pullback_pct": 39.1,
       "above_ma200": false,
       "shares_owned": 13105,
-      "cc_contracts": 60,
-      "shares_covered": 6000,
-      "coverage_pct": 42.5,
-      "uncovered_shares": 8105,
-      "add_cc_contracts": 81,
+      "cc_contracts": 50,
+      "shares_covered": 5000,
+      "coverage_pct": 35.4,
+      "uncovered_shares": 9105,
+      "add_cc_contracts": 91,
       "csp_contracts": 0,
       "csp_obligation": 0,
-      "exp_status": "42% Covered",
+      "exp_status": "35% Covered",
       "account": "CRT",
       "accounts_all": [
-        "IRA",
-        "CRT"
+        "CRT",
+        "IRA"
       ],
       "market_value": 575834.0,
       "mv_by_account": {
-        "IRA": 163896.2,
-        "CRT": 411937.5
+        "CRT": 411937.5,
+        "IRA": 163896.2
       },
       "leaps": [
         {
@@ -3959,13 +3927,13 @@
       "exp_status": "49% Covered",
       "account": "CRT",
       "accounts_all": [
-        "IRA",
-        "CRT"
+        "CRT",
+        "IRA"
       ],
       "market_value": 574842.0,
       "mv_by_account": {
-        "IRA": 31428.0,
-        "CRT": 98212.5
+        "CRT": 98212.5,
+        "IRA": 31428.0
       },
       "leaps": [],
       "bcs": []
@@ -4297,111 +4265,30 @@
       "sort_priority": 2
     },
     {
-      "account": "CRT",
-      "ticker": "IBIT",
+      "account": "Personal",
+      "ticker": "OWL",
       "tier": "Opportunistic",
       "type": "CC",
-      "contracts": 20,
-      "strike": 49.0,
-      "expiry": "20260522",
-      "dte": 33,
-      "underlying": 43.73,
-      "mark": 0.79,
-      "premium_received": 0.84,
-      "profit_pct": 6.3,
-      "pnl_dollar": 107.0,
-      "breakeven": 49.84,
-      "dist_to_be_pct": 14.0,
-      "dist_to_strike": 12.1,
-      "remaining_prem": 93.7,
-      "day_chg_pct": 2.34,
-      "chg_3d_pct": 4.3,
-      "shares_covered": 2000,
-      "earn_days": 999,
-      "earn_zone": "SAFE",
-      "action": "HOLD",
-      "reason": "6.3% profit, DTE 33, 12.1% below call strike $49.00",
-      "sort_priority": 2
-    },
-    {
-      "account": "IRA",
-      "ticker": "IBIT",
-      "tier": "Opportunistic",
-      "type": "CC",
-      "contracts": 10,
-      "strike": 47.0,
+      "contracts": 61,
+      "strike": 10.0,
       "expiry": "20260515",
       "dte": 26,
-      "underlying": 43.73,
-      "mark": 1.05,
-      "premium_received": 0.69,
-      "profit_pct": -51.4,
-      "pnl_dollar": -357.0,
-      "breakeven": 47.69,
-      "dist_to_be_pct": 9.1,
-      "dist_to_strike": 7.5,
-      "remaining_prem": 151.4,
-      "day_chg_pct": 2.34,
-      "chg_3d_pct": 4.3,
-      "shares_covered": 1000,
+      "underlying": 0,
+      "mark": 0.65,
+      "premium_received": 0.67,
+      "profit_pct": 2.8,
+      "pnl_dollar": 114.0,
+      "breakeven": 10.67,
+      "dist_to_be_pct": 99,
+      "dist_to_strike": 99,
+      "remaining_prem": 97.2,
+      "day_chg_pct": 0,
+      "chg_3d_pct": 0,
+      "shares_covered": 6100,
       "earn_days": 999,
       "earn_zone": "SAFE",
       "action": "HOLD",
-      "reason": "-51.4% profit, DTE 26, 7.5% below call strike $47.00",
-      "sort_priority": 2
-    },
-    {
-      "account": "IRA",
-      "ticker": "NBIS",
-      "tier": "Opportunistic",
-      "type": "CC",
-      "contracts": 2,
-      "strike": 140.0,
-      "expiry": "20260515",
-      "dte": 26,
-      "underlying": 156.2,
-      "mark": 24.77,
-      "premium_received": 7.74,
-      "profit_pct": -100,
-      "pnl_dollar": -3406.0,
-      "breakeven": 147.74,
-      "dist_to_be_pct": -5.4,
-      "dist_to_strike": -10.4,
-      "remaining_prem": 320.0,
-      "day_chg_pct": 5.53,
-      "chg_3d_pct": -2.96,
-      "shares_covered": 200,
-      "earn_days": 999,
-      "earn_zone": "SAFE",
-      "action": "HOLD",
-      "reason": "-100% profit, DTE 26, -10.4% below call strike $140.00",
-      "sort_priority": 2
-    },
-    {
-      "account": "IRA",
-      "ticker": "IBIT",
-      "tier": "Opportunistic",
-      "type": "CC",
-      "contracts": 10,
-      "strike": 44.0,
-      "expiry": "20260515",
-      "dte": 26,
-      "underlying": 43.73,
-      "mark": 2.2,
-      "premium_received": 1.01,
-      "profit_pct": -100,
-      "pnl_dollar": -1187.0,
-      "breakeven": 45.01,
-      "dist_to_be_pct": 2.9,
-      "dist_to_strike": 0.6,
-      "remaining_prem": 217.1,
-      "day_chg_pct": 2.34,
-      "chg_3d_pct": 4.3,
-      "shares_covered": 1000,
-      "earn_days": 999,
-      "earn_zone": "SAFE",
-      "action": "HOLD",
-      "reason": "-100% profit, DTE 26, 0.6% below call strike $44.00",
+      "reason": "2.8% profit, DTE 26, 99% below call strike $10.00",
       "sort_priority": 2
     },
     {
@@ -4429,6 +4316,33 @@
       "earn_zone": "SAFE",
       "action": "HOLD",
       "reason": "13.5% profit, DTE 33, 99% below call strike $220.00",
+      "sort_priority": 2
+    },
+    {
+      "account": "IRA",
+      "ticker": "IBIT",
+      "tier": "Opportunistic",
+      "type": "CC",
+      "contracts": 10,
+      "strike": 49.0,
+      "expiry": "20260522",
+      "dte": 33,
+      "underlying": 43.73,
+      "mark": 0.79,
+      "premium_received": 0.84,
+      "profit_pct": 6.3,
+      "pnl_dollar": 53.0,
+      "breakeven": 49.84,
+      "dist_to_be_pct": 14.0,
+      "dist_to_strike": 12.1,
+      "remaining_prem": 93.7,
+      "day_chg_pct": 2.34,
+      "chg_3d_pct": 4.3,
+      "shares_covered": 1000,
+      "earn_days": 999,
+      "earn_zone": "SAFE",
+      "action": "HOLD",
+      "reason": "6.3% profit, DTE 33, 12.1% below call strike $49.00",
       "sort_priority": 2
     },
     {
@@ -4513,35 +4427,89 @@
       "sort_priority": 2
     },
     {
-      "account": "Personal",
-      "ticker": "OWL",
+      "account": "IRA",
+      "ticker": "IBIT",
       "tier": "Opportunistic",
       "type": "CC",
-      "contracts": 61,
-      "strike": 10.0,
+      "contracts": 10,
+      "strike": 47.0,
       "expiry": "20260515",
       "dte": 26,
-      "underlying": 0,
-      "mark": 0.65,
-      "premium_received": 0.67,
-      "profit_pct": 2.8,
-      "pnl_dollar": 114.0,
-      "breakeven": 10.67,
-      "dist_to_be_pct": 99,
-      "dist_to_strike": 99,
-      "remaining_prem": 97.2,
-      "day_chg_pct": 0,
-      "chg_3d_pct": 0,
-      "shares_covered": 6100,
+      "underlying": 43.73,
+      "mark": 1.05,
+      "premium_received": 0.69,
+      "profit_pct": -51.4,
+      "pnl_dollar": -357.0,
+      "breakeven": 47.69,
+      "dist_to_be_pct": 9.1,
+      "dist_to_strike": 7.5,
+      "remaining_prem": 151.4,
+      "day_chg_pct": 2.34,
+      "chg_3d_pct": 4.3,
+      "shares_covered": 1000,
       "earn_days": 999,
       "earn_zone": "SAFE",
       "action": "HOLD",
-      "reason": "2.8% profit, DTE 26, 99% below call strike $10.00",
+      "reason": "-51.4% profit, DTE 26, 7.5% below call strike $47.00",
+      "sort_priority": 2
+    },
+    {
+      "account": "IRA",
+      "ticker": "NBIS",
+      "tier": "Opportunistic",
+      "type": "CC",
+      "contracts": 2,
+      "strike": 140.0,
+      "expiry": "20260515",
+      "dte": 26,
+      "underlying": 156.2,
+      "mark": 24.77,
+      "premium_received": 7.74,
+      "profit_pct": -100,
+      "pnl_dollar": -3406.0,
+      "breakeven": 147.74,
+      "dist_to_be_pct": -5.4,
+      "dist_to_strike": -10.4,
+      "remaining_prem": 320.0,
+      "day_chg_pct": 5.53,
+      "chg_3d_pct": -2.96,
+      "shares_covered": 200,
+      "earn_days": 999,
+      "earn_zone": "SAFE",
+      "action": "HOLD",
+      "reason": "-100% profit, DTE 26, -10.4% below call strike $140.00",
+      "sort_priority": 2
+    },
+    {
+      "account": "IRA",
+      "ticker": "IBIT",
+      "tier": "Opportunistic",
+      "type": "CC",
+      "contracts": 10,
+      "strike": 44.0,
+      "expiry": "20260515",
+      "dte": 26,
+      "underlying": 43.73,
+      "mark": 2.2,
+      "premium_received": 1.01,
+      "profit_pct": -100,
+      "pnl_dollar": -1187.0,
+      "breakeven": 45.01,
+      "dist_to_be_pct": 2.9,
+      "dist_to_strike": 0.6,
+      "remaining_prem": 217.1,
+      "day_chg_pct": 2.34,
+      "chg_3d_pct": 4.3,
+      "shares_covered": 1000,
+      "earn_days": 999,
+      "earn_zone": "SAFE",
+      "action": "HOLD",
+      "reason": "-100% profit, DTE 26, 0.6% below call strike $44.00",
       "sort_priority": 2
     }
   ],
   "analysis": "",
-  "total_opps": 11,
+  "total_opps": 10,
   "price_watch": [
     {
       "ticker": "LULU",
