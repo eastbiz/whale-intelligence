@@ -1664,10 +1664,12 @@ def score_csp(opp: dict) -> int:
 def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
                                total_csp_exposure: float, spy_day_chg: float = 0) -> dict:
     """
-    CSP / CC Position Management Engine v2.
-    Spec: March 2026 v2. Breakeven-first, safe-zone protected.
-    Actions: DEFENSIVE, CLOSE NOW, OPTIONAL CLOSE, REDUCE, HOLD
-    Priority: profit capture > real risk > time > velocity > earnings
+    CSP / CC Position Management Engine v3.
+    Philosophy: assignment is acceptable — it was priced in when you wrote the option.
+    Actions: TAKE PROFIT, EARNINGS WARNING, HOLD
+    - TAKE PROFIT: profit >= 90% (Core/Growth) or >= 80% (Speculative/Trading)
+    - EARNINGS WARNING: earnings within 7 days — heads up only, not a forced close
+    - HOLD: everything else
     """
     ticker        = pos.get("ticker", "")
     pos_type      = pos.get("type", "CSP")
@@ -1740,9 +1742,13 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
 
     earn_risk = earn_days <= 5
 
+    # Per-tier profit thresholds
+    is_speculative = tier in ("Opportunistic",) or pos.get("speculative", False)
+    take_profit_threshold = 80.0 if is_speculative else 90.0
+
     # ── Helper to return result ────────────────────────────────────────
     def R(action, reason):
-        priority = {"DEFENSIVE":0,"CLOSE NOW":1,"OPTIONAL CLOSE":2,"REDUCE":3,"HOLD":4}
+        priority = {"TAKE PROFIT": 0, "EARNINGS WARNING": 1, "HOLD": 2}
         return {
             "action":          action,
             "reason":          reason,
@@ -1755,97 +1761,30 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
             "remaining_prem":  remaining_prem,
             "earn_zone":       earn_zone,
             "earn_days":       earn_days,
-            "sort_priority":   priority.get(action, 4),
+            "sort_priority":   priority.get(action, 2),
         }
 
-    # ══════════════════════════════════════════════════════════════════
-    # STEP 1: PROFIT OVERRIDE (top priority — §6)
-    # ══════════════════════════════════════════════════════════════════
-    if profit_pct >= 95:
-        return R("CLOSE NOW", f"{profit_pct}% profit captured — excellent result, close now")
-    if profit_pct >= 90:
-        return R("OPTIONAL CLOSE", f"{profit_pct}% profit captured, low risk, long DTE" if in_safe_zone else f"{profit_pct}% profit — strong exit window")
+    # ── TAKE PROFIT ────────────────────────────────────────────────────
+    # Act now — premium has decayed enough, risk/reward favours closing
+    if profit_pct >= take_profit_threshold:
+        return R("TAKE PROFIT",
+                 f"{profit_pct}% profit captured — close now before reversal "
+                 f"(threshold: {take_profit_threshold:.0f}%)")
 
-    # ══════════════════════════════════════════════════════════════════
-    # CSP LOGIC (§7)
-    # ══════════════════════════════════════════════════════════════════
+    # ── EARNINGS WARNING ───────────────────────────────────────────────
+    # Heads up only — decision is yours, but you need to know
+    if earn_days <= 7:
+        return R("EARNINGS WARNING",
+                 f"Earnings in {earn_days}d — decide before event "
+                 f"({profit_pct}% profit captured, {dte} DTE remaining)")
+
+    # ── HOLD ───────────────────────────────────────────────────────────
     if pos_type == "CSP":
-
-        # DEFENSIVE — rare, requires real risk (§7 + §8 safe zone guard)
-        if not in_safe_zone:
-            defensive_trigger = (
-                dte <= 7 and dist_to_breakeven <= 2 and
-                (is_accelerating or earn_risk)
-            )
-            if defensive_trigger:
-                return R("DEFENSIVE", f"DTE {dte}, only {dist_to_breakeven}% above breakeven" +
-                         (" + earnings in " + str(earn_days) + "d" if earn_risk else " + 3d drop accelerating"))
-
-        # CLOSE NOW — §7
-        if dte <= 7 and not assignment_intent:
-            if profit_pct >= 50:
-                return R("CLOSE NOW", f"DTE {dte}, {profit_pct}% profit — take it")
-            if remaining_prem <= 25:
-                return R("CLOSE NOW", f"DTE {dte}, only {remaining_prem}% premium remains")
-            if profit_pct < 0:
-                return R("CLOSE NOW", f"DTE {dte}, small loss — don't hold into expiry")
-
-        # OPTIONAL CLOSE — §7
-        if profit_pct >= 70 and dist_to_breakeven >= 8:
-            return R("OPTIONAL CLOSE", f"{profit_pct}% profit, {dist_to_breakeven}% above breakeven — good exit window")
-
-        # BELOW BREAKEVEN — stock has passed through breakeven (no cushion left)
-        if dist_to_breakeven < 0:
-            if dte <= 21:
-                return R("CLOSE NOW", f"Stock ${underlying:.2f} is below breakeven ${breakeven:.2f} with {dte} DTE — assignment likely")
-            else:
-                return R("REDUCE", f"Stock ${underlying:.2f} below breakeven ${breakeven:.2f} — consider reducing size")
-
-        # REDUCE — §7
-        if dte <= 21 and profit_pct >= 40 and dist_to_breakeven <= 5:
-            return R("REDUCE", f"DTE {dte}, {profit_pct}% profit, only {dist_to_breakeven}% above breakeven — reduce size")
-
-        # Velocity escalation — only when risk present (§9)
-        if not in_safe_zone and is_accelerating and dist_to_breakeven <= 5:
-            return R("CLOSE NOW", f"3D drop {chg_3d*100:.1f}%, only {dist_to_breakeven}% above breakeven")
-
-        # Earnings escalation (§10)
-        if earn_risk and dist_to_breakeven <= 5:
-            return R("CLOSE NOW", f"Earnings in {earn_days}d, only {dist_to_breakeven}% above breakeven")
-        if earn_risk and profit_pct >= 40:
-            return R("OPTIONAL CLOSE", f"Earnings in {earn_days}d, {profit_pct}% profit — consider closing before event")
-
-        # HOLD — safe zone or nothing triggered
-        if in_safe_zone:
-            return R("HOLD", f"DTE {dte}, {dist_to_breakeven}% above breakeven — safe to hold")
-        return R("HOLD", f"{profit_pct}% profit, DTE {dte}, {dist_to_breakeven}% above breakeven")
-
-    # ══════════════════════════════════════════════════════════════════
-    # CC LOGIC (§11)
-    # ══════════════════════════════════════════════════════════════════
+        return R("HOLD", f"{profit_pct}% profit, DTE {dte}, breakeven ${breakeven:.2f} "
+                         f"({dist_to_breakeven}% cushion)")
     else:
-        # CLOSE NOW
-        if remaining_prem <= 20:
-            return R("CLOSE NOW", f"Only {remaining_prem}% premium remains — free the shares")
-        if dte <= 7 and mark < 0.20:
-            return R("CLOSE NOW", f"DTE {dte}, mark ${mark:.2f} — not worth keeping cap on")
-        if is_fast_rally and dist_to_strike <= 3:
-            return R("CLOSE NOW", f"Stock up {day_chg*100:.1f}%, within {dist_to_strike}% of call strike — protect upside")
-        if earn_risk and dist_to_strike <= 3:
-            return R("CLOSE NOW", f"Earnings {earn_days}d, stock within {dist_to_strike}% of strike — close before event")
-        if profit_pct >= 95:
-            return R("CLOSE NOW", f"{profit_pct}% profit — free the shares")
-
-        # OPTIONAL CLOSE
-        if profit_pct >= 85 and dist_to_strike >= 5:
-            return R("OPTIONAL CLOSE", f"{profit_pct}% profit, far from strike — good exit window")
-
-        # DEFENSIVE
-        if not in_safe_zone and dist_to_strike <= 2 and (is_fast_rally or earn_risk):
-            return R("DEFENSIVE", f"Stock pressing strike" + (" + earnings " + str(earn_days) + "d" if earn_risk else " + rallying fast"))
-
-        # HOLD
-        return R("HOLD", f"{profit_pct}% profit, DTE {dte}, {dist_to_strike}% below strike")
+        return R("HOLD", f"{profit_pct}% profit, DTE {dte}, "
+                         f"{dist_to_strike}% below call strike ${strike:.2f}")
 
 
 def score_leaps(opp: dict) -> int:
@@ -2172,7 +2111,7 @@ def stock_quality_check(ticker: str, md: dict, earn_date) -> dict:
 
     if days_to_earnings < 14:
         earnings_status = "hard_stop"
-    elif days_to_earnings < 21:
+    elif days_to_earnings < 35:
         earnings_status = "warning"
     else:
         earnings_status = "ok"
@@ -3968,6 +3907,8 @@ def run_scanner():
             "chg_30d_pct":  round(_pw_md.get("change_30d_pct",  0) * 100, 1),
             # Dynamic support levels (calc_support_levels) — display + scoring signal
             "support_levels": _pw_sl if _pw_sl else None,
+            # Earnings proximity — shown as badge on Price Watch tile
+            "days_to_earnings": (lambda _ed: max(0, (_ed - datetime.now()).days) if _ed else 999)(get_earnings_date(_tk)),
         })
 
     # Sort: IN_ZONE → APPROACHING → WATCHLIST (by distance) → FAR
@@ -4090,6 +4031,25 @@ def run_scanner():
         _move_alerts.sort(key=lambda x: (0 if x[1] else 1, x[0]))
         briefing += "\n━━━ NOTABLE MOVES ━━━\n"
         for _, _, _line in _move_alerts:
+            briefing += f"{_line}\n"
+
+    # ── Earnings this week — positions at risk ────────────────
+    _earn_alerts = []
+    for _etk in ALL_TICKERS:
+        _edate = get_earnings_date(_etk)
+        if _edate:
+            try:
+                _edays = (_edate - datetime.now()).days
+                if 0 <= _edays <= 7:
+                    _ep = mkt.get(_etk, {}).get("price", 0)
+                    _ep_str = f" ${_ep:.2f}" if _ep > 0 else ""
+                    _earn_alerts.append((_edays, f"  {_etk}{_ep_str} — earnings in {_edays}d"))
+            except Exception:
+                pass
+    if _earn_alerts:
+        _earn_alerts.sort()
+        briefing += "\n⚠️ *EARNINGS THIS WEEK*\n"
+        for _, _line in _earn_alerts:
             briefing += f"{_line}\n"
 
     send_telegram(briefing)
@@ -4379,7 +4339,7 @@ def run_scanner():
         lst.sort(key=lambda x: x["score"], reverse=True)
 
     top_csps  = csp_opps[:3];  top_ccs   = cc_opps[:3]
-    top_leaps = leaps_opps[:3];top_pmccs = pmcc_opps[:3]
+    top_leaps = leaps_opps[:5];top_pmccs = pmcc_opps[:3]  # top_leaps capped for Telegram only; dashboard shows all
     top_bcss  = bcs_opps[:3]
     top_spikes = spike_opps[:3]
     top_drops  = drop_opps[:3]
@@ -4585,6 +4545,7 @@ def run_scanner():
             "mode":              mode,
             "action_label":      action_label,
             "strike":            strike,
+            "days_to_earnings":  o.get("quality", {}).get("days_to_earnings", 999),
             "expiry":            s.get("expiry",""),
             "dte":               s.get("dte",0),
             "premium":           premium,
@@ -5076,6 +5037,20 @@ def run_scanner():
                             score *= 1.05  # shallow starter zone
                         if _agg_lo > 0 and price <= _agg_lo:
                             score *= 1.08  # deep panic low — highest conviction
+                    # Drawdown timing boost — stock has pulled back, better entry price
+                    _c1d = mkt.get(ticker, {}).get("day_change_pct", 0)
+                    _c5d = mkt.get(ticker, {}).get("change_5d_pct", 0)
+                    _near_buy = _leaps_buy_under > 0 and price <= _leaps_buy_under * 1.10
+                    _drop_1d  = _c1d <= -0.05   # -5%+ today
+                    _drop_5d  = _c5d <= -0.08   # -8%+ in 5 days
+                    if _near_buy and (_drop_1d or _drop_5d):
+                        score *= 1.20  # strongest: zone + drawdown align
+                    elif _drop_1d and _c1d <= -0.08:
+                        score *= 1.12  # big single-day drop → elevated opportunity
+                    elif _drop_5d:
+                        score *= 1.08  # sustained 5d drawdown
+                    elif _drop_1d:
+                        score *= 1.05  # mild today drop
                     if score > best_leaps_score:
                         best_leaps_score = score
                         best_leaps = {"strike":strike,"expiry":c["expiry"],"dte":dte,
