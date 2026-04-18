@@ -643,15 +643,20 @@ def get_market_data(tickers: list) -> dict:
             ma200 = sum(closes_clean[-200:]) / min(200, len(closes_clean)) if closes_clean else 0
             ma50  = sum(closes_clean[-50:])  / min(50,  len(closes_clean)) if closes_clean else 0
             price = float(meta.get("regularMarketPrice", 0))
-            # Only use regularMarketPreviousClose — chartPreviousClose can be stale
-            prev_close = float(meta.get("regularMarketPreviousClose", 0) or 0)
-            if prev_close <= 0:
-                prev_close = price  # can't calculate change, assume 0%
-            day_change_pct = (price - prev_close) / prev_close if prev_close > 0 else 0
+
+            # Day change — always use closes array, never Yahoo metadata.
+            # On weekends Yahoo's regularMarketPrice / regularMarketPreviousClose fields
+            # can be swapped (current=Thu, previous=Fri) producing an inverted sign.
+            # closes_clean[-1] = last actual trading day, [-2] = day before. Always correct.
+            if len(closes_clean) >= 2 and closes_clean[-2] > 0:
+                day_change_pct = (closes_clean[-1] - closes_clean[-2]) / closes_clean[-2]
+                prev_close     = closes_clean[-2]
+            else:
+                prev_close     = float(meta.get("regularMarketPreviousClose", 0) or 0) or price
+                day_change_pct = (price - prev_close) / prev_close if prev_close > 0 else 0
             # Sanity check — ignore if change looks like stale data (>50% single day move)
             if abs(day_change_pct) > 0.50:
                 day_change_pct = 0.0
-                prev_close = price
 
             # Multi-timeframe price changes — all computed from already-fetched closes
             p3d  = closes_clean[-4]  if len(closes_clean) >= 4  else price
@@ -3983,12 +3988,21 @@ def run_scanner():
         if not (_trigger_drop or _trigger_rise):
             continue
 
+        # "today" label: use actual weekday name if running on weekend (stale Friday data)
+        _now_dow = now_et().weekday()  # 0=Mon … 6=Sun
+        _is_weekend = _now_dow >= 5
+        if _is_weekend:
+            # Last trading day was Friday
+            _day_lbl = "Fri"
+        else:
+            _day_lbl = "today"
+
         # Build move line: show all timeframes that are non-trivial
         _parts = []
-        if abs(_c1) >= 1.0:  _parts.append(f"{_c1:+.1f}% today")
+        if abs(_c1) >= 1.0:  _parts.append(f"{_c1:+.1f}% {_day_lbl}")
         if abs(_c5) >= 2.0:  _parts.append(f"{_c5:+.1f}% (5d)")
         if abs(_c30) >= 5.0: _parts.append(f"{_c30:+.1f}% (30d)")
-        _move_str = " · ".join(_parts) if _parts else f"{_c1:+.1f}%"
+        _move_str = " · ".join(_parts) if _parts else f"{_c1:+.1f}% {_day_lbl}"
 
         # Zone context — only mention what's actionable
         _zone_parts = []
@@ -3998,24 +4012,22 @@ def run_scanner():
         elif _pw["csp_status"] == "APPROACHING" and _bu:
             _zone_parts.append(f"CSP zone ${_bu} ({_pct_buy:.1f}% away)")
         elif _pw["csp_status"] == "WATCHLIST" and _bu and _pct_buy <= 20:
-            # Only mention if realistically close; silent when very far
             _zone_parts.append(f"CSP zone ${_bu} ({_pct_buy:.1f}% away)")
-        # CSP zone > 20% away: say nothing — CC alert says enough
 
         if _pw.get("cc_status") == "IN_ZONE" and _sa:
-            # Price already above sell target — just say so, no confusing negative distance
             _zone_parts.append(f"above CC target ${_sa} — write calls")
         elif _pw.get("cc_status") == "APPROACHING" and _sa:
             _pct_s = _pw.get("pct_from_sell", 0)
             if 0 < _pct_s <= 20:
                 _zone_parts.append(f"CC target ${_sa} ({_pct_s:.1f}% away)")
-        # cc_status WAIT or > 20% away: say nothing
 
+        # Action suggestion — only on trading days (markets open)
         _action = ""
-        if _trigger_drop:
-            _action = "→ consider CSP/LEAPS"
-        elif _trigger_rise:
-            _action = "→ consider CC"
+        if not _is_weekend:
+            if _trigger_drop:
+                _action = "→ consider CSP/LEAPS"
+            elif _trigger_rise:
+                _action = "→ consider CC"
 
         _icon = "📉" if _trigger_drop else "📈"
         _zone_txt = " · ".join(_zone_parts)
