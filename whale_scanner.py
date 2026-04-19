@@ -5008,7 +5008,34 @@ def run_scanner():
             leaps_calls = [c for c in contracts_d
                            if c.get("option_type") == "C"
                            and (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days >= LEAPS_DTE_MIN]
-            best_leaps = None; best_leaps_score = 0
+            # ── 3-band LEAPS selection ──────────────────────────────
+            # Conservative (δ 0.89–0.92): core stock replacement, lower risk
+            # Sweet spot   (δ 0.85–0.88): best balance for most positions
+            # Aggressive   (δ 0.80–0.84): more leverage, more extrinsic
+            # Each band picks the contract with lowest extrinsic% within the band.
+            _bands = {
+                "conservative": {"d_lo": 0.89, "d_hi": 0.93, "label": "🛡️ Conservative",
+                                 "note": "Lower risk · more intrinsic · less decay"},
+                "sweet_spot":   {"d_lo": 0.85, "d_hi": 0.889,"label": "🎯 Sweet spot",
+                                 "note": "Best balance · high delta · capital efficient"},
+                "aggressive":   {"d_lo": 0.80, "d_hi": 0.849,"label": "⚡ More leverage",
+                                 "note": "More OTM · more extrinsic · higher leverage"},
+            }
+            _band_best = {b: None for b in _bands}  # best contract per band (lowest ext%)
+
+            # Determine recommendation: Core → Conservative by default
+            # Shift toward aggressive when price is near/below buy_under
+            _near_buy_l = _leaps_buy_under > 0 and price <= _leaps_buy_under * 1.05
+            _at_buy_l   = _leaps_buy_under > 0 and price <= _leaps_buy_under
+            if _at_buy_l:
+                _recommended_band = "aggressive"   # at/below target → cheapest entry
+            elif _near_buy_l:
+                _recommended_band = "sweet_spot"   # near target → good balance
+            elif tier == "Core":
+                _recommended_band = "conservative" # Core → safer stock replacement
+            else:
+                _recommended_band = "sweet_spot"   # Growth/Trading → sweet spot
+
             for c in leaps_calls:
                 try:
                     strike = float(c["strike"])
@@ -5018,97 +5045,92 @@ def run_scanner():
                     mid = (bid+ask)/2
                     if mid < 5: continue
                     itm_pct = (price-strike)/price*100
-                    if not (-5 <= itm_pct <= 40): continue
+                    if not (-5 <= itm_pct <= 50): continue
                     delta = abs(float(c.get("delta",0) or 0))
                     if delta == 0: delta = abs(estimate_delta(price,strike,dte,0.30,"C") or 0)
-                    if not (_leaps_delta_min <= delta <= _leaps_delta_max): continue
+                    if not (0.80 <= delta <= 0.93): continue  # cover all three bands
                     intrinsic = max(0, price-strike)
                     extrinsic = max(0, mid-intrinsic)
                     ext_pct = (extrinsic/mid*100) if mid > 0 else 100
-                    if ext_pct > 35: continue  # very relaxed for dashboard
+                    if ext_pct > 40: continue
+                    breakeven = round(strike + mid, 2)
+                    be_pct    = round((breakeven - price) / price * 100, 1) if price > 0 else 0
                     if ext_pct < 10:   ext_lbl = f"🔥 Excellent ({ext_pct:.1f}%)"
                     elif ext_pct < 15: ext_lbl = f"✅ Good ({ext_pct:.1f}%)"
                     elif ext_pct < 20: ext_lbl = f"⚠️ Acceptable ({ext_pct:.1f}%)"
                     elif ext_pct < 25: ext_lbl = f"🔶 Expensive ({ext_pct:.1f}%)"
                     else:              ext_lbl = f"❌ Very expensive ({ext_pct:.1f}%)"
-                    score = delta * (30 - ext_pct) * (dte/365)
-                    # Manual buy_under alignment
-                    if _leaps_buy_under > 0 and price <= _leaps_buy_under:
-                        score *= 1.15  # manual target met — good entry
-                    elif _leaps_buy_under > 0 and price > _leaps_buy_under * 1.20:
-                        score *= 0.85  # well above manual target
-                    # Dynamic support zone overlay (from calc_support_levels)
-                    _sl_l = support_cache.get(ticker, {})
-                    if _sl_l:
-                        _main_sup  = _sl_l.get("main_buy_under", 0)
-                        _start_hi  = _sl_l.get("starter_buy_high", 0)
-                        _agg_lo    = _sl_l.get("aggressive_buy_low", 0)
-                        if _main_sup > 0 and price <= _main_sup:
-                            score *= 1.10  # at repeated support cluster
-                        elif _start_hi > 0 and price <= _start_hi:
-                            score *= 1.05  # shallow starter zone
-                        if _agg_lo > 0 and price <= _agg_lo:
-                            score *= 1.08  # deep panic low — highest conviction
-                    # Drawdown timing boost — stock has pulled back, better entry price
-                    _c1d = mkt.get(ticker, {}).get("day_change_pct", 0)
-                    _c5d = mkt.get(ticker, {}).get("change_5d_pct", 0)
-                    _near_buy = _leaps_buy_under > 0 and price <= _leaps_buy_under * 1.10
-                    _drop_1d  = _c1d <= -0.05   # -5%+ today
-                    _drop_5d  = _c5d <= -0.08   # -8%+ in 5 days
-                    if _near_buy and (_drop_1d or _drop_5d):
-                        score *= 1.20  # strongest: zone + drawdown align
-                    elif _drop_1d and _c1d <= -0.08:
-                        score *= 1.12  # big single-day drop → elevated opportunity
-                    elif _drop_5d:
-                        score *= 1.08  # sustained 5d drawdown
-                    elif _drop_1d:
-                        score *= 1.05  # mild today drop
-                    if score > best_leaps_score:
-                        best_leaps_score = score
-                        best_leaps = {"strike":strike,"expiry":c["expiry"],"dte":dte,
-                                      "premium":round(mid,2),"delta":round(delta,2),
-                                      "extrinsic_pct":round(ext_pct,1),"ext_label":ext_lbl,
-                                      "itm_pct":round(itm_pct,1),"ivp":ivp_d}
+                    candidate = {"strike":strike,"expiry":c["expiry"],"dte":dte,
+                                 "premium":round(mid,2),"delta":round(delta,2),
+                                 "extrinsic_pct":round(ext_pct,1),"ext_label":ext_lbl,
+                                 "itm_pct":round(itm_pct,1),"ivp":ivp_d,
+                                 "breakeven":breakeven,"be_pct":be_pct}
+                    # File into matching band (lowest ext% wins within band)
+                    for _bname, _bdef in _bands.items():
+                        if _bdef["d_lo"] <= delta <= _bdef["d_hi"]:
+                            prev = _band_best[_bname]
+                            if prev is None or ext_pct < prev["extrinsic_pct"]:
+                                _band_best[_bname] = candidate
+                            break
                 except: continue
-            if best_leaps:
-                w52h = md.get("week52_high",price); w52l = md.get("week52_low",price)
-                pullback = round(pullback_from_high(price,w52h)*100,1)
-                ext_pct = best_leaps["extrinsic_pct"]
+
+            # Build one leaps_entry per band that found a contract
+            _trend_computed = False
+            _trend_state_v = "UNKNOWN"; _trend_label_v = "WATCH"
+            _trend_signal_v = ""; _trend_action_v = "WATCH"
+            _w52h = md.get("week52_high",price)
+            _pullback = round(pullback_from_high(price,_w52h)*100,1)
+
+            for _bname, _bdef in _bands.items():
+                _bl = _band_best[_bname]
+                if not _bl: continue
+                ext_pct = _bl["extrinsic_pct"]
                 warnings = []
                 if ext_pct > 20: warnings.append(f"High extrinsic {ext_pct:.1f}%")
                 if ivp_d > 50:   warnings.append(f"IVP elevated {ivp_d:.0f}%")
+                _is_rec = (_bname == _recommended_band)
                 leaps_entry = {
-                    "ticker":ticker,"tier":tier,"price":price,"ivp":ivp_d,"mode":"LEAPS",
-                    "strike":best_leaps["strike"],"expiry":best_leaps["expiry"],"dte":best_leaps["dte"],
-                    "premium":best_leaps["premium"],"annualized_return":0,
-                    "delta":best_leaps["delta"],"extrinsic_pct":ext_pct,
-                    "below_min":ext_pct>20,"warnings":warnings,
-                    "passes_quality":ext_pct<=20 and ivp_d<=50,
-                    "breakeven":round(best_leaps["strike"] + best_leaps["premium"], 2),
-                    "signal":f"{best_leaps['ext_label']} | {pullback:.0f}% off highs",  # IVP in header
-                    "risk_note":", ".join(warnings) if warnings else None,
+                    "ticker":       ticker, "tier": tier, "price": price, "ivp": ivp_d,
+                    "mode":         "LEAPS",
+                    "leaps_band":   _bname,
+                    "leaps_label":  _bdef["label"],
+                    "leaps_note":   _bdef["note"],
+                    "is_recommended": _is_rec,
+                    "strike":       _bl["strike"], "expiry": _bl["expiry"], "dte": _bl["dte"],
+                    "premium":      _bl["premium"], "annualized_return": 0,
+                    "delta":        _bl["delta"], "extrinsic_pct": ext_pct,
+                    "below_min":    ext_pct > 20, "warnings": warnings,
+                    "passes_quality": ext_pct <= 20 and ivp_d <= 50,
+                    "breakeven":    _bl["breakeven"],
+                    "breakeven_pct": _bl["be_pct"],
+                    "signal":       f"{_bl['ext_label']} | {_pullback:.0f}% off highs",
+                    "risk_note":    ", ".join(warnings) if warnings else None,
+                    "buy_under":    _leaps_buy_under if _leaps_buy_under > 0 else None,
+                    "days_to_earnings": (lambda _ed: max(0, (_ed - datetime.now()).days) if _ed else 999)(earn_date),
                 }
                 leaps_entry["score"] = score_leaps(leaps_entry)
                 leaps_entry["normalized"] = normalized_score(leaps_entry["score"], "LEAPS")
                 leaps_entry["quality_label"] = quality_label(leaps_entry["score"], SCORE_MAX["LEAPS"])
-                leaps_entry["buy_under"] = _leaps_buy_under if _leaps_buy_under > 0 else None
-                # Add trend classifier to dashboard LEAPS entry
-                try:
-                    _trend_d  = leaps_trend_state(ticker, price)
-                    _w52h_d   = md.get("week52_high", price * 1.3)
-                    _ta_d     = leaps_trend_action(_trend_d, ivp_d, price, _w52h_d)
-                    leaps_entry["trend_state"]  = str(_trend_d.get("state", "UNKNOWN"))
-                    leaps_entry["trend_label"]  = str(_ta_d.get("label", "WATCH"))
-                    leaps_entry["trend_signal"] = str(_ta_d.get("signal", ""))
-                    leaps_entry["trend_action"] = str(_ta_d.get("action", "WATCH"))
-                    print(f"   LEAPS trend {ticker}: {leaps_entry['trend_label']}")
-                except Exception as _te:
-                    leaps_entry["trend_state"]  = "UNKNOWN"
-                    leaps_entry["trend_label"]  = "WATCH"
-                    leaps_entry["trend_signal"] = ""
-                    leaps_entry["trend_action"] = "WATCH"
-                    print(f"   LEAPS trend error {ticker}: {_te}")
+                leaps_entry["support_levels"] = support_cache.get(ticker, {}) or {}
+                # Compute trend once per ticker — share across bands
+                if not _trend_computed:
+                    try:
+                        _trend_d  = leaps_trend_state(ticker, price)
+                        _ta_d     = leaps_trend_action(_trend_d, ivp_d, price, _w52h)
+                        _trend_state_v  = str(_trend_d.get("state","UNKNOWN"))
+                        _trend_label_v  = str(_ta_d.get("label","WATCH"))
+                        _trend_signal_v = str(_ta_d.get("signal",""))
+                        _trend_action_v = str(_ta_d.get("action","WATCH"))
+                        print(f"   LEAPS trend {ticker}: {_trend_label_v}")
+                    except Exception as _te:
+                        print(f"   LEAPS trend error {ticker}: {_te}")
+                    _trend_computed = True
+                leaps_entry["trend_state"]  = _trend_state_v
+                leaps_entry["trend_label"]  = _trend_label_v
+                leaps_entry["trend_signal"] = _trend_signal_v
+                leaps_entry["trend_action"] = _trend_action_v
                 dashboard_leaps.append(leaps_entry)
+                print(f"   LEAPS [{_bdef['label']}] {ticker} ${_bl['strike']} δ{_bl['delta']} ext{ext_pct:.1f}% BE${_bl['breakeven']} {'★REC' if _is_rec else ''}")
 
     # Apply unified score for cross-strategy normalization (patch 5)
     for o in dashboard_csps:
