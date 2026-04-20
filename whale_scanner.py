@@ -5008,6 +5008,12 @@ def run_scanner():
             leaps_calls = [c for c in contracts_d
                            if c.get("option_type") == "C"
                            and (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days >= LEAPS_DTE_MIN]
+            if ticker in ("TSLA", "NVDA", "AAPL"):
+                all_calls = [c for c in contracts_d if c.get("option_type") == "C"]
+                print(f"   DBG LEAPS {ticker}: contracts_d={len(contracts_d)} calls={len(all_calls)} leaps_calls(DTE>={LEAPS_DTE_MIN})={len(leaps_calls)}")
+                if leaps_calls:
+                    sample = leaps_calls[0]
+                    print(f"     sample: strike={sample.get('strike')} expiry={sample.get('expiry')} delta={sample.get('delta')} mid={(float(sample.get('nbbo_bid',0))+float(sample.get('nbbo_ask',0)))/2:.2f}")
             # ── 3-band LEAPS selection ──────────────────────────────
             # Conservative (δ 0.89–0.92): core stock replacement, lower risk
             # Sweet spot   (δ 0.85–0.88): best balance for most positions
