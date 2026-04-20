@@ -5094,7 +5094,12 @@ def run_scanner():
                     "mode":         "LEAPS",
                     "leaps_band":   _bname,
                     "leaps_label":  _bdef["label"],
-                    "leaps_note":   _bdef["note"],
+                    "leaps_note":   (
+                        f"🔥 Excellent cost — {ext_pct:.1f}% extrinsic. Prioritize this." if ext_pct < 20
+                        else f"⚠️ Extrinsic {ext_pct:.1f}% — getting expensive. Compare vs lower-strike bands."  if ext_pct < 30
+                        else f"❌ Extrinsic {ext_pct:.1f}% — expensive. Check if a cheaper band exists for this ticker."  if ext_pct < 40
+                        else f"🚫 Extrinsic {ext_pct:.1f}% — avoid. IV too high or strike too close to ATM."
+                    ),
                     "is_recommended": _is_rec,
                     "strike":       _bl["strike"], "expiry": _bl["expiry"], "dte": _bl["dte"],
                     "premium":      _bl["premium"], "annualized_return": 0,
