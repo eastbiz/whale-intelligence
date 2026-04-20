@@ -2969,7 +2969,7 @@ def find_best_leaps(ticker, price, contracts, ivdata, pir):
             if dte < LEAPS_DTE_MIN: continue
         except Exception: continue
         itm_pct = (price - strike) / price * 100  # positive = ITM
-        if not (-5 <= itm_pct <= 35): continue
+        if not (-5 <= itm_pct <= 70): continue
         bid = float(c.get("nbbo_bid",0) or 0)
         ask = float(c.get("nbbo_ask",0) or 0)
         mid = (bid + ask) / 2
@@ -5051,7 +5051,7 @@ def run_scanner():
                     mid = (bid+ask)/2
                     if mid < 5: continue
                     itm_pct = (price-strike)/price*100
-                    if not (-5 <= itm_pct <= 50): continue
+                    if not (-5 <= itm_pct <= 70): continue
                     delta = abs(float(c.get("delta",0) or 0))
                     if delta == 0: delta = abs(estimate_delta(price,strike,dte,0.30,"C") or 0)
                     if not (delta >= 0.75): continue  # floor only — no upper cap
