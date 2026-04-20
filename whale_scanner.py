@@ -5567,13 +5567,12 @@ def run_scanner():
     # review_candidates: relaxed filters, for dashboard human review
     execution_candidates = all_opps  # already filtered by main scan strict rules
 
-    # review_candidates = full dashboard list with quality labels
-    # For LEAPS: prefer entries from leaps_opps (have trend data) over dashboard_leaps
-    leaps_tickers_in_opps = {o.get("ticker") for o in all_opps if o.get("mode") == "LEAPS"}
-    dashboard_leaps_filtered = [o for o in dashboard_leaps if o.get("ticker") not in leaps_tickers_in_opps]
+    # Dashboard always uses three-band dashboard_leaps — never deduplicate against leaps_from_opps.
+    # leaps_from_opps (strict Telegram path) returns only one contract per ticker.
+    # dashboard_leaps has all three bands with full extrinsic/BE fields — always prefer it.
     leaps_from_opps = [o for o in all_opps if o.get("mode") == "LEAPS"]
     review_candidates = []
-    for o in dashboard_csps + dashboard_ccs + dashboard_leaps_filtered + leaps_from_opps + dashboard_bcss + dash_spikes + dash_drops + dash_pio:
+    for o in dashboard_csps + dashboard_ccs + dashboard_leaps + dashboard_bcss + dash_spikes + dash_drops + dash_pio:
         o["candidate_type"] = "execution" if o.get("passes_quality") and not o.get("below_min") and not o.get("warnings") else "review"
         review_candidates.append(o)
 
