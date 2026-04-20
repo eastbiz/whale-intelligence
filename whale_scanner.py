@@ -4575,6 +4575,26 @@ def run_scanner():
             d["trend_action"] = o.get("trend_action", s.get("trend_action", {}) if isinstance(s.get("trend_action"), dict) else {})
             if isinstance(d["trend_action"], dict):
                 d["trend_action"] = d["trend_action"].get("action", "WATCH")
+            # Add LEAPS table fields — may come from nested s or top-level o
+            _be = s.get("breakeven", o.get("breakeven", 0))
+            _ep = s.get("extrinsic_pct", o.get("extrinsic_pct", 0))
+            _price = o.get("price", 0)
+            d["extrinsic_pct"]  = round(_ep, 1) if _ep else 0
+            d["breakeven"]      = round(_be, 2) if _be else round(strike + premium, 2)
+            d["breakeven_pct"]  = round((_be - _price) / _price * 100, 1) if _be and _price else 0
+            d["leaps_band"]     = o.get("leaps_band", s.get("leaps_band", "sweet_spot"))
+            d["leaps_label"]    = o.get("leaps_label", s.get("leaps_label", "🎯 Sweet spot"))
+            d["is_recommended"] = o.get("is_recommended", s.get("is_recommended", False))
+            d["buy_under"]      = o.get("buy_under", s.get("buy_under", None))
+            d["days_to_earnings"] = o.get("days_to_earnings", o.get("quality", {}).get("days_to_earnings", 999))
+            # leaps_note: dynamic extrinsic signal
+            _ext = d["extrinsic_pct"]
+            d["leaps_note"] = (
+                f"🔥 Excellent cost — {_ext:.1f}% extrinsic. Prioritize this." if _ext < 20
+                else f"⚠️ Extrinsic {_ext:.1f}% — getting expensive. Compare vs lower-strike bands." if _ext < 30
+                else f"❌ Extrinsic {_ext:.1f}% — expensive. Check if a cheaper band exists for this ticker." if _ext < 40
+                else f"🚫 Extrinsic {_ext:.1f}% — avoid. IV too high or strike too close to ATM."
+            )
         return d
 
     def find_best_csp_relaxed(ticker, price, contracts):
