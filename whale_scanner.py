@@ -350,7 +350,7 @@ def schwab_get_option_chain(ticker: str, from_date: str, to_date: str) -> list:
             params={
                 "symbol":       ticker,
                 "contractType": "ALL",
-                "strikeCount":  20,
+                "strikeCount":  50,  # wider range needed for deep ITM LEAPS on high-price stocks
                 "includeUnderlyingQuote": True,
                 "fromDate":     from_date,
                 "toDate":       to_date,
