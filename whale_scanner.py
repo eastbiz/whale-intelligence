@@ -2262,7 +2262,9 @@ def find_position_income_cc(ticker, price, qty, avg_cost, contracts,
 
             bid    = float(c.get("nbbo_bid", 0) or 0)
             ask    = float(c.get("nbbo_ask", 0) or 0)
-            mid    = (bid + ask) / 2
+            if bid <= 0: continue  # stale/no market — Schwab returned bad quote
+            spread_pct = (ask - bid) / ask if ask > 0 else 1.0
+            mid    = bid + (ask - bid) * 0.25 if spread_pct > 0.30 else (bid + ask) / 2
             if mid < 0.50: continue
 
             delta  = float(c.get("delta", 0) or 0)
@@ -2385,7 +2387,9 @@ def find_drop_csp(ticker, price, contracts, ivdata, pir, quality,
 
             bid    = float(c.get("nbbo_bid", 0) or 0)
             ask    = float(c.get("nbbo_ask", 0) or 0)
-            mid    = (bid + ask) / 2
+            if bid <= 0: continue  # stale/no market — Schwab returned bad quote
+            spread_pct = (ask - bid) / ask if ask > 0 else 1.0
+            mid    = bid + (ask - bid) * 0.25 if spread_pct > 0.30 else (bid + ask) / 2
             if mid < 1.0: continue
 
             # Use real delta from Schwab if available
@@ -2497,7 +2501,9 @@ def find_spike_cc(ticker, price, qty, avg_cost, contracts, ivdata, spike_info) -
             if strike <= price: continue  # must be OTM
             bid    = float(c.get("nbbo_bid", 0) or 0)
             ask    = float(c.get("nbbo_ask", 0) or 0)
-            mid    = (bid + ask) / 2
+            if bid <= 0: continue  # stale/no market — Schwab returned bad quote
+            spread_pct = (ask - bid) / ask if ask > 0 else 1.0
+            mid    = bid + (ask - bid) * 0.25 if spread_pct > 0.30 else (bid + ask) / 2
             if mid < 0.50: continue
 
             delta = float(c.get("delta", 0) or 0)
@@ -2685,7 +2691,9 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality, sizing=None, m
 
             bid    = float(c.get("nbbo_bid", 0) or 0)
             ask    = float(c.get("nbbo_ask", 0) or 0)
-            mid    = (bid + ask) / 2
+            if bid <= 0: continue  # stale/no market — Schwab returned bad quote
+            spread_pct = (ask - bid) / ask if ask > 0 else 1.0
+            mid    = bid + (ask - bid) * 0.25 if spread_pct > 0.30 else (bid + ask) / 2
             if mid < 0.10: continue
 
             # Use real delta from Schwab if available
