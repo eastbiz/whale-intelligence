@@ -3725,9 +3725,9 @@ def run_scanner():
             mkt[ticker]["week52_low"]  = sq["week52_low"]  or mkt[ticker]["week52_low"]
             mkt[ticker]["avg_volume"]  = sq["avg_volume"]  or mkt[ticker]["avg_volume"]
             if sq.get("prev_close", 0) > 0:
-                mkt[ticker]["day_change_pct"] = abs(
+                mkt[ticker]["day_change_pct"] = (
                     sq["price"] - sq["prev_close"]
-                ) / sq["prev_close"]
+                ) / sq["prev_close"]  # signed — negative = drop, positive = gain
     print(f"   Schwab: {len(schwab_quotes)} real-time | Yahoo fallback: {len(mkt)-len(schwab_quotes)}")
 
     # Fetch Schwab accounts for position awareness
