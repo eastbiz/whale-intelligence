@@ -2837,10 +2837,10 @@ def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir, already_c
 def leaps_trend_state(ticker: str, price: float) -> dict:
     """
     Classify recent price behavior for LEAPS timing.
-    States: AT_LOWS | STILL_FALLING | REAL_BOUNCE | BASE_FORMING
+    States: AT_HIGHS | TRENDING_UP | AT_LOWS | STILL_FALLING | REAL_BOUNCE | BASE_FORMING
 
     Evaluated strict top-down. First match wins.
-    Default: STILL_FALLING (conservative).
+    Handles both uptrending and downtrending markets correctly.
     """
     try:
         r = requests.get(
@@ -2853,40 +2853,47 @@ def leaps_trend_state(ticker: str, price: float) -> dict:
         closes = data["indicators"]["quote"][0].get("close", [])
         closes = [c for c in closes if c is not None]
         if len(closes) < 6:
-            return {"state": "STILL_FALLING", "r1": 0, "r3": 0, "r5": 0, "off_low_5d": 0}
+            return {"state": "BASE_FORMING", "r1": 0, "r3": 0, "r5": 0, "off_low_5d": 0, "off_high_5d": 0}
 
-        today      = closes[-1]
-        p1d        = closes[-2]
-        p3d        = closes[-4] if len(closes) >= 4 else closes[0]
-        p5d        = closes[-6] if len(closes) >= 6 else closes[0]
-        recent_low = min(closes[-5:])
+        today       = closes[-1]
+        p1d         = closes[-2]
+        p3d         = closes[-4] if len(closes) >= 4 else closes[0]
+        p5d         = closes[-6] if len(closes) >= 6 else closes[0]
+        recent_low  = min(closes[-5:])
+        recent_high = max(closes[-5:])
 
-        r1       = (today - p1d)  / p1d        if p1d  > 0 else 0
-        r3       = (today - p3d)  / p3d        if p3d  > 0 else 0
-        r5       = (today - p5d)  / p5d        if p5d  > 0 else 0
-        off_low  = (today - recent_low) / recent_low if recent_low > 0 else 0
+        r1       = (today - p1d) / p1d         if p1d  > 0 else 0
+        r3       = (today - p3d) / p3d         if p3d  > 0 else 0
+        r5       = (today - p5d) / p5d         if p5d  > 0 else 0
+        off_low  = (today - recent_low)  / recent_low  if recent_low  > 0 else 0
+        off_high = (recent_high - today) / recent_high if recent_high > 0 else 0
 
         # Strict top-down — first match wins
-        if off_low <= 0.02:
-            state = "AT_LOWS"
+        if off_high <= 0.02 and r5 >= 0.05:
+            state = "AT_HIGHS"          # within 2% of 5d high AND up 5%+ over 5 days
+        elif r3 >= 0.04 and r5 >= 0.06:
+            state = "TRENDING_UP"       # strong multi-day uptrend
+        elif off_low <= 0.02 and r5 < 0:
+            state = "AT_LOWS"           # within 2% of 5d low AND trend is down
         elif r3 <= -0.05 or r5 <= -0.08:
             state = "STILL_FALLING"
         elif r1 > 0.01 and r3 >= 0 and off_low >= 0.05:
             state = "REAL_BOUNCE"
-        elif off_low > 0.02 and off_low < 0.05 and abs(r1) < 0.01 and r3 > -0.03:
+        elif abs(r1) < 0.01 and abs(r3) < 0.03 and r5 > -0.05:
             state = "BASE_FORMING"
         else:
-            state = "STILL_FALLING"  # conservative default
+            state = "BASE_FORMING"      # neutral default (not falling, not rising)
 
         return {
-            "state":     state,
-            "r1":        round(r1 * 100, 1),
-            "r3":        round(r3 * 100, 1),
-            "r5":        round(r5 * 100, 1),
-            "off_low_5d": round(off_low * 100, 1),
+            "state":      state,
+            "r1":         round(r1  * 100, 1),
+            "r3":         round(r3  * 100, 1),
+            "r5":         round(r5  * 100, 1),
+            "off_low_5d": round(off_low  * 100, 1),
+            "off_high_5d":round(off_high * 100, 1),
         }
     except Exception as e:
-        return {"state": "STILL_FALLING", "r1": 0, "r3": 0, "r5": 0, "off_low_5d": 0}
+        return {"state": "BASE_FORMING", "r1": 0, "r3": 0, "r5": 0, "off_low_5d": 0, "off_high_5d": 0}
 
 
 def leaps_trend_action(trend: dict, ivp: float, price: float, week52_high: float) -> dict:
@@ -2899,16 +2906,36 @@ def leaps_trend_action(trend: dict, ivp: float, price: float, week52_high: float
     r3      = trend.get("r3", 0)
     off_low = trend.get("off_low_5d", 0)
 
-    # §5.1 AT LOWS
+    off_high = trend.get("off_high_5d", 0)
+
+    # AT HIGHS — stock near 5d high on strong uptrend
+    if state == "AT_HIGHS":
+        return {
+            "action":    "WATCH",
+            "label":     "WATCH — NEAR HIGHS",
+            "signal":    f"Up {trend.get('r5',0):.1f}% over 5 days, {off_high:.1f}% from recent high — consider waiting for a pullback",
+            "recommend": False,
+        }
+
+    # TRENDING UP — solid multi-day uptrend
+    if state == "TRENDING_UP":
+        return {
+            "action":    "WATCH",
+            "label":     "WATCH — UPTREND",
+            "signal":    f"Up {trend.get('r3',0):.1f}% over 3 days — strong momentum, better entry on a pause",
+            "recommend": False,
+        }
+
+    # AT LOWS — near 5d low on a downtrend
     if state == "AT_LOWS":
         return {
             "action":    "WAIT",
             "label":     "WAIT — AT LOWS",
-            "signal":    f"Price at 5-day low ({off_low:.1f}% off low) — no base yet",
+            "signal":    f"Near 5-day low, down {abs(trend.get('r5',0)):.1f}% over 5 days — wait for stabilization",
             "recommend": False,
         }
 
-    # §5.2 STILL FALLING
+    # STILL FALLING
     if state == "STILL_FALLING":
         return {
             "action":    "WAIT",
