@@ -5434,9 +5434,17 @@ def run_scanner():
         target_low, target_high = ticker_target_range(ticker, tier)
         exposure = exposure_map.get(ticker, 0.0)
 
+        # Combined exposure: stock + LEAPS market value
+        _leaps_mv_ticker = sum(
+            p.get("market_value", 0) or p.get("avg_cost", 0) * p.get("contracts", 0) * 100
+            for p in portfolio_exposure.get("leaps_positions", []) if p.get("ticker") == ticker
+        )
+        _stock_mv_ticker = mv_map_total.get(ticker, 0)
+        combined_exposure = round((_stock_mv_ticker + _leaps_mv_ticker) / PORTFOLIO_SIZE * 100, 2) if PORTFOLIO_SIZE > 0 else exposure
+
         # Ownership precedence (Spec §5): any exposure > 0 = Owned
-        status = "Owned" if exposure > 0 else "Watchlist"
-        pos_status = ticker_position_status(ticker, tier, exposure)
+        status = "Owned" if exposure > 0 or _leaps_mv_ticker > 0 else "Watchlist"
+        pos_status = ticker_position_status(ticker, tier, combined_exposure)
 
         # Price opportunity
         md_t = mkt.get(ticker, {})
@@ -5496,7 +5504,7 @@ def run_scanner():
             "ticker":          ticker,
             "tier":            tier,
             "status":          status,
-            "exposure_pct":    exposure,
+            "exposure_pct":    combined_exposure,  # stock + LEAPS MV / portfolio
             "target_range":    f"{target_low:.1f}–{target_high:.1f}%",
             "pos_status":      pos_status,
             "price_opp":       price_opp,
