@@ -5521,6 +5521,13 @@ def run_scanner():
             "mv_by_account":   mv_map_acct.get(ticker, {}),
             # LEAPS positions for this ticker
             "leaps":           [p for p in portfolio_exposure.get("leaps_positions",[]) if p["ticker"]==ticker],
+            # Combined exposure including LEAPS market value
+            "leaps_mv":        round(sum(p.get("market_value",0) or p.get("avg_cost",0)*p.get("contracts",0)*100
+                                         for p in portfolio_exposure.get("leaps_positions",[]) if p["ticker"]==ticker), 0),
+            "combined_exposure_pct": round((mv_map_total.get(ticker,0) +
+                                             sum(p.get("market_value",0) or p.get("avg_cost",0)*p.get("contracts",0)*100
+                                                 for p in portfolio_exposure.get("leaps_positions",[]) if p["ticker"]==ticker))
+                                            / PORTFOLIO_SIZE * 100, 2) if PORTFOLIO_SIZE > 0 else exposure,
             # BCS positions for this ticker (long legs only for display)
             "bcs":             [p for p in portfolio_exposure.get("bcs_positions",[]) if p["ticker"]==ticker],
         })
