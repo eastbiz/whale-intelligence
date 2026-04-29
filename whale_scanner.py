@@ -5385,7 +5385,7 @@ def run_scanner():
     all_allocation_tickers = owned_tickers | watchlist_tickers | option_only_tickers
     print(f"   📋 Allocation: {len(owned_tickers)} owned, {len(watchlist_tickers)} watchlist, {len(EXCLUDED_SYMBOLS)} excluded")
     # Debug specific tickers
-    for _dbg in ["TSLA","MSTR","IBIT","OWL","NLCP"]:
+    for _dbg in ["TSLA","MSTR","IBIT","OWL","NLCP","MU","CLS","CRDO","LULU"]:
         _dbg_pos = ibkr.get(_dbg, {})
         print(f"   DEBUG {_dbg}: asset={_dbg_pos.get('asset_class','NOT IN IBKR')} mv={_dbg_pos.get('market_value',0):.0f} acct={_dbg_pos.get('account_type','')} in_exposure={_dbg in exposure_map} in_account_map={_dbg in account_map}")
     # Account breakdown from account_map (authoritative)
@@ -5434,16 +5434,25 @@ def run_scanner():
         target_low, target_high = ticker_target_range(ticker, tier)
         exposure = exposure_map.get(ticker, 0.0)
 
-        # Combined exposure: stock + LEAPS market value
+        # Combined exposure: stock + LEAPS market value + CSP obligation (if assigned)
         _leaps_mv_ticker = sum(
             p.get("market_value", 0) or p.get("avg_cost", 0) * p.get("contracts", 0) * 100
             for p in portfolio_exposure.get("leaps_positions", []) if p.get("ticker") == ticker
         )
         _stock_mv_ticker = mv_map_total.get(ticker, 0)
-        combined_exposure = round((_stock_mv_ticker + _leaps_mv_ticker) / PORTFOLIO_SIZE * 100, 2) if PORTFOLIO_SIZE > 0 else exposure
+        _csp_mv_ticker   = sum(p.get("cso", 0) for p in portfolio_exposure.get("csp_positions", []) if p.get("ticker") == ticker)
+        # Use CSP obligation only when no stock owned (shows what's at risk if assigned)
+        _csp_contrib     = _csp_mv_ticker if _stock_mv_ticker == 0 else 0
+        combined_exposure = round((_stock_mv_ticker + _leaps_mv_ticker + _csp_contrib) / PORTFOLIO_SIZE * 100, 2) if PORTFOLIO_SIZE > 0 else exposure
 
         # Ownership precedence (Spec §5): any exposure > 0 = Owned
-        status = "Owned" if exposure > 0 or _leaps_mv_ticker > 0 else "Watchlist"
+        # Also owned if has open CSP, CC, or LEAPS contracts (even with no stock)
+        _has_open_options = (
+            any(p.get("ticker") == ticker for p in portfolio_exposure.get("csp_positions", [])) or
+            any(p.get("ticker") == ticker for p in portfolio_exposure.get("cc_positions", [])) or
+            any(p.get("ticker") == ticker for p in portfolio_exposure.get("leaps_positions", []))
+        )
+        status = "Owned" if exposure > 0 or _leaps_mv_ticker > 0 or _has_open_options else "Watchlist"
         pos_status = ticker_position_status(ticker, tier, combined_exposure)
 
         # Price opportunity
