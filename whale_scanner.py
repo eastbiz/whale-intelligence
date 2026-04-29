@@ -5492,7 +5492,7 @@ def run_scanner():
         # Use account_map which covers both stock and option-only positions
         _raw_acct = _stk_pos.get("account_type", "") or ""
         # All accounts this ticker appears in (for multi-account filtering)
-        _acct_primary = account_map.get(ticker, _raw_acct if _raw_acct else "IBKR")
+        _acct_primary = account_map.get(ticker, _raw_acct if _raw_acct else "IBKR") or "IBKR"
         _acct_all     = account_map_all.get(ticker, [_acct_primary])
         _account      = _acct_primary
         # Status label
