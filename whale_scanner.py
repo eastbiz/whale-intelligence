@@ -5320,7 +5320,13 @@ def run_scanner():
                 _exp = round(mv / PORTFOLIO_SIZE * 100, 2)
                 exposure_map[t] = max(_exp, 0.01)  # min 0.01% so small positions show as Owned
                 mv_map_total[t] = mv
-                mv_map_acct[t]  = dict(schwab_mv_by_acct[t]) if t in schwab_mv_by_acct else {"IBKR": mv}
+                # Build per-account MV: start from Schwab accounts, then add IBKR remainder
+                _schwab_by_acct = dict(schwab_mv_by_acct[t]) if t in schwab_mv_by_acct else {}
+                _schwab_total   = sum(_schwab_by_acct.values())
+                _ibkr_mv        = round(mv - _schwab_total, 0)
+                if _ibkr_mv > 50:  # meaningful IBKR position (>$50 to avoid rounding noise)
+                    _schwab_by_acct["IBKR"] = _ibkr_mv
+                mv_map_acct[t] = _schwab_by_acct if _schwab_by_acct else {"IBKR": mv}
 
     # -- Build account_map: IBKR first, then Schwab overrides --
     # IBKR stocks default to "IBKR". schwab_account_map overrides with IRA/CRT/Personal.
@@ -5337,6 +5343,12 @@ def run_scanner():
     # All accounts per ticker from Schwab
     for _t, _by in schwab_mv_by_acct.items():
         account_map_all[_t] = list(_by.keys())
+    # Add IBKR to account_map_all for tickers with IBKR shares (detected via mv_map_acct)
+    for _t, _by_acct in mv_map_acct.items():
+        if "IBKR" in _by_acct and _t in account_map_all and "IBKR" not in account_map_all[_t]:
+            account_map_all[_t].append("IBKR")
+        elif "IBKR" in _by_acct and _t not in account_map_all:
+            account_map_all[_t] = ["IBKR"]
     # Option-only tickers (e.g. MSFT puts in IRA but no MSFT shares)
     for _optpos in (portfolio_exposure.get("csp_positions", []) +
                     portfolio_exposure.get("cc_positions", []) +
@@ -5385,7 +5397,7 @@ def run_scanner():
     all_allocation_tickers = owned_tickers | watchlist_tickers | option_only_tickers
     print(f"   📋 Allocation: {len(owned_tickers)} owned, {len(watchlist_tickers)} watchlist, {len(EXCLUDED_SYMBOLS)} excluded")
     # Debug specific tickers
-    for _dbg in ["TSLA","MSTR","IBIT","OWL","NLCP","MU","CLS","CRDO","LULU"]:
+    for _dbg in ["TSLA","MSTR","IBIT","OWL","NLCP","MU","CLS","CRDO","LULU","NBIS"]:
         _dbg_pos = ibkr.get(_dbg, {})
         print(f"   DEBUG {_dbg}: asset={_dbg_pos.get('asset_class','NOT IN IBKR')} mv={_dbg_pos.get('market_value',0):.0f} acct={_dbg_pos.get('account_type','')} in_exposure={_dbg in exposure_map} in_account_map={_dbg in account_map}")
     # Account breakdown from account_map (authoritative)
