@@ -3805,7 +3805,9 @@ def run_scanner():
         schwab_stk_added = 0; schwab_opt_added = 0
         for ticker, pos in schwab_positions.items():
             if pos.get("asset_class") == "OPT":
-                ibkr[ticker] = pos
+                # Use option symbol as key — never overwrite stock position with option data
+                opt_key = pos.get("option_symbol", ticker) or ticker
+                ibkr[opt_key] = pos
                 schwab_opt_added += 1
             else:
                 if ticker in ibkr and ibkr[ticker].get("asset_class") == "STK":
@@ -5336,6 +5338,9 @@ def run_scanner():
                     _schwab_by_acct["IBKR"] = _ibkr_mv
                 mv_map_acct[t] = _schwab_by_acct if _schwab_by_acct else {"IBKR": mv}
 
+    # Debug: print exposure_map to verify all tickers captured
+    print(f"   exposure_map tickers ({len(exposure_map)}): {sorted(exposure_map.keys())}")
+
     # -- Build account_map: IBKR first, then Schwab overrides --
     # IBKR stocks default to "IBKR". schwab_account_map overrides with IRA/CRT/Personal.
     # Must be built BEFORE the grouped-ticker merge below which references it.
@@ -5405,7 +5410,7 @@ def run_scanner():
     all_allocation_tickers = owned_tickers | watchlist_tickers | option_only_tickers
     print(f"   📋 Allocation: {len(owned_tickers)} owned, {len(watchlist_tickers)} watchlist, {len(EXCLUDED_SYMBOLS)} excluded")
     # Debug specific tickers
-    for _dbg in ["TSLA","MSTR","IBIT","OWL","NLCP","MU","CLS","CRDO","LULU","NBIS"]:
+    for _dbg in ["TSLA","MSTR","IBIT","OWL","NLCP","MU","CLS","CRDO","LULU","NBIS","MELI","PLTR","TSM","FIX","IBKR"]:
         _dbg_pos = ibkr.get(_dbg, {})
         print(f"   DEBUG {_dbg}: asset={_dbg_pos.get('asset_class','NOT IN IBKR')} mv={_dbg_pos.get('market_value',0):.0f} acct={_dbg_pos.get('account_type','')} in_exposure={_dbg in exposure_map} in_account_map={_dbg in account_map}")
     # Account breakdown from account_map (authoritative)
