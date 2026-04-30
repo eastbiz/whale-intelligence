@@ -800,12 +800,20 @@ def get_ibkr_positions() -> dict:
         stk_pos = [(k,v) for k,v in positions.items() if v.get("asset_class")=="STK"][:3]
         for k,v in stk_pos:
             print(f"   IBKR STK: {k} qty={v.get('quantity')} mv={v.get('market_value')}")
-        # Show MU specifically
+        # Show MU and NBIS specifically
         if "MU" in positions:
             print(f"   IBKR MU found: {positions['MU']}")
         else:
             mu_keys = [k for k in positions if "MU" in k.upper()]
             print(f"   IBKR MU keys: {mu_keys}")
+        if "NBIS" in positions:
+            print(f"   IBKR NBIS found: {positions['NBIS']}")
+        else:
+            nbis_keys = [k for k in positions if "NBIS" in k.upper()]
+            print(f"   IBKR NBIS keys: {nbis_keys}")
+        # Print all STK symbols so we can spot missing/renamed tickers
+        all_stk = sorted([k for k,v in positions.items() if v.get("asset_class")=="STK"])
+        print(f"   IBKR all STK symbols ({len(all_stk)}): {all_stk}")
     except Exception as e:
         print(f"   IBKR error: {e}")
     return positions
@@ -5568,6 +5576,7 @@ def run_scanner():
         assert "sizing_action" not in _p, f"FATAL: sizing_action found in {_p['ticker']} — dual signal violation"
     print(f"   ✅ Decision system: single action field only, no dual signals")
     print(f"   📋 Positions tab: {len(pos_list)} rows ({sum(1 for p in pos_list if p['status']=='Owned')} owned, {sum(1 for p in pos_list if p['status']=='Watchlist')} watchlist)")
+
 
     # Add spike and drop opps to dashboard
     dash_spikes = []
