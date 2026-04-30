@@ -756,6 +756,8 @@ def get_ibkr_positions() -> dict:
         root = ET.fromstring(r.text)
         ref  = root.findtext("ReferenceCode")
         if root.findtext("Status") != "Success" or not ref:
+            print(f"   ⚠️ IBKR Flex SendRequest failed: Status={root.findtext('Status')!r} Ref={ref!r}")
+            print(f"   IBKR Flex raw response: {r.text[:300]}")
             return positions
         time.sleep(5)
         r2    = requests.get(
