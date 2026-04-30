@@ -765,6 +765,12 @@ def get_ibkr_positions() -> dict:
             timeout=15
         )
         root2 = ET.fromstring(r2.text)
+        _all_positions = list(root2.iter("OpenPosition"))
+        _all_stk = [p for p in _all_positions if p.get("assetCategory","") == "STK"]
+        _all_opt = [p for p in _all_positions if p.get("assetCategory","") == "OPT"]
+        print(f"   IBKR Flex raw XML: {len(_all_positions)} OpenPosition elements ({len(_all_stk)} STK, {len(_all_opt)} OPT)")
+        if _all_stk:
+            print(f"   IBKR Flex STK symbols: {sorted([p.get('symbol','') for p in _all_stk])}")
         for pos in root2.iter("OpenPosition"):
             sym = pos.get("symbol","").strip()
             if not sym: continue
