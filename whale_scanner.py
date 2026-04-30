@@ -4518,7 +4518,23 @@ def run_scanner():
 
     tg_csps   = _tg_green(top_csps,  "CSP")
     tg_ccs    = _tg_green(top_ccs,   "CC")
-    tg_leaps  = _tg_green(top_leaps, "LEAPS")
+    # LEAPS Telegram filter: only BUY trend + high score
+    # trend_action is stored as string at top level of opp dict
+    # Prevents every scan from flooding Telegram with routine LEAPS
+    def _tg_leaps_filter(opps: list) -> list:
+        mx  = SCORE_MAX.get("LEAPS", 13)
+        thr = math.ceil(TELEGRAM_MIN_SCORE_PCT * mx)
+        result = []
+        for o in opps:
+            if o.get("score", 0) < thr: continue
+            # Only send when trend recommends buying (BUY action, not WATCH/WAIT)
+            trend_action = o.get("trend_action", "WATCH")
+            if isinstance(trend_action, dict):
+                trend_action = trend_action.get("action", "WATCH")
+            if trend_action != "BUY": continue
+            result.append(o)
+        return result
+    tg_leaps  = _tg_leaps_filter(top_leaps)
     tg_spikes = top_spikes   # time-sensitive — no score gate
     tg_drops  = top_drops    # time-sensitive — no score gate
     # PMCC and BCS: dashboard only — too complex/optional for a ping
