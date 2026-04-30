@@ -5182,8 +5182,17 @@ def run_scanner():
                     for _bname, _bdef in _bands.items():
                         if _bdef["d_lo"] <= delta <= _bdef["d_hi"]:
                             prev = _band_best[_bname]
-                            if prev is None or ext_pct < prev["extrinsic_pct"]:
+                            if prev is None:
                                 _band_best[_bname] = candidate
+                            else:
+                                # Prefer longer DTE unless shorter saves >3% extrinsic
+                                # This avoids picking Sep 2027 over Jan 2028 for trivial savings
+                                _ext_saving = prev["extrinsic_pct"] - ext_pct
+                                _dte_gain   = prev["dte"] - dte  # positive = prev is longer
+                                if _dte_gain > 30 and _ext_saving < 3.0:
+                                    pass  # keep prev (longer expiry, not worth the small saving)
+                                elif ext_pct < prev["extrinsic_pct"]:
+                                    _band_best[_bname] = candidate
                             break
                 except: continue
 
