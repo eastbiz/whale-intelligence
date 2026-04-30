@@ -756,9 +756,27 @@ def get_ibkr_positions() -> dict:
         root = ET.fromstring(r.text)
         ref  = root.findtext("ReferenceCode")
         if root.findtext("Status") != "Success" or not ref:
-            print(f"   ⚠️ IBKR Flex SendRequest failed: Status={root.findtext('Status')!r} Ref={ref!r}")
+            _err = root.findtext("ErrorCode","")
+            print(f"   ⚠️ IBKR Flex SendRequest failed: Status={root.findtext('Status')!r} ErrorCode={_err} Ref={ref!r}")
             print(f"   IBKR Flex raw response: {r.text[:300]}")
-            return positions
+            # ErrorCode 1001 = transient server error — retry once after 30s
+            if _err == "1001":
+                print("   Retrying IBKR Flex in 30 seconds...")
+                time.sleep(30)
+                r = requests.get(
+                    f"https://gdcdyn.interactivebrokers.com/Universal/servlet/"
+                    f"FlexStatementService.SendRequest"
+                    f"?t={IBKR_FLEX_TOKEN}&q={IBKR_FLEX_QUERY_ID}&v=3",
+                    timeout=15
+                )
+                root = ET.fromstring(r.text)
+                ref  = root.findtext("ReferenceCode")
+                if root.findtext("Status") != "Success" or not ref:
+                    print(f"   ⚠️ IBKR Flex retry also failed: {r.text[:200]}")
+                    return positions
+                print("   ✅ IBKR Flex retry succeeded")
+            else:
+                return positions
         time.sleep(5)
         r2    = requests.get(
             f"https://gdcdyn.interactivebrokers.com/Universal/servlet/"
