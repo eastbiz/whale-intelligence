@@ -800,6 +800,9 @@ def get_ibkr_positions() -> dict:
             # Normalize BRK B → BRK-B for watchlist matching
             sym        = sym.replace("BRK B", "BRK-B")
             underlying = pos.get("underlyingSymbol", sym).strip().replace("BRK B","BRK-B")
+            # IBKR Flex XML does not have a "side" attribute — infer from signed position qty
+            # Negative qty = short (sold), positive qty = long (bought)
+            _ibkr_side = "Short" if qty < 0 else "Long"
             positions[sym] = {
                 "market_value":   float(pos.get("positionValue",    0) or 0),
                 "quantity":       qty,
@@ -813,7 +816,9 @@ def get_ibkr_positions() -> dict:
                 "underlying":     underlying,
                 "unrealized_pnl": float(pos.get("fifoPnlUnrealized", 0) or 0),
                 "account":        pos.get("accountId", pos.get("clientAccountID","")),
-                "side":           pos.get("side","Long"),
+                "account_type":   "IBKR",
+                "side":           _ibkr_side,
+                "source":         "ibkr",
             }
         stk  = sum(1 for v in positions.values() if v["asset_class"]=="STK")
         lopt = sum(1 for v in positions.values() if v["asset_class"]=="OPT" and v.get("side")=="Long")
@@ -980,7 +985,10 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
                 except:
                     _exp_str = str(expiry)[:7]
                 _leaps_mv = float(pos.get("market_value", 0) or 0)
-                _lkey = (underlying, _strike_f, str(expiry))
+                # Resolve account label — same logic as CSP/CC
+                _leaps_acct = pos.get("account_type", "") or ("IBKR" if source == "ibkr" else source)
+                # Key by (ticker, strike, expiry, account) — preserves per-account rows
+                _lkey = (underlying, _strike_f, str(expiry), _leaps_acct)
                 if _lkey in leaps_accum:
                     leaps_accum[_lkey]["contracts"]    += int(qty)
                     leaps_accum[_lkey]["market_value"] += round(_leaps_mv, 0)
@@ -996,6 +1004,7 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
                         "breakeven":    breakeven,
                         "market_value": round(_leaps_mv, 0),
                         "source":       source,
+                        "account":      _leaps_acct,
                     }
 
     # Flush accumulated LEAPS into leaps_positions
