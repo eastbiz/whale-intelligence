@@ -742,9 +742,53 @@ def pullback_from_high(price, w52_high) -> float:
 # IBKR
 # ════════════════════════════════════════════════════════════
 
+def _parse_ibkr_xml(root: "ET.Element") -> dict:
+    """Parse OpenPosition elements from a Flex XML root into the IBKR positions dict."""
+    positions = {}
+    _all_positions = list(root.iter("OpenPosition"))
+    _all_stk = [p for p in _all_positions if p.get("assetCategory","") == "STK"]
+    _all_opt = [p for p in _all_positions if p.get("assetCategory","") == "OPT"]
+    print(f"   IBKR Flex XML: {len(_all_positions)} OpenPosition elements ({len(_all_stk)} STK, {len(_all_opt)} OPT)")
+    for pos in _all_positions:
+        sym = pos.get("symbol","").strip()
+        if not sym: continue
+        asset = pos.get("assetCategory", pos.get("assetClass",""))
+        qty   = float(pos.get("position", 0) or 0)
+        sym        = sym.replace("BRK B", "BRK-B")
+        underlying = pos.get("underlyingSymbol", sym).strip().replace("BRK B","BRK-B")
+        # Infer side from signed position qty (Flex XML has no side attribute)
+        _ibkr_side = "Short" if qty < 0 else "Long"
+        positions[sym] = {
+            "market_value":   float(pos.get("positionValue",    0) or 0),
+            "quantity":       qty,
+            "avg_cost":       float(pos.get("costBasisPrice",   0) or 0),
+            "pct_nav":        float(pos.get("percentOfNAV",     0) or 0),
+            "asset_class":    asset,
+            "currency":       pos.get("currency", pos.get("currencyPrimary","USD")),
+            "strike":         pos.get("strike",""),
+            "expiry":         pos.get("expiry",""),
+            "put_call":       pos.get("putCall",""),
+            "underlying":     underlying,
+            "unrealized_pnl": float(pos.get("fifoPnlUnrealized", 0) or 0),
+            "account":        pos.get("accountId", pos.get("clientAccountID","")),
+            "account_type":   "IBKR",
+            "side":           _ibkr_side,
+            "source":         "ibkr",
+        }
+    stk  = sum(1 for v in positions.values() if v["asset_class"]=="STK")
+    lopt = sum(1 for v in positions.values() if v["asset_class"]=="OPT" and v.get("side")=="Long")
+    sopt = sum(1 for v in positions.values() if v["asset_class"]=="OPT" and v.get("side")=="Short")
+    print(f"   IBKR: {stk} stocks, {lopt} long options, {sopt} short options loaded")
+    return positions
+
+
+IBKR_XML_FALLBACK = "ibkr_positions.xml"   # commit this file to repo when Flex API is down
+
+
 def get_ibkr_positions() -> dict:
     positions = {}
     if not IBKR_FLEX_TOKEN or not IBKR_FLEX_QUERY_ID:
+        print("   ⚠️ IBKR_FLEX_TOKEN or IBKR_FLEX_QUERY_ID not set")
         return positions
     try:
         r = requests.get(
@@ -759,7 +803,6 @@ def get_ibkr_positions() -> dict:
             _err = root.findtext("ErrorCode","")
             print(f"   ⚠️ IBKR Flex SendRequest failed: Status={root.findtext('Status')!r} ErrorCode={_err} Ref={ref!r}")
             print(f"   IBKR Flex raw response: {r.text[:300]}")
-            # ErrorCode 1001 = transient server error — retry once after 30s
             if _err == "1001":
                 print("   Retrying IBKR Flex in 30 seconds...")
                 time.sleep(30)
@@ -773,10 +816,11 @@ def get_ibkr_positions() -> dict:
                 ref  = root.findtext("ReferenceCode")
                 if root.findtext("Status") != "Success" or not ref:
                     print(f"   ⚠️ IBKR Flex retry also failed: {r.text[:200]}")
-                    return positions
+                    # ── XML file fallback ──────────────────────────────────
+                    return _ibkr_xml_file_fallback()
                 print("   ✅ IBKR Flex retry succeeded")
             else:
-                return positions
+                return _ibkr_xml_file_fallback()
         time.sleep(5)
         r2    = requests.get(
             f"https://gdcdyn.interactivebrokers.com/Universal/servlet/"
@@ -785,69 +829,37 @@ def get_ibkr_positions() -> dict:
             timeout=15
         )
         root2 = ET.fromstring(r2.text)
-        _all_positions = list(root2.iter("OpenPosition"))
-        _all_stk = [p for p in _all_positions if p.get("assetCategory","") == "STK"]
-        _all_opt = [p for p in _all_positions if p.get("assetCategory","") == "OPT"]
-        print(f"   IBKR Flex raw XML: {len(_all_positions)} OpenPosition elements ({len(_all_stk)} STK, {len(_all_opt)} OPT)")
-        if _all_stk:
-            print(f"   IBKR Flex STK symbols: {sorted([p.get('symbol','') for p in _all_stk])}")
-        for pos in root2.iter("OpenPosition"):
-            sym = pos.get("symbol","").strip()
-            if not sym: continue
-            # XML uses assetCategory (not assetClass), accountId (not clientAccountID)
-            asset = pos.get("assetCategory", pos.get("assetClass",""))
-            qty   = float(pos.get("position", 0) or 0)
-            # Normalize BRK B → BRK-B for watchlist matching
-            sym        = sym.replace("BRK B", "BRK-B")
-            underlying = pos.get("underlyingSymbol", sym).strip().replace("BRK B","BRK-B")
-            # IBKR Flex XML does not have a "side" attribute — infer from signed position qty
-            # Negative qty = short (sold), positive qty = long (bought)
-            _ibkr_side = "Short" if qty < 0 else "Long"
-            positions[sym] = {
-                "market_value":   float(pos.get("positionValue",    0) or 0),
-                "quantity":       qty,
-                "avg_cost":       float(pos.get("costBasisPrice",   0) or 0),
-                "pct_nav":        float(pos.get("percentOfNAV",     0) or 0),
-                "asset_class":    asset,
-                "currency":       pos.get("currency", pos.get("currencyPrimary","USD")),
-                "strike":         pos.get("strike",""),
-                "expiry":         pos.get("expiry",""),
-                "put_call":       pos.get("putCall",""),
-                "underlying":     underlying,
-                "unrealized_pnl": float(pos.get("fifoPnlUnrealized", 0) or 0),
-                "account":        pos.get("accountId", pos.get("clientAccountID","")),
-                "account_type":   "IBKR",
-                "side":           _ibkr_side,
-                "source":         "ibkr",
-            }
-        stk  = sum(1 for v in positions.values() if v["asset_class"]=="STK")
-        lopt = sum(1 for v in positions.values() if v["asset_class"]=="OPT" and v.get("side")=="Long")
-        sopt = sum(1 for v in positions.values() if v["asset_class"]=="OPT" and v.get("side")=="Short")
-        print(f"   IBKR: {stk} stocks, {lopt} long options, {sopt} short options loaded")
-        # Debug: show unique asset categories found
-        cats = set(v.get("asset_class","?") for v in positions.values())
-        print(f"   IBKR asset categories: {cats}")
-        # Show first 3 STK positions for verification
-        stk_pos = [(k,v) for k,v in positions.items() if v.get("asset_class")=="STK"][:3]
-        for k,v in stk_pos:
-            print(f"   IBKR STK: {k} qty={v.get('quantity')} mv={v.get('market_value')}")
-        # Show MU and NBIS specifically
-        if "MU" in positions:
-            print(f"   IBKR MU found: {positions['MU']}")
-        else:
-            mu_keys = [k for k in positions if "MU" in k.upper()]
-            print(f"   IBKR MU keys: {mu_keys}")
-        if "NBIS" in positions:
-            print(f"   IBKR NBIS found: {positions['NBIS']}")
-        else:
-            nbis_keys = [k for k in positions if "NBIS" in k.upper()]
-            print(f"   IBKR NBIS keys: {nbis_keys}")
-        # Print all STK symbols so we can spot missing/renamed tickers
-        all_stk = sorted([k for k,v in positions.items() if v.get("asset_class")=="STK"])
-        print(f"   IBKR all STK symbols ({len(all_stk)}): {all_stk}")
+        positions = _parse_ibkr_xml(root2)
     except Exception as e:
         print(f"   IBKR error: {e}")
+        return _ibkr_xml_file_fallback()
     return positions
+
+
+def _ibkr_xml_file_fallback() -> dict:
+    """Parse ibkr_positions.xml from the working directory when Flex API is unavailable.
+    To use: download the XML manually from IBKR (Reports → Flex Queries → Run),
+    save it as 'ibkr_positions.xml' in the repo root, commit and push."""
+    import os
+    if not os.path.exists(IBKR_XML_FALLBACK):
+        print(f"   ℹ️  No {IBKR_XML_FALLBACK} file found — IBKR positions unavailable")
+        return {}
+    try:
+        print(f"   📂 Loading IBKR positions from {IBKR_XML_FALLBACK} (Flex API fallback)...")
+        with open(IBKR_XML_FALLBACK) as f:
+            xml_text = f.read()
+        root = ET.fromstring(xml_text)
+        # Accept both FlexQueryResponse (manual download) and FlexStatementResponse wrappers
+        positions = _parse_ibkr_xml(root)
+        if positions:
+            # Show file date so it's clear this is not live data
+            _stmt = root.find(".//FlexStatement")
+            _when = _stmt.get("whenGenerated","?") if _stmt is not None else "?"
+            print(f"   ⚠️  Using XML fallback data — statement generated {_when} (NOT live)")
+        return positions
+    except Exception as e:
+        print(f"   ⚠️ Failed to parse {IBKR_XML_FALLBACK}: {e}")
+        return {}
 
 
 def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
