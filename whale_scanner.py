@@ -800,9 +800,6 @@ def get_ibkr_positions() -> dict:
             # Normalize BRK B → BRK-B for watchlist matching
             sym        = sym.replace("BRK B", "BRK-B")
             underlying = pos.get("underlyingSymbol", sym).strip().replace("BRK B","BRK-B")
-            # IBKR Flex XML does not have a "side" attribute — infer from signed position qty
-            # Negative qty = short (sold), positive qty = long (bought)
-            _ibkr_side = "Short" if qty < 0 else "Long"
             positions[sym] = {
                 "market_value":   float(pos.get("positionValue",    0) or 0),
                 "quantity":       qty,
@@ -816,9 +813,7 @@ def get_ibkr_positions() -> dict:
                 "underlying":     underlying,
                 "unrealized_pnl": float(pos.get("fifoPnlUnrealized", 0) or 0),
                 "account":        pos.get("accountId", pos.get("clientAccountID","")),
-                "account_type":   "IBKR",
-                "side":           _ibkr_side,
-                "source":         "ibkr",
+                "side":           pos.get("side","Long"),
             }
         stk  = sum(1 for v in positions.values() if v["asset_class"]=="STK")
         lopt = sum(1 for v in positions.values() if v["asset_class"]=="OPT" and v.get("side")=="Long")
@@ -985,10 +980,7 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
                 except:
                     _exp_str = str(expiry)[:7]
                 _leaps_mv = float(pos.get("market_value", 0) or 0)
-                # Resolve account label — same logic as CSP/CC
-                _leaps_acct = pos.get("account_type", "") or ("IBKR" if source == "ibkr" else source)
-                # Key by (ticker, strike, expiry, account) — preserves per-account rows
-                _lkey = (underlying, _strike_f, str(expiry), _leaps_acct)
+                _lkey = (underlying, _strike_f, str(expiry))
                 if _lkey in leaps_accum:
                     leaps_accum[_lkey]["contracts"]    += int(qty)
                     leaps_accum[_lkey]["market_value"] += round(_leaps_mv, 0)
@@ -1004,7 +996,6 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
                         "breakeven":    breakeven,
                         "market_value": round(_leaps_mv, 0),
                         "source":       source,
-                        "account":      _leaps_acct,
                     }
 
     # Flush accumulated LEAPS into leaps_positions
@@ -3780,42 +3771,8 @@ def run_scanner():
 
     print("📊 IBKR positions...")
     ibkr     = get_ibkr_positions()
-
-    # ── IBKR Flex stale-data protection ──────────────────────────────────────
-    # Flex caches responses server-side. Multiple rapid runs (testing) can return
-    # an older cached statement with missing or zero options — without any error.
-    # Fix: compare fresh option count against last-known-good cache. If fresh has
-    # significantly fewer options, emit a loud warning and fall back to cached data.
-    _ibkr_fresh_opts = sum(1 for v in ibkr.values() if v.get("asset_class") == "OPT")
-    _ibkr_fresh_stk  = sum(1 for v in ibkr.values() if v.get("asset_class") == "STK")
-    print(f"   IBKR Flex fresh: {_ibkr_fresh_stk} stocks, {_ibkr_fresh_opts} options")
-
-    _ibkr_cache = {}
-    try:
-        with open("ibkr_positions_cache.json") as _cf:
-            _ibkr_cache = json.load(_cf)
-        _cache_opts = sum(1 for v in _ibkr_cache.values() if v.get("asset_class") == "OPT")
-        _cache_stk  = sum(1 for v in _ibkr_cache.values() if v.get("asset_class") == "STK")
-        print(f"   IBKR Flex cache: {_cache_stk} stocks, {_cache_opts} options")
-
-        # Fall back if fresh is missing more than half the cached options, OR has no options at all
-        # (but cached had some). This catches silent stale responses.
-        _opts_ok  = _ibkr_fresh_opts >= max(1, _cache_opts * 0.5)
-        _stk_ok   = _ibkr_fresh_stk  >= max(1, _cache_stk  * 0.5)
-        if not _opts_ok or not _stk_ok:
-            print(f"   ⚠️⚠️  IBKR Flex data looks stale/incomplete "
-                  f"(fresh: {_ibkr_fresh_stk}stk/{_ibkr_fresh_opts}opt vs "
-                  f"cache: {_cache_stk}stk/{_cache_opts}opt) — USING CACHE")
-            ibkr = _ibkr_cache
-        else:
-            print(f"   ✅ IBKR Flex fresh data looks complete — using it")
-    except FileNotFoundError:
-        print("   ℹ️  No IBKR positions cache found (first run or cache cleared)")
-    except Exception as _ce:
-        print(f"   ⚠️ Could not load IBKR positions cache: {_ce}")
-    # ─────────────────────────────────────────────────────────────────────────
-
     stk_hold = {k:v for k,v in ibkr.items() if v.get("asset_class")=="STK"}
+
     all_tickers = ALL_TICKERS
     print(f"💹 Market data ({len(all_tickers)} stocks)...")
     # Use Schwab for real-time quotes if available, else Yahoo Finance
@@ -5960,17 +5917,6 @@ def run_scanner():
     with open("results.json","w") as f:
         json.dump(results, f, indent=2)
     print("   💾 results.json saved")
-
-    # ── Save IBKR positions cache (for stale-Flex protection on next run) ──
-    try:
-        _ibkr_only = {k: v for k, v in ibkr.items() if v.get("source", "ibkr") == "ibkr"}
-        _ibkr_opts = sum(1 for v in _ibkr_only.values() if v.get("asset_class") == "OPT")
-        if _ibkr_opts > 0:
-            with open("ibkr_positions_cache.json", "w") as _cf:
-                json.dump(_ibkr_only, _cf)
-            print(f"   💾 ibkr_positions_cache.json saved ({_ibkr_opts} IBKR options cached)")
-    except Exception as _ce:
-        print(f"   ⚠️ Could not save IBKR cache: {_ce}")
 
     print("\n✅ Done!")
 
