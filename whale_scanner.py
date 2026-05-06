@@ -3887,7 +3887,10 @@ def run_scanner():
         for ticker, pos in schwab_positions.items():
             if pos.get("asset_class") == "OPT":
                 # Use option symbol as key — never overwrite stock position with option data
-                opt_key = pos.get("option_symbol", ticker) or ticker
+                # Prefix with account type so Schwab CRT/IRA options never
+                # overwrite IBKR options that share the same option symbol
+                _acct_pfx = pos.get("account_type", "schwab")
+                opt_key   = f"{_acct_pfx}_{pos.get('option_symbol', ticker) or ticker}"
                 ibkr[opt_key] = pos
                 schwab_opt_added += 1
             else:
