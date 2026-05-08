@@ -792,8 +792,8 @@ def get_ibkr_positions() -> dict:
         return positions
     try:
         r = requests.get(
-            f"https://gdcdyn.interactivebrokers.com/Universal/servlet/"
-            f"FlexStatementService.SendRequest"
+            f"https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService/"
+            f"SendRequest"
             f"?t={IBKR_FLEX_TOKEN}&q={IBKR_FLEX_QUERY_ID}&v=3",
             timeout=15
         )
@@ -807,8 +807,8 @@ def get_ibkr_positions() -> dict:
                 print("   Retrying IBKR Flex in 30 seconds...")
                 time.sleep(30)
                 r = requests.get(
-                    f"https://gdcdyn.interactivebrokers.com/Universal/servlet/"
-                    f"FlexStatementService.SendRequest"
+                    f"https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService/"
+                    f"SendRequest"
                     f"?t={IBKR_FLEX_TOKEN}&q={IBKR_FLEX_QUERY_ID}&v=3",
                     timeout=15
                 )
@@ -823,8 +823,8 @@ def get_ibkr_positions() -> dict:
                 return _ibkr_xml_file_fallback()
         time.sleep(5)
         r2    = requests.get(
-            f"https://gdcdyn.interactivebrokers.com/Universal/servlet/"
-            f"FlexStatementService.GetStatement"
+            f"https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService/"
+            f"GetStatement"
             f"?t={IBKR_FLEX_TOKEN}&q={ref}&v=3",
             timeout=15
         )
