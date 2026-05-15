@@ -14,6 +14,18 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from typing import Optional
 
+# ── Phase 1: Bucket-aware options system ─────────────────────
+from bucket_config import (
+    load_buckets,
+    get_bucket,
+    get_min_annualized_csp,
+    get_min_annualized_cc,
+    is_spreads_only,
+    is_leaps_only,
+    is_cc_only,
+    is_watchlist_only,
+)
+
 # ── API Keys ────────────────────────────────────────────────
 # Pacific Time helper (your local timezone)
 PT = ZoneInfo("America/Los_Angeles")
@@ -175,6 +187,12 @@ SYMBOL_SETTINGS = {
     "NVO":  {"buy_under":   33, "sell_above":   48, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "POWL": {"buy_under":  162, "sell_above":  275, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
 }
+
+# ── Phase 1: Load bucket assignments ──
+# Buckets define spreads_only / leaps_only / cc_only flags and bucket-aware
+# annualized return minimums (A: 12%, B: 18%, C: 28%, D: 40%).
+# Falls back to per-symbol SYMBOL_SETTINGS for everything else.
+BUCKETS = load_buckets("buckets.csv")
 
 # Speculative tickers — smaller position sizing, wider OTM buffers.
 # Suppressed from Telegram CSP entry alerts (entries only on deliberate decision).
@@ -1502,7 +1520,8 @@ def score_cc(opp: dict) -> int:
     return max(0, s)
 
 def csp_engine(opp: dict, spy_day_chg: float = 0,
-               buy_under: float = 0, csp_delta_min: float = 0, csp_delta_max: float = 0) -> dict:
+               buy_under: float = 0, csp_delta_min: float = 0, csp_delta_max: float = 0,
+               ticker: str = "") -> dict:
     """
     CSP Entry Engine v3 — price-first, risk-aware.
     Actions: BUY_SAFE, BUY_RISKY, WAIT, SKIP
@@ -1510,7 +1529,30 @@ def csp_engine(opp: dict, spy_day_chg: float = 0,
     buy_under:     per-symbol max effective entry (strike - premium). 0 = no restriction.
     csp_delta_min: per-symbol delta floor. 0 = use global default.
     csp_delta_max: per-symbol delta ceiling. 0 = use global default.
+    ticker:        symbol (for bucket-aware flag/threshold lookup). "" = skip bucket checks.
     """
+    # ── Phase 1: Bucket-aware early skip ──────────────────────
+    # NBIS, CRDO → spreads_only (handled by Phase 2 spread scanner, not CSPs)
+    # BABA → leaps_only (no premium selling)
+    # MSTR, OWL → cc_only (exit-waiting positions, no new CSPs)
+    if ticker and BUCKETS:
+        if is_spreads_only(ticker, BUCKETS):
+            return {"action": "SKIP", "drop_type": "WEAK", "yield_30d": 0,
+                    "flags": ["BUCKET: spreads-only ticker"], "sort_key": 0}
+        if is_leaps_only(ticker, BUCKETS):
+            return {"action": "SKIP", "drop_type": "WEAK", "yield_30d": 0,
+                    "flags": ["BUCKET: LEAPS-only ticker"], "sort_key": 0}
+        if is_cc_only(ticker, BUCKETS):
+            return {"action": "SKIP", "drop_type": "WEAK", "yield_30d": 0,
+                    "flags": ["BUCKET: CC-only (exit-waiting)"], "sort_key": 0}
+        # Watchlist tickers (META): require price to be in lower zone for new entries
+        # Approximated by requiring a meaningful pullback
+        if is_watchlist_only(ticker, BUCKETS):
+            _pb = opp.get("pullback_pct", 0)
+            if _pb < 15:
+                return {"action": "SKIP", "drop_type": "WEAK", "yield_30d": 0,
+                        "flags": ["BUCKET: watchlist — needs >15% pullback"], "sort_key": 0}
+
     tier      = opp.get("tier", "Opportunistic")
     delta     = abs(opp.get("delta", 0))
     dte       = opp.get("dte", 30)
@@ -1609,6 +1651,21 @@ def csp_engine(opp: dict, spy_day_chg: float = 0,
         return {"action": "SKIP", "drop_type": drop_type,
                 "yield_30d": round(yield_30d*100, 2),
                 "flags": ["PREMIUM < $500"], "sort_key": 0}
+
+    # ── Step 3c: Bucket-aware annualized minimum ──────────────
+    # In addition to the tier-based 30d yield check above, enforce the
+    # bucket-level annualized return floor (A:12%, B:18%, C:28%, D:40%).
+    # This catches cases where the tier check passes but the bucket
+    # (which reflects volatility) demands more premium for the risk.
+    if ticker and BUCKETS and dte > 0 and strike > 0:
+        _annualized = (premium / strike) * (365 / dte) * 100
+        _bucket_min_ann = get_min_annualized_csp(ticker, BUCKETS)
+        if _bucket_min_ann > 0 and _annualized < _bucket_min_ann:
+            _bkt = get_bucket(ticker, BUCKETS)
+            return {"action": "SKIP", "drop_type": drop_type,
+                    "yield_30d": round(yield_30d*100, 2),
+                    "flags": [f"BUCKET {_bkt}: ANN {_annualized:.1f}% < {_bucket_min_ann:.0f}% floor"],
+                    "sort_key": 0}
 
     # ── Step 3b: Buy Under — effective entry alignment ─────────
     # effective_entry = strike - premium (what we'd pay if assigned)
@@ -4944,7 +5001,8 @@ def run_scanner():
                 _result = csp_engine(_eng_opp, spy_day_chg=spy_regime.get("day_change", 0),
                                      buy_under=_buy_under,
                                      csp_delta_min=_csp_delta_min,
-                                     csp_delta_max=_csp_delta_max)
+                                     csp_delta_max=_csp_delta_max,
+                                     ticker=ticker)
                 if _result["action"] == "SKIP":
                     print(f"   DBG CSP SKIP {ticker}: dte={dte} d={delta:.2f} flags={_result['flags']} drop1d={_drop_1d:.2%} drop5d={_drop_5d:.2%} yield={_result['yield_30d']:.2f}% contracts={_contracts}")
                     continue
