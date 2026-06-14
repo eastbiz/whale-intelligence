@@ -1545,8 +1545,7 @@ def csp_engine(opp: dict, spy_day_chg: float = 0,
         if is_cc_only(ticker, BUCKETS):
             return {"action": "SKIP", "drop_type": "WEAK", "yield_30d": 0,
                     "flags": ["BUCKET: CC-only (exit-waiting)"], "sort_key": 0}
-        # Watchlist tickers (META): require price to be in lower zone for new entries
-        # Approximated by requiring a meaningful pullback
+        # Watchlist tickers (META): require meaningful pullback for new CSPs
         if is_watchlist_only(ticker, BUCKETS):
             _pb = opp.get("pullback_pct", 0)
             if _pb < 15:
@@ -2888,10 +2887,38 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality, sizing=None, m
     return best, best["timing"]
 
 
-def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir, already_covered=0, sell_above=0):
+def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir, already_covered=0, sell_above=0, buy_under=0):
+    """
+    Find best covered call.
+
+    Phase 1.5 — Zone-First CC framework:
+      - Stock must be in UPPER HALF of its buy_under/sell_above band (price >= midpoint)
+      - Strike must be in upper half too (strike >= midpoint)
+      - Strike must clear cost_basis * 1.10 (don't lock in <10% gains if called away)
+      - Strike must clear buy_under * 1.10 (preserve original entry intent)
+      - Existing rule retained: strike + premium must reach sell_above
+
+    Applies uniformly — no exceptions for cc_only or speculative tickers.
+    Cost basis protection is the lesson learned from MSTR/OWL drops.
+    """
     timing = timing_score("CC", pir, ivdata["ivp"])
     if not contracts or price <= 0 or qty < 100: return None, timing
     # Note: timing["recommend"] is advisory only — dashboard shows all
+
+    # ── Phase 1.5: Zone-first master gate ───────────────────────
+    # Only write CCs when stock is in the upper half of its target band.
+    # If buy_under/sell_above not set, fall through to cost basis protection.
+    _zone_block_reason = None
+    _band_midpoint = 0
+    if buy_under > 0 and sell_above > 0 and sell_above > buy_under:
+        _band_midpoint = (buy_under + sell_above) / 2
+        if price < _band_midpoint:
+            _zone_block_reason = (
+                f"ZONE: price ${price:.2f} < band midpoint ${_band_midpoint:.2f} "
+                f"(BB ${buy_under:.0f} / SA ${sell_above:.0f}) — wait for recovery"
+            )
+            print(f"   DBG CC SKIP {ticker}: {_zone_block_reason}")
+            return None, timing
 
     atm_iv        = ivdata["iv_current"]
     today         = datetime.now()
@@ -2912,7 +2939,17 @@ def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir, already_c
         except Exception: continue
         otm_pct = (strike - price) / price * 100
         if not (1 <= otm_pct <= 15): continue
-        if avg_cost > 0 and strike < avg_cost * 1.01: continue  # protect cost basis
+        # ── Phase 1.5: Tightened cost basis protection (was 1.01, now 1.10) ──
+        # Don't sell calls that would lock in less than 10% gain if assigned.
+        # This is the protection for tickers that dropped (MSTR, OWL etc).
+        if avg_cost > 0 and strike < avg_cost * 1.10: continue
+        # ── Phase 1.5: Strike must clear buy_under * 1.10 ───────
+        # If we'd sell below 110% of our Buy Below target, the position is
+        # being given away too cheaply. Wait.
+        if buy_under > 0 and strike < buy_under * 1.10: continue
+        # ── Phase 1.5: Strike must clear band midpoint ──────────
+        # Upper-half zone for both price AND strike.
+        if _band_midpoint > 0 and strike < _band_midpoint: continue
         bid = float(c.get("nbbo_bid",0) or 0)
         ask = float(c.get("nbbo_ask",0) or 0)
         mid = (bid + ask) / 2
@@ -4458,7 +4495,8 @@ def run_scanner():
                 and ticker not in LEAPS_ONLY):
             cc, _ = find_best_cc(ticker, price, qty, avg, contracts, ivdata, pir,
                                already_covered=portfolio_exposure.get("cc_shares_covered",{}).get(ticker, 0),
-                               sell_above=SYMBOL_SETTINGS.get(ticker, {}).get("sell_above", 0))
+                               sell_above=SYMBOL_SETTINGS.get(ticker, {}).get("sell_above", 0),
+                               buy_under=SYMBOL_SETTINGS.get(ticker, {}).get("buy_under", 0))
             if cc:
                 cc_opps.append({**base,"cc":cc,
                     "score":score_cc({"tier":base.get("tier","Opportunistic"),
