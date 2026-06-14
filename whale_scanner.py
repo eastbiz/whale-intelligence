@@ -194,6 +194,13 @@ SYMBOL_SETTINGS = {
 # Falls back to per-symbol SYMBOL_SETTINGS for everything else.
 BUCKETS = load_buckets("buckets.csv")
 
+# ── Feature flag: Position Income Optimization (PIO) ─────────
+# PIO uses relaxed rules (loss positions allowed, lower delta, etc.) and
+# generates a lot of noise. Set to False to suppress all PIO cards from
+# dashboard and Telegram. Only zone-first CCs will surface.
+# Toggle to True to re-enable PIO scanning.
+ENABLE_PIO = False
+
 # Speculative tickers — smaller position sizing, wider OTM buffers.
 # Suppressed from Telegram CSP entry alerts (entries only on deliberate decision).
 # CC alerts still sent when approaching sell_above (useful for existing positions).
@@ -4421,7 +4428,9 @@ def run_scanner():
         # ── Position Income Optimization (Mode 4) ──────────────
         # Generate income from existing holdings regardless of market conditions
         # Ignores 200MA, pullback, gap rules — pure income focus
-        if qty >= 100 and avg > 0:
+        # Phase 1.5: Disabled via ENABLE_PIO flag — too noisy, not used for trading.
+        # Zone-first CCs (above) are the only CC opportunity surfaced.
+        if ENABLE_PIO and qty >= 100 and avg > 0:
             pos_status = get_position_status(sizing["current_pct"])
             pnl_status = get_pnl_status(avg, price)
             # Always run PIO — different delta rules than standard CC
@@ -5110,12 +5119,32 @@ def run_scanner():
         #   Normal income:    target 0.20-0.30, hard max 0.35
         #   Overweight pos:   allow up to 0.50 (happy to be called away)
         # Strike: must be above cost basis
+        # Phase 1.5: Zone-first — block all CCs (regular + PIO) when stock is
+        # in lower half of buy_under/sell_above band. Wait for recovery.
         if qty_d >= 100:
             # Per-symbol settings for CC
             _sym_cc     = SYMBOL_SETTINGS.get(ticker, {})
             _sell_above = _sym_cc.get("sell_above", 0)
+            _buy_under_cc = _sym_cc.get("buy_under", 0)
             _cc_dmin    = _sym_cc.get("cc_delta_min", 0)
             _cc_dmax    = _sym_cc.get("cc_delta_max", 0)
+
+            # ── Phase 1.5: Zone-first master gate ─────────────────
+            # Compute band midpoint and check if price is in upper half.
+            # Applies to BOTH regular CC and PIO below. cc_only tickers
+            # (MSTR, OWL) also subject to this — no special exceptions.
+            _cc_band_mid = 0
+            _cc_zone_blocked = False
+            _cc_zone_reason = ""
+            if _buy_under_cc > 0 and _sell_above > 0 and _sell_above > _buy_under_cc:
+                _cc_band_mid = (_buy_under_cc + _sell_above) / 2
+                _cc_band_pos_pct = (price - _buy_under_cc) / (_sell_above - _buy_under_cc) * 100
+                if price < _cc_band_mid:
+                    _cc_zone_blocked = True
+                    _cc_zone_reason = (f"Stock at {_cc_band_pos_pct:.0f}% of band "
+                                       f"(${_buy_under_cc:.0f}–${_sell_above:.0f}). "
+                                       f"Wait for ${_cc_band_mid:.0f}+ before writing CCs.")
+                    print(f"   DBG CC/PIO SKIP {ticker}: ZONE price ${price:.2f} < mid ${_cc_band_mid:.2f}")
 
             # Determine if overweight to set delta range
             global_pct_d = (qty_d * price / PORTFOLIO_SIZE * 100) if PORTFOLIO_SIZE > 0 else 0
@@ -5135,11 +5164,19 @@ def run_scanner():
                            and 20 <= (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days <= 60
                            and float(c.get("strike",0) or 0) > price*0.99]
             best_cc = None; best_cc_score = 0
+            # Phase 1.5: zone-blocked tickers skip the loop entirely
+            if _cc_zone_blocked:
+                calls_30_60 = []  # no candidates considered
             for c in calls_30_60:
                 try:
                     strike = float(c["strike"])
-                    # Must be above cost basis (never sell below breakeven)
-                    if avg_d > 0 and strike < avg_d: continue
+                    # Phase 1.5: Tightened cost basis protection (was avg_d, now avg_d*1.10).
+                    # Prevents selling calls that lock in less than 10% gain if assigned.
+                    if avg_d > 0 and strike < avg_d * 1.10: continue
+                    # Phase 1.5: Strike must clear buy_under * 1.10 (preserve entry intent)
+                    if _buy_under_cc > 0 and strike < _buy_under_cc * 1.10: continue
+                    # Phase 1.5: Strike must clear band midpoint (upper-half zone)
+                    if _cc_band_mid > 0 and strike < _cc_band_mid: continue
                     dte = (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days
                     bid = float(c.get("nbbo_bid",0) or 0)
                     ask = float(c.get("nbbo_ask",0) or 0)
@@ -5178,6 +5215,32 @@ def run_scanner():
                 pos_status = "Profit" if pnl_pct_cc>5 else "Loss" if pnl_pct_cc<-5 else "Break-even"
                 ppd_cc = round(best_cc["premium"] / max(1, best_cc["dte"]), 2)
                 ow_warn = ["Overweight — higher delta allowed"] if is_overweight else []
+                # ── Phase 1.5: Build reasoning string for dashboard card ──
+                _reasoning_parts = []
+                if _cc_band_mid > 0:
+                    _pos_pct = (price - _buy_under_cc) / (_sell_above - _buy_under_cc) * 100
+                    _reasoning_parts.append(
+                        f"✅ Zone: stock at {_pos_pct:.0f}% of band (${_buy_under_cc:.0f}–${_sell_above:.0f}), in upper half"
+                    )
+                if avg_d > 0:
+                    _gain_if_called = (best_cc['strike'] + best_cc['premium'] - avg_d) / avg_d * 100
+                    _reasoning_parts.append(
+                        f"✅ Cost basis ${avg_d:.0f}: strike ${best_cc['strike']:.0f} locks in {_gain_if_called:.0f}% gain if called away"
+                    )
+                if _sell_above > 0:
+                    _eff_sale = best_cc['strike'] + best_cc['premium']
+                    _reasoning_parts.append(
+                        f"✅ Effective sale ${_eff_sale:.2f} ≥ Sell Above ${_sell_above:.0f}"
+                    )
+                if ivp_d >= 50:
+                    _reasoning_parts.append(f"✅ IVP {ivp_d:.0f}% — premium environment is paying")
+                elif ivp_d < 30:
+                    _reasoning_parts.append(f"⚠️ IVP {ivp_d:.0f}% — premium is light, modest income")
+                _reasoning_parts.append(
+                    f"📊 {best_cc['annualized_return']:.0f}% annualized = ${ppd_cc}/day per contract"
+                )
+                _reasoning = " | ".join(_reasoning_parts)
+
                 cc_entry = {
                     "ticker":ticker,"tier":tier,"price":price,"ivp":ivp_d,"mode":"CC",
                     "strike":best_cc["strike"],"expiry":best_cc["expiry"],"dte":best_cc["dte"],
@@ -5188,9 +5251,12 @@ def run_scanner():
                     "breakeven":round(avg_d,2) if avg_d > 0 else None,
                     "premium_per_day":ppd_cc,"position_status":pos_status,
                     "signal":f"{pos_status} | {'⚠️ Overweight — reduce via CC' if is_overweight else 'Income'} | IVP {ivp_d:.0f}%",
+                    "reasoning": _reasoning,
                     "risk_note":"Overweight position — delta up to 0.50 allowed" if is_overweight else None,
                     "effective_sale": best_cc.get("effective_sale"),  # strike + premium
                     "sell_above":     best_cc.get("sell_above"),      # None if no setting
+                    "buy_under":      _buy_under_cc if _buy_under_cc > 0 else None,
+                    "band_midpoint":  round(_cc_band_mid, 2) if _cc_band_mid > 0 else None,
                 }
                 cc_entry["day_change_pct"] = md.get("day_change_pct", 0)
                 cc_entry["score"] = score_cc(cc_entry)
@@ -5215,7 +5281,11 @@ def run_scanner():
                 dashboard_ccs.append(cc_entry)
 
             # ── PIO: position income ─────────────────────────
-            if avg_d > 0:
+            # Phase 1.5: PIO follows same zone-first rules as regular CC.
+            # No more aggressive shortcut for "exit-waiting" or loss positions.
+            # The reason: writing CCs in lower band = locking in poor exit prices.
+            # Phase 1.5: Disabled via ENABLE_PIO flag — only zone-first CCs surface.
+            if ENABLE_PIO and avg_d > 0 and not _cc_zone_blocked:
                 pnl_pct = (price - avg_d)/avg_d*100
                 # PIO delta per framework doc:
                 # profit → 0.30-0.40 (more aggressive, happy to reduce)
@@ -5228,7 +5298,12 @@ def run_scanner():
                 for c in calls_30_60:
                     try:
                         strike = float(c["strike"])
-                        if strike <= avg_d: continue
+                        # Phase 1.5: Tightened cost basis (was avg_d, now avg_d*1.10)
+                        if strike < avg_d * 1.10: continue
+                        # Phase 1.5: Strike must clear buy_under * 1.10 if set
+                        if _buy_under_cc > 0 and strike < _buy_under_cc * 1.10: continue
+                        # Phase 1.5: Strike must clear band midpoint (upper-half zone)
+                        if _cc_band_mid > 0 and strike < _cc_band_mid: continue
                         dte = (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days
                         bid = float(c.get("nbbo_bid",0) or 0)
                         ask = float(c.get("nbbo_ask",0) or 0)
@@ -5250,6 +5325,30 @@ def run_scanner():
                                         "annualized_return":round(ann,1),"avg_cost":round(avg_d,2)}
                     except: continue
                 if best_pio:
+                    # ── Phase 1.5: Build PIO reasoning string ──
+                    _ppd_pio = round(best_pio["premium"] / max(1, best_pio["dte"]), 2)
+                    _pio_reasoning_parts = []
+                    if _cc_band_mid > 0:
+                        _pos_pct = (price - _buy_under_cc) / (_sell_above - _buy_under_cc) * 100
+                        _pio_reasoning_parts.append(
+                            f"✅ Zone: stock at {_pos_pct:.0f}% of band (${_buy_under_cc:.0f}–${_sell_above:.0f})"
+                        )
+                    _gain_if_called = (best_pio['strike'] + best_pio['premium'] - avg_d) / avg_d * 100
+                    _pio_reasoning_parts.append(
+                        f"✅ Cost basis ${avg_d:.0f}: strike ${best_pio['strike']:.0f} = {_gain_if_called:.0f}% gain if called"
+                    )
+                    if _sell_above > 0 and (best_pio['strike'] + best_pio['premium']) >= _sell_above:
+                        _pio_reasoning_parts.append(
+                            f"✅ Effective sale ${best_pio['strike']+best_pio['premium']:.2f} ≥ Sell Above ${_sell_above:.0f}"
+                        )
+                    _pio_reasoning_parts.append(f"📊 {pnl_lbl} position — {pnl_pct:+.0f}% from cost")
+                    _pio_reasoning_parts.append(
+                        f"📊 {best_pio['annualized_return']:.0f}% annualized = ${_ppd_pio}/day per contract"
+                    )
+                    if ivp_d < 30:
+                        _pio_reasoning_parts.append(f"⚠️ IVP {ivp_d:.0f}% — light premium, modest income")
+                    _pio_reasoning = " | ".join(_pio_reasoning_parts)
+
                     dashboard_ccs.append({
                         "ticker":ticker,"tier":tier,"price":price,"ivp":ivp_d,"mode":"PIO",
                         "strike":best_pio["strike"],"expiry":best_pio["expiry"],"dte":best_pio["dte"],
@@ -5257,8 +5356,15 @@ def run_scanner():
                         "delta":best_pio["delta"],"below_min":best_pio["annualized_return"]<8,
                         "warnings":[],"passes_quality":True,
                         "signal":f"{pnl_lbl} | Above cost basis ${avg_d:.0f} | IVP {ivp_d:.0f}%",
+                        "reasoning": _pio_reasoning,
                         "risk_note":None,
+                        "buy_under": _buy_under_cc if _buy_under_cc > 0 else None,
+                        "sell_above": _sell_above if _sell_above > 0 else None,
+                        "band_midpoint": round(_cc_band_mid, 2) if _cc_band_mid > 0 else None,
                     })
+            elif ENABLE_PIO and avg_d > 0 and _cc_zone_blocked:
+                # Log why PIO was blocked (visible in scanner output)
+                print(f"   DBG PIO BLOCKED {ticker}: {_cc_zone_reason}")
 
         # ── LEAPS: all with decent timing ────────────────────
         if ticker not in LEAPS_ONLY:
