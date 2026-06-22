@@ -4169,15 +4169,12 @@ def run_scanner():
         if not _is_remove:
             if _pw["csp_status"] == "IN_ZONE" and _pb is not None:
                 _alerts_csp.append(f"🚨 *{_tk}* ${_p:.2f} — BELOW buy target ${_bu} ({abs(_pb):.1f}% under) — check options now")
-            elif _pw["csp_status"] == "APPROACHING" and _pb is not None:
-                _alerts_csp.append(f"🎯 *{_tk}* ${_p:.2f} — {_pb:.1f}% above buy target ${_bu} — approaching zone")
-            elif _pw["csp_status"] == "WATCHLIST" and _pb is not None:
-                _watchlist.append((_pb, f"   {_tk} ${_p:.2f} → CSP zone at ${_bu} ({_pb:.1f}% away)"))
+            # Phase 1.5: APPROACHING/WATCHLIST removed from Telegram (dashboard only)
+            # Only actionable IN_ZONE alerts surface.
 
         if _sa > 0 and _pw["cc_status"] == "IN_ZONE":
             _alerts_cc.append(f"💰 *{_tk}* ${_p:.2f} — AT/ABOVE sell target ${_sa} — write covered calls")
-        elif _pw["cc_status"] == "APPROACHING" and _ps is not None:
-            _alerts_cc.append(f"📈 *{_tk}* ${_p:.2f} — {_ps:.1f}% below CC target ${_sa} — approaching")
+        # Phase 1.5: APPROACHING CC alerts removed (dashboard only)
 
     briefing = (
         f"📡 *MARKET BRIEFING — {now_et().strftime('%b %d, %Y %H:%M')} ET*\n"
@@ -4192,10 +4189,7 @@ def run_scanner():
         briefing += "\n━━━ CC OPPORTUNITY ALERTS ━━━\n"
         for _a in _alerts_cc:
             briefing += f"{_a}\n"
-    if _watchlist:
-        briefing += "\n⏳ *WATCHING FOR ENTRY* (5–15% from zone)\n"
-        for _, _line in _watchlist:   # already sorted by distance
-            briefing += f"{_line}\n"
+    # Phase 1.5: WATCHLIST section removed from Telegram (was noise — dashboard only)
     # ── Notable price moves on tracked tickers ──────────────
     # Triggers: 1d ≥ |5%|  OR  5d ≥ |10%|  (30d shown as context)
     _move_alerts = []
@@ -4209,8 +4203,11 @@ def run_scanner():
         _c5  = _md.get("change_5d_pct",  0) * 100
         _c30 = _md.get("change_30d_pct", 0) * 100
 
-        _trigger_drop = _c1 <= -5.0 or _c5 <= -10.0
-        _trigger_rise = _c1 >=  6.0 or _c5 >=  10.0
+        # Phase 1.5: Tighter thresholds for Telegram — reduce noise.
+        # Was: 1d ≥ 5%  OR  5d ≥ 10%
+        # Now: 1d ≥ 7%  OR  5d ≥ 15%
+        _trigger_drop = _c1 <= -7.0 or _c5 <= -15.0
+        _trigger_rise = _c1 >=  7.0 or _c5 >=  15.0
 
         # REMOVE tickers: skip drop alerts (no new entries), keep rise alerts (may want to write CCs)
         if _tk in SPECULATIVE_TICKERS and _trigger_drop and not _trigger_rise:
@@ -4294,8 +4291,14 @@ def run_scanner():
         for _, _line in _earn_alerts:
             briefing += f"{_line}\n"
 
-    send_telegram(briefing)
-    time.sleep(2)
+    # Phase 1.5: Only send briefing if there's actionable content.
+    # Suppresses near-empty pings showing just VIX line.
+    _has_briefing_content = bool(_alerts_csp or _alerts_cc or _move_alerts or _earn_alerts)
+    if _has_briefing_content:
+        send_telegram(briefing)
+        time.sleep(2)
+    else:
+        print("   📱 Briefing skipped — no actionable alerts (VIX-only briefing suppressed)")
 
     # Scanner always runs — IVP filters individual trades
 
@@ -4713,8 +4716,9 @@ def run_scanner():
     # ── Telegram — ORDER: Summary → Trades ───────────────
     print("\n📱 Sending...")
 
-    # 1. Claude summary — only when there are actual opportunities
-    if analysis and has_real_opps:
+    # 1. Claude summary — only when there are Telegram-grade opportunities
+    #    (was: any opps anywhere; now: only when something will actually be sent)
+    if analysis and tg_any:
         send_telegram(f"🧠 *CLAUDE SUMMARY*\n\n{analysis}")
         time.sleep(2)
 
