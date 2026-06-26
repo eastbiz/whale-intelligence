@@ -215,6 +215,67 @@ BUCKETS = load_buckets("buckets.csv")
 # Toggle to True to re-enable PIO scanning.
 ENABLE_PIO = False
 
+# ── Feature flag: Strict zone-only Telegram ──────────────────
+# When True: Telegram alerts ONLY fire for opportunities where the stock's
+# current price has reached the actionable zone (CSP: price ≤ buy_under,
+# CC: price ≥ sell_above, LEAPS: price ≤ buy_under × 1.10), OR an IVR
+# override applies (IVR ≥ 70 for CSP/CC, IVR ≤ 25 for LEAPS, with data
+# reliability guards). Dashboard has a separate UI toggle.
+# Default False — keeps current Telegram behavior.
+STRICT_ZONE_TELEGRAM = False
+
+
+def compute_in_zone(strategy: str, price: float, buy_under: float, sell_above: float,
+                    ivr: float, atm_iv: float) -> tuple:
+    """
+    Determine if an opportunity is in its actionable zone.
+
+    Returns (in_zone: bool, reason: str).
+
+    Zones:
+      CSP:   price ≤ buy_under  (stock is in BUY zone)
+      CC:    price ≥ sell_above (stock is at SELL target)
+      LEAPS: price ≤ buy_under × 1.10 (stock near BUY zone — stock replacement entry)
+
+    IVR override (relaxes zone gate when premium environment is exceptional):
+      CSP/CC: IVR ≥ 70 → premium pays enough to justify out-of-zone trade
+      LEAPS:  IVR ≤ 25 → premium so cheap that LEAPS make sense even mid-band
+
+    Reliability guard for IVR override: requires atm_iv ≥ 0.15 (15%) to confirm
+    the IVR value isn't a phantom/stale reading. Stale weekend IVP showing 7%
+    won't satisfy this guard.
+    """
+    iv_reliable = atm_iv >= 0.15
+    if strategy == "CSP":
+        if buy_under <= 0:
+            return (False, f"NO BUY (buy_under=0)")
+        if price <= buy_under:
+            return (True, f"Price ${price:.2f} ≤ Buy Below ${buy_under:.0f} — IN BUY ZONE")
+        if iv_reliable and ivr >= 70:
+            return (True, f"OUT of zone but IVR {ivr:.0f} override (premium pays)")
+        gap = (price - buy_under) / buy_under * 100
+        return (False, f"Stock ${price:.2f} is {gap:.1f}% above Buy Below ${buy_under:.0f}")
+    if strategy == "CC":
+        if sell_above <= 0:
+            return (False, f"No sell target set")
+        if price >= sell_above:
+            return (True, f"Price ${price:.2f} ≥ Sell Above ${sell_above:.0f} — IN SELL ZONE")
+        if iv_reliable and ivr >= 70:
+            return (True, f"OUT of zone but IVR {ivr:.0f} override (premium pays)")
+        gap = (sell_above - price) / sell_above * 100
+        return (False, f"Stock ${price:.2f} is {gap:.1f}% below Sell Above ${sell_above:.0f}")
+    if strategy == "LEAPS":
+        if buy_under <= 0:
+            return (False, f"NO BUY (buy_under=0)")
+        threshold = buy_under * 1.10
+        if price <= threshold:
+            return (True, f"Price ${price:.2f} ≤ ${threshold:.0f} (Buy Below ×1.10) — NEAR BUY ZONE")
+        if iv_reliable and ivr <= 25:
+            return (True, f"OUT of zone but IVR {ivr:.0f} override (premium cheap)")
+        gap = (price - threshold) / threshold * 100
+        return (False, f"Stock ${price:.2f} is {gap:.1f}% above LEAPS entry zone ${threshold:.0f}")
+    return (False, "unknown strategy")
+
 # Speculative tickers — smaller position sizing, wider OTM buffers.
 # Suppressed from Telegram CSP entry alerts (entries only on deliberate decision).
 # CC alerts still sent when approaching sell_above (useful for existing positions).
@@ -4716,6 +4777,41 @@ def run_scanner():
     tg_leaps  = _tg_leaps_filter(top_leaps)
     tg_spikes = top_spikes   # time-sensitive — no score gate
     tg_drops  = top_drops    # time-sensitive — no score gate
+
+    # ── Phase 1.6: STRICT_ZONE_TELEGRAM filter ─────────────────
+    # When the flag is True, suppress Telegram alerts unless the opportunity
+    # is in its actionable zone (CSP: price ≤ buy_under; CC: price ≥ sell_above;
+    # LEAPS: price ≤ buy_under × 1.10) OR IVR override applies.
+    if STRICT_ZONE_TELEGRAM:
+        def _apply_strict_zone(opps: list, strategy: str) -> list:
+            kept = []
+            for o in opps:
+                _tk = o.get("ticker", "")
+                _sym = SYMBOL_SETTINGS.get(_tk, {})
+                _bu  = _sym.get("buy_under", 0) or 0
+                _sa  = _sym.get("sell_above", 0) or 0
+                _px  = o.get("price", 0) or 0
+                _ivr = o.get("ivp", 0) or 0
+                # Pull atm_iv from nested strategy dict (csp/cc/leaps)
+                _atm_iv = 0
+                for _k in ("csp", "cc", "leaps"):
+                    if isinstance(o.get(_k), dict):
+                        _atm_iv = o[_k].get("atm_iv", 0) or _atm_iv
+                _iz, _reason = compute_in_zone(strategy, _px, _bu, _sa, _ivr, _atm_iv)
+                if _iz:
+                    kept.append(o)
+                else:
+                    print(f"   📵 TG SUPPRESS {_tk} {strategy}: {_reason}")
+            return kept
+        _pre_counts = (len(tg_csps), len(tg_ccs), len(tg_leaps))
+        tg_csps  = _apply_strict_zone(tg_csps,  "CSP")
+        tg_ccs   = _apply_strict_zone(tg_ccs,   "CC")
+        tg_leaps = _apply_strict_zone(tg_leaps, "LEAPS")
+        print(f"   📵 STRICT_ZONE_TELEGRAM filter: "
+              f"{_pre_counts[0]}→{len(tg_csps)} CSPs, "
+              f"{_pre_counts[1]}→{len(tg_ccs)} CCs, "
+              f"{_pre_counts[2]}→{len(tg_leaps)} LEAPS")
+
     # PMCC and BCS: dashboard only — too complex/optional for a ping
     # Spike CCs (opp_opps + tg_spikes): dashboard only — NOTABLE MOVES briefing already signals them
 
@@ -5130,6 +5226,13 @@ def run_scanner():
             csp_entry["score"]        = score_csp(csp_entry)  # kept for display score badge
             csp_entry["normalized"]   = normalized_score(csp_entry["score"], "CSP")
             csp_entry["quality_label"] = quality_label(csp_entry["score"], SCORE_MAX["CSP"])
+            # Phase 1.6: In-zone determination for UI filter
+            _iz, _iz_reason = compute_in_zone(
+                "CSP", price, csp_entry.get("buy_under") or 0, 0,
+                ivp_d, ivdata.get("iv_current", 0) or 0
+            )
+            csp_entry["in_zone"]      = _iz
+            csp_entry["zone_reason"]  = _iz_reason
             dashboard_csps.append(csp_entry)
 
         # ── CC: owned positions only ─────────────────────────
@@ -5296,6 +5399,13 @@ def run_scanner():
                     "total_shares":        int(qty_d),
                     "action_label":        cc_entry["action_label"],
                 }
+                # Phase 1.6: In-zone determination for UI filter
+                _iz_cc, _iz_cc_reason = compute_in_zone(
+                    "CC", price, _buy_under_cc or 0, _sell_above or 0,
+                    ivp_d, ivdata.get("iv_current", 0) or 0
+                )
+                cc_entry["in_zone"]     = _iz_cc
+                cc_entry["zone_reason"] = _iz_cc_reason
                 dashboard_ccs.append(cc_entry)
 
             # ── PIO: position income ─────────────────────────
@@ -5534,6 +5644,13 @@ def run_scanner():
                 leaps_entry["trend_label"]  = _trend_label_v
                 leaps_entry["trend_signal"] = _trend_signal_v
                 leaps_entry["trend_action"] = _trend_action_v
+                # Phase 1.6: In-zone determination for UI filter
+                _iz_l, _iz_l_reason = compute_in_zone(
+                    "LEAPS", price, _leaps_buy_under or 0, 0,
+                    ivp_d, ivdata.get("iv_current", 0) or 0
+                )
+                leaps_entry["in_zone"]     = _iz_l
+                leaps_entry["zone_reason"] = _iz_l_reason
                 dashboard_leaps.append(leaps_entry)
                 print(f"   LEAPS [{_bdef['label']}] {ticker} ${_bl['strike']} δ{_bl['delta']} ext{ext_pct:.1f}% BE${_bl['breakeven']} {'★REC' if _is_rec else ''}")
 
