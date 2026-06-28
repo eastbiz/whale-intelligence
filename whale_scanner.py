@@ -136,6 +136,39 @@ IVP_MIN_SELL          = 30    # floor — skip below 30
 IVP_ELEVATED          = 50    # "elevated" — allow wider delta, flag as excellent
 IVP_MAX_BUY           = 50    # max IVP to buy LEAPS
 LEAPS_EXTRINSIC_MAX   = 20.0  # 20% max extrinsic — primary cost filter for LEAPS — target <20%
+# ── Cheap Convexity LEAPS (far-OTM long-dated calls, asymmetric upside) ──
+# Distinct from deep-ITM stock-replacement LEAPS above. Buys large upside per
+# dollar of premium. Max loss = premium. Required CAGR is the primary gate;
+# Convexity Score (strike/ask) ranks AFTER CAGR is acceptable.
+CVX_DTE_MIN           = 540    # acceptable floor (days)
+CVX_DTE_PREF_MIN      = 700    # preferred window starts
+CVX_DTE_MAX           = 1100   # preferred/acceptable ceiling
+CVX_FETCH_DAYS        = 1150   # chain fetch horizon (covers DTE_MAX + buffer)
+CVX_OI_MIN            = 20     # below 20 = usually pass (manual review)
+CVX_OI_PREF           = 100    # preferred liquidity
+CVX_SPREAD_MAX        = 0.15   # bid/ask spread % hard ceiling (15%)
+# Required CAGR rating bands (decimal). Reject above 35% unless lottery-approved.
+CVX_CAGR_EXCELLENT    = 0.15
+CVX_CAGR_ATTRACTIVE   = 0.20
+CVX_CAGR_GOOD         = 0.25
+CVX_CAGR_AGGRESSIVE   = 0.30
+CVX_CAGR_SPECULATIVE  = 0.35   # above this = lottery/reject
+# Convexity Score (strike/ask) rating bands
+CVX_SCORE_EXCEPTIONAL = 30
+CVX_SCORE_VERY_ATTR   = 20
+CVX_SCORE_INTERESTING = 15
+CVX_SCORE_AVERAGE     = 10
+CVX_SCORE_EXPENSIVE   = 5
+# Premium % (ask/price) rating bands
+CVX_PREM_EXCEPTIONAL  = 0.08
+CVX_PREM_ATTRACTIVE   = 0.12
+CVX_PREM_FAIR         = 0.20
+CVX_PREM_EXPENSIVE    = 0.30
+CVX_PREM_VERY_EXP     = 0.40
+# Default scenario CAGRs for breakeven coverage
+CVX_SCENARIOS         = [0.15, 0.20, 0.25, 0.30]
+CVX_SCENARIOS_AGGR    = [0.40, 0.50]  # hypergrowth / bitcoin-linked names
+CVX_AGGR_TICKERS      = {"IBIT", "MSTR", "PLTR", "NBIS"}  # show 40/50% coverage too
 # Earnings filter: <14 days = hard stop, 14-21 = warning, >21 = normal
 EARNINGS_HARD_STOP    = 14    # hard stop
 EARNINGS_WARNING      = 21    # warning label
@@ -3208,6 +3241,227 @@ def leaps_trend_action(trend: dict, ivp: float, price: float, week52_high: float
         "recommend": False,
     }
 
+def _cvx_classify(req_cagr, conv_score, prem_pct, cov30, dte, spread_pct, oi, strike_pct):
+    """
+    Classify a convexity candidate per spec categories A–F.
+    Returns (class_code, class_label, color_hint).
+    Inputs are decimals where noted: req_cagr, prem_pct, spread_pct are fractions;
+    conv_score and cov30 are ratios; dte/oi ints; strike_pct fraction (strike/price).
+    """
+    # F — Reject / too expensive (any hard fail)
+    if (req_cagr > CVX_CAGR_SPECULATIVE or prem_pct > CVX_PREM_VERY_EXP
+            or conv_score < CVX_SCORE_EXPENSIVE or cov30 < 1.00
+            or spread_pct > CVX_SPREAD_MAX or oi < CVX_OI_MIN or dte < CVX_DTE_MIN):
+        # D — Supercycle / lottery: high CAGR but cheap premium + high convexity
+        if (req_cagr > CVX_CAGR_SPECULATIVE and conv_score >= CVX_SCORE_EXCEPTIONAL
+                and prem_pct < 0.10):
+            return ("D", "🎰 Lottery / Supercycle", "lottery")
+        return ("F", "❌ Reject / Too expensive", "reject")
+    # E — Leveraged stock replacement: near-ATM, higher premium, low CAGR
+    if (strike_pct <= 1.10 and prem_pct >= 0.20 and req_cagr < CVX_CAGR_ATTRACTIVE):
+        return ("E", "🔁 Stock Replacement", "replacement")
+    # A — Cheap Convexity (top category)
+    if (req_cagr < CVX_CAGR_GOOD and conv_score > CVX_SCORE_VERY_ATTR
+            and prem_pct < 0.10 and cov30 > 1.00 and dte > CVX_DTE_PREF_MIN
+            and spread_pct < CVX_SPREAD_MAX and oi >= CVX_OI_PREF):
+        return ("A", "💎 Cheap Convexity", "cheap")
+    # B — Balanced Convexity
+    if (req_cagr < CVX_CAGR_GOOD and CVX_SCORE_INTERESTING <= conv_score <= CVX_SCORE_EXCEPTIONAL
+            and prem_pct < 0.15 and cov30 > 1.00 and dte > CVX_DTE_MIN):
+        return ("B", "⚖️ Balanced Convexity", "balanced")
+    # C — Speculative Convexity
+    if (CVX_CAGR_GOOD <= req_cagr <= CVX_CAGR_SPECULATIVE
+            and prem_pct < 0.15 and cov30 >= 0.95):
+        return ("C", "🌶️ Speculative Convexity", "speculative")
+    # Fallthrough — treat as reject
+    return ("F", "❌ Reject / Too expensive", "reject")
+
+
+def _cvx_score(req_cagr, conv_score, prem_pct, cov20, cov30, spread_pct, oi, dte, ann_burden):
+    """100-point scoring system per spec. All-decimal inputs as in _cvx_classify."""
+    s = 100.0
+    rc = req_cagr * 100  # to percent
+    pp = prem_pct * 100
+    # Subtractions
+    if rc > 20: s -= 3 * (rc - 20)
+    if pp > 10: s -= 2 * (pp - 10)
+    if cov30 < 1.00: s -= 15
+    if spread_pct > 0.10: s -= 10
+    if spread_pct > 0.15: s -= 25
+    if oi < 100: s -= 20
+    if rc > 35: s -= 30
+    # Additions
+    if rc < 20: s += 15
+    if rc < 25: s += 10
+    if conv_score > 25: s += 15
+    if conv_score > 20: s += 10
+    if pp < 8:  s += 10
+    if pp < 12: s += 5
+    if cov30 > 1.15: s += 10
+    if cov20 > 1.00: s += 15
+    if dte > 900: s += 10
+    if ann_burden < 0.03: s += 5
+    return round(max(0, min(200, s)))
+
+
+def _cvx_note(cls, req_cagr, conv_score, prem_pct, cov30, cov20, spread_pct):
+    """Plain-English summary for a convexity candidate."""
+    rc = req_cagr * 100; pp = prem_pct * 100
+    parts = []
+    # CAGR difficulty
+    if req_cagr < CVX_CAGR_ATTRACTIVE:   parts.append(f"Needs only {rc:.0f}%/yr to break even — realistic")
+    elif req_cagr < CVX_CAGR_GOOD:       parts.append(f"Needs {rc:.0f}%/yr — attainable")
+    elif req_cagr < CVX_CAGR_SPECULATIVE:parts.append(f"Needs {rc:.0f}%/yr — aggressive")
+    else:                                parts.append(f"Needs {rc:.0f}%/yr — extraordinary move required")
+    # Premium
+    if prem_pct < CVX_PREM_EXCEPTIONAL:  parts.append(f"cheap premium ({pp:.0f}% of stock)")
+    elif prem_pct < CVX_PREM_ATTRACTIVE: parts.append(f"attractive premium ({pp:.0f}%)")
+    elif prem_pct < CVX_PREM_FAIR:       parts.append(f"fair premium ({pp:.0f}%)")
+    else:                                parts.append(f"expensive premium ({pp:.0f}%)")
+    # Coverage verdict
+    if cov30 >= 1.30:   parts.append("30% CAGR clears BE comfortably")
+    elif cov30 >= 1.15: parts.append("30% CAGR clears BE")
+    elif cov30 >= 1.00: parts.append("30% CAGR barely clears BE")
+    else:               parts.append("even 30% CAGR misses BE")
+    if cov20 >= 1.00:   parts.append("20% scenario also clears")
+    # Convexity
+    if conv_score >= CVX_SCORE_VERY_ATTR: parts.append(f"strong convexity ({conv_score:.0f}×)")
+    # Liquidity flag
+    if spread_pct > CVX_SPREAD_MAX:
+        parts.append("⚠️ wide spread — use limit near mid, do not pay ask")
+    elif spread_pct > 0.10:
+        parts.append("spread a bit wide — limit near mid")
+    return ". ".join(parts) + "."
+
+
+def scan_convexity(ticker, price, contracts, ivp):
+    """
+    Cheap Convexity LEAPS scanner — far-OTM long-dated calls with asymmetric upside.
+
+    Universe: watchlist tickers (caller controls). Calls only, DTE 540–1100, strike>price.
+    Uses ASK for conservative breakeven/CAGR; reports MID for limit-order reference.
+    Required CAGR is the primary gate; Convexity Score ranks after CAGR is acceptable.
+
+    Returns up to 3 candidates per ticker (best strike + alternates), each a dict ready
+    for the dashboard CONVEXITY table. Does NOT auto-recommend — flags for manual review.
+    """
+    if not contracts or price <= 0:
+        return []
+    today = datetime.now()
+    use_aggr = ticker in CVX_AGGR_TICKERS
+    cands = []
+    for c in contracts:
+        try:
+            if c.get("option_type") != "C":
+                continue
+            strike = float(c.get("strike", 0) or 0)
+            if strike <= price:           # OTM only
+                continue
+            dte = (datetime.strptime(c["expiry"], "%Y-%m-%d") - today).days
+            if not (CVX_DTE_MIN <= dte <= CVX_DTE_MAX):
+                continue
+            bid = float(c.get("nbbo_bid", 0) or 0)
+            ask = float(c.get("nbbo_ask", 0) or 0)
+            if ask <= 0:                  # need a real ask to price the trade
+                continue
+            mid = (bid + ask) / 2 if (bid > 0 and ask > 0) else ask
+            oi  = int(c.get("open_interest", 0) or 0)
+            vol = int(c.get("volume", 0) or 0)
+            spread_pct = ((ask - bid) / mid) if mid > 0 else 1.0
+            years = dte / 365.0
+            breakeven = strike + ask
+            req_gain  = breakeven / price - 1.0
+            req_cagr  = (breakeven / price) ** (1.0 / years) - 1.0 if years > 0 else 9.0
+            prem_pct  = ask / price
+            ann_burden = prem_pct / years if years > 0 else 9.0
+            strike_pct = strike / price
+            conv_score = strike / ask if ask > 0 else 0.0
+            intrinsic  = max(0.0, price - strike)   # 0 for OTM
+            extrinsic  = ask - intrinsic
+            extrinsic_pct = extrinsic / price
+            # Scenario future values + coverage
+            scen = CVX_SCENARIOS + (CVX_SCENARIOS_AGGR if use_aggr else [])
+            cov = {}
+            for g in scen:
+                fv = price * (1 + g) ** years
+                cov[int(g * 100)] = round(fv / breakeven, 2) if breakeven > 0 else 0
+            cov30 = cov.get(30, 0)
+            cov20 = cov.get(20, 0)
+            # Skip obviously dead contracts: no OI and no volume
+            if oi == 0 and vol == 0:
+                continue
+            cls, cls_label, color = _cvx_classify(
+                req_cagr, conv_score, prem_pct, cov30, dte, spread_pct, oi, strike_pct)
+            score = _cvx_score(req_cagr, conv_score, prem_pct, cov20, cov30,
+                               spread_pct, oi, dte, ann_burden)
+            note = _cvx_note(cls, req_cagr, conv_score, prem_pct, cov30, cov20, spread_pct)
+            cands.append({
+                "ticker": ticker, "mode": "CONVEXITY", "price": round(price, 2),
+                "ivp": round(ivp, 1),
+                "strike": round(strike, 2), "expiry": c["expiry"], "dte": dte,
+                "years": round(years, 2),
+                "bid": round(bid, 2), "ask": round(ask, 2), "mid": round(mid, 2),
+                "premium": round(ask, 2),                 # ASK = conservative cost
+                "open_interest": oi, "volume": vol,
+                "spread_pct": round(spread_pct * 100, 1),
+                "breakeven": round(breakeven, 2),
+                "required_gain_pct": round(req_gain * 100, 1),
+                "required_cagr": round(req_cagr * 100, 1),  # percent
+                "premium_pct": round(prem_pct * 100, 1),
+                "ann_burden_pct": round(ann_burden * 100, 1),
+                "strike_pct": round(strike_pct * 100, 1),
+                "convexity_score": round(conv_score, 1),
+                "intrinsic": round(intrinsic, 2),
+                "extrinsic": round(extrinsic, 2),
+                "extrinsic_pct": round(extrinsic_pct * 100, 1),
+                "coverage": cov,
+                "cov30": cov30, "cov20": cov20,
+                "classification": cls, "class_label": cls_label, "color": color,
+                "score": score,
+                "convexity_note": note,
+                "signal": f"{cls_label} | CAGR {req_cagr*100:.0f}% | conv {conv_score:.0f}×",
+                "passes_quality": cls in ("A", "B"),
+                "below_min": cls in ("D", "F"),
+                "warnings": (["wide spread"] if spread_pct > CVX_SPREAD_MAX else [])
+                            + (["low OI"] if oi < CVX_OI_MIN else []),
+            })
+        except Exception:
+            continue
+    if not cands:
+        return []
+    # Strike selection per spec: the RECOMMENDED pick is the best strike whose
+    # Required CAGR is still acceptable (≤25%), ranked by score then CAGR then convexity.
+    # But the table is meant to show the full convexity spectrum (you chose
+    # "show all, color-coded"), so we also surface the best alternate from the
+    # higher-CAGR classes (Speculative, then Lottery) when no acceptable pick exists
+    # or to illustrate the curve. Cap at 3 rows/ticker to keep the table readable.
+    def _rank(x):
+        return (-x["score"], x["required_cagr"], -x["convexity_score"])
+    acceptable  = sorted([x for x in cands if x["classification"] in ("A", "B", "E")], key=_rank)
+    speculative = sorted([x for x in cands if x["classification"] == "C"], key=_rank)
+    lottery     = sorted([x for x in cands if x["classification"] == "D"], key=_rank)
+    reject      = sorted([x for x in cands if x["classification"] == "F"], key=_rank)
+
+    top = []
+    if acceptable:
+        top.append(acceptable[0])                 # recommended
+        top += acceptable[1:2]                    # one more acceptable if present
+        if speculative: top.append(speculative[0])
+        if lottery and len(top) < 3: top.append(lottery[0])
+    elif speculative:
+        top.append(speculative[0])
+        if lottery: top.append(lottery[0])
+        elif reject: top.append(reject[0])
+    elif lottery:
+        top.append(lottery[0])
+    elif reject:
+        top.append(reject[0])                     # show best reject so ticker isn't blank
+    top = top[:3]
+    for i, x in enumerate(top):
+        x["is_recommended"] = (i == 0 and x["classification"] in ("A", "B"))
+    return top
+
+
 def find_best_leaps(ticker, price, contracts, ivdata, pir):
     """Deep ITM LEAPS — delta ≥0.75 (no upper cap), BE% and extrinsic% are primary gates."""
     is_spec = ticker in SPECULATIVE
@@ -4381,6 +4635,7 @@ def run_scanner():
     pmcc_opps= []; bcs_opps = []; spike_opps = []; drop_opps = []; pio_opps = []
     # Caches for dashboard reuse — avoid re-fetching chains
     contracts_cache = {}
+    convex_cache = {}    # ticker -> far-OTM long-dated calls for Cheap Convexity scan
     schwab_ivp_cache = {}
     trend_state_cache = {}  # ticker -> leaps_trend_state result, reused by CSP engine
     qty_cache = {}
@@ -4415,8 +4670,15 @@ def run_scanner():
             from_d       = datetime.now().strftime("%Y-%m-%d")
             to_d_short   = (datetime.now() + _td(days=75)).strftime("%Y-%m-%d")
             to_d_leaps   = (datetime.now() + _td(days=750)).strftime("%Y-%m-%d")
+            to_d_convex  = (datetime.now() + _td(days=CVX_FETCH_DAYS)).strftime("%Y-%m-%d")
             contracts_short = schwab_get_option_chain(ticker, from_d, to_d_short)
             contracts_leaps = schwab_get_option_chain(ticker, from_d, to_d_leaps)
+            # Dedicated far-OTM long-dated fetch for Cheap Convexity (DTE 540–1100)
+            contracts_convex_raw = schwab_get_option_chain(ticker, from_d, to_d_convex)
+            convex_contracts = [c for c in contracts_convex_raw
+                                if c.get("option_type") == "C"
+                                and CVX_DTE_MIN <= (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days <= CVX_DTE_MAX]
+            convex_cache[ticker] = convex_contracts
             # Merge: use short for CSP/CC (more contracts, faster), add leaps-range
             leaps_contracts = [c for c in contracts_leaps
                                if (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days >= LEAPS_DTE_MIN]
@@ -5069,6 +5331,7 @@ def run_scanner():
     dashboard_ccs   = []
     dashboard_leaps = []
     dashboard_bcss  = []
+    dashboard_convexity = []
 
     for ticker in all_tickers:
         if ticker in CORE_STOCKS:        tier = "Core"
@@ -5654,6 +5917,27 @@ def run_scanner():
                 dashboard_leaps.append(leaps_entry)
                 print(f"   LEAPS [{_bdef['label']}] {ticker} ${_bl['strike']} δ{_bl['delta']} ext{ext_pct:.1f}% BE${_bl['breakeven']} {'★REC' if _is_rec else ''}")
 
+        # ── Cheap Convexity LEAPS: far-OTM long-dated calls ──────
+        _convex_contracts = convex_cache.get(ticker, [])
+        if _convex_contracts:
+            try:
+                _cvx_results = scan_convexity(ticker, price, _convex_contracts, ivp_d)
+                for _cv in _cvx_results:
+                    _cv["tier"] = tier
+                    _cv["support_levels"] = support_cache.get(ticker, {}) or {}
+                    _cv["days_to_earnings"] = (lambda _ed: max(0, (_ed - datetime.now()).days) if _ed else 999)(earn_date_d)
+                    # In-zone: convexity entry favored when stock near/below buy_under (cheaper premium)
+                    _cv_bu = SYMBOL_SETTINGS.get(ticker, {}).get("buy_under", 0)
+                    _iz_cv, _iz_cv_reason = compute_in_zone(
+                        "LEAPS", price, _cv_bu or 0, 0, ivp_d, ivdata.get("iv_current", 0) or 0)
+                    _cv["in_zone"]     = _iz_cv
+                    _cv["zone_reason"] = _iz_cv_reason
+                    _cv["buy_under"]   = _cv_bu if _cv_bu > 0 else None
+                    dashboard_convexity.append(_cv)
+                    print(f"   CVX [{_cv['class_label']}] {ticker} ${_cv['strike']} CAGR{_cv['required_cagr']:.0f}% conv{_cv['convexity_score']:.0f}× score{_cv['score']} {'★REC' if _cv.get('is_recommended') else ''}")
+            except Exception as _cve:
+                print(f"   CVX error {ticker}: {_cve}")
+
     # Apply unified score for cross-strategy normalization (patch 5)
     for o in dashboard_csps:
         o["unified_score"] = score_unified(o, "CSP")
@@ -5661,6 +5945,10 @@ def run_scanner():
         o["unified_score"] = score_unified(o, o.get("mode","CC"))
     for o in dashboard_leaps:
         o["unified_score"] = score_unified(o, "LEAPS")
+    # Convexity uses its own 100-pt score directly (no cross-strategy normalization)
+    for o in dashboard_convexity:
+        o["unified_score"] = o.get("score", 0)
+    dashboard_convexity.sort(key=lambda x: x.get("score", 0), reverse=True)
 
     # Sort by canonical score descending — never by annualized return
     dashboard_csps = csp_promote_best(dashboard_csps)
@@ -5695,7 +5983,7 @@ def run_scanner():
 
     pio_count = sum(1 for o in dashboard_ccs if o.get("mode") == "PIO")
     cc_count  = sum(1 for o in dashboard_ccs if o.get("mode") == "CC")
-    print(f"   📊 Dashboard: {len(dashboard_csps)} CSPs | {cc_count} CCs | {pio_count} PIOs | {len(dashboard_leaps)} LEAPS | {len(dashboard_bcss)} BCS")
+    print(f"   📊 Dashboard: {len(dashboard_csps)} CSPs | {cc_count} CCs | {pio_count} PIOs | {len(dashboard_leaps)} LEAPS | {len(dashboard_convexity)} CVX | {len(dashboard_bcss)} BCS")
 
     all_opps = []
     for o in top_csps:   all_opps.append(opp_to_dict(o, "csp"))
@@ -6103,7 +6391,7 @@ def run_scanner():
     # dashboard_leaps has all three bands with full extrinsic/BE fields — always prefer it.
     leaps_from_opps = [o for o in all_opps if o.get("mode") == "LEAPS"]
     review_candidates = []
-    for o in dashboard_csps + dashboard_ccs + dashboard_leaps + dashboard_bcss + dash_spikes + dash_drops + dash_pio:
+    for o in dashboard_csps + dashboard_ccs + dashboard_leaps + dashboard_convexity + dashboard_bcss + dash_spikes + dash_drops + dash_pio:
         o["candidate_type"] = "execution" if o.get("passes_quality") and not o.get("below_min") and not o.get("warnings") else "review"
         review_candidates.append(o)
 
