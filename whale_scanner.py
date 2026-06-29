@@ -144,7 +144,6 @@ CVX_DTE_MIN           = 700    # HARD floor — reject below 700 in main view
 CVX_DTE_PREF_MIN      = 700    # preferred window starts
 CVX_DTE_MAX           = 1100   # preferred/acceptable ceiling
 CVX_FETCH_DAYS        = 1150   # chain fetch horizon (covers DTE_MAX + buffer)
-CVX_NEARMISS_DTE_MIN  = 365    # diagnostics floor — keep 1–2yr near-misses for the hidden panel
 # ── HARD FILTERS (all must pass for main view) ──
 CVX_CAGR_MAX          = 0.25   # Required CAGR hard max (≤25%)
 CVX_CAGR_PREF         = 0.20   # preferred (<20%)
@@ -3303,11 +3302,6 @@ def _cvx_note_pass(grade, req_cagr, conv_score, prem_pct, cov30):
             f"scenario clears breakeven by {clears:.0f}%.")
 
 
-def _cvx_note_nearmiss(fails):
-    """One-line explanation for a near-miss (why it failed)."""
-    return "Near miss — fails: " + "; ".join(fails) + "."
-
-
 def scan_convexity(ticker, price, contracts, ivp):
     """
     Cheap Convexity LEAPS scanner — STRICT MODE (default).
@@ -3327,7 +3321,6 @@ def scan_convexity(ticker, price, contracts, ivp):
     today = datetime.now()
     use_aggr = ticker in CVX_AGGR_TICKERS
     passers = []
-    nearmiss = []
     for c in contracts:
         try:
             if c.get("option_type") != "C":
@@ -3336,8 +3329,8 @@ def scan_convexity(ticker, price, contracts, ivp):
             if strike <= price:           # OTM only
                 continue
             dte = (datetime.strptime(c["expiry"], "%Y-%m-%d") - today).days
-            if dte < CVX_NEARMISS_DTE_MIN or dte > CVX_DTE_MAX:
-                continue                  # outside even the diagnostics window
+            if dte < CVX_DTE_MIN or dte > CVX_DTE_MAX:
+                continue                  # strict DTE window (>=700)
             bid = float(c.get("nbbo_bid", 0) or 0)
             ask = float(c.get("nbbo_ask", 0) or 0)
             if ask <= 0:
@@ -3370,13 +3363,10 @@ def scan_convexity(ticker, price, contracts, ivp):
 
             fails = _cvx_hard_filters(req_cagr, conv_score, prem_pct, cov30, dte,
                                       spread_pct, oi, strike_pct, ann_burden)
-            is_pass = not fails
-            if is_pass:
-                grade, label = _cvx_grade(req_cagr, conv_score, prem_pct, cov30, dte)
-                note = _cvx_note_pass(grade, req_cagr, conv_score, prem_pct, cov30)
-            else:
-                grade, label = ("N", "🔍 Near Miss")
-                note = _cvx_note_nearmiss(fails)
+            if fails:
+                continue   # near-misses discarded — main view shows passers only
+            grade, label = _cvx_grade(req_cagr, conv_score, prem_pct, cov30, dte)
+            note = _cvx_note_pass(grade, req_cagr, conv_score, prem_pct, cov30)
 
             row = {
                 "ticker": ticker, "mode": "CONVEXITY", "price": round(price, 2),
@@ -3402,36 +3392,22 @@ def scan_convexity(ticker, price, contracts, ivp):
                 "classification": grade, "class_label": label,
                 "iv_rank": None,            # not available — display "N/A"
                 "convexity_note": note,
-                "is_nearmiss": not is_pass,
-                "fail_reasons": fails,
-                "signal": (f"{label} | CAGR {req_cagr*100:.0f}% | conv {conv_score:.0f}x"
-                           if is_pass else f"Near miss | {fails[0] if fails else ''}"),
-                "passes_quality": is_pass,
+                "is_nearmiss": False,
+                "signal": f"{label} | CAGR {req_cagr*100:.0f}% | conv {conv_score:.0f}x",
+                "passes_quality": True,
             }
-            # sort scalars (raw, not percent-rounded) for ranking precision
-            row["_cagr_raw"] = req_cagr
-            if is_pass:
-                passers.append(row)
-            else:
-                nearmiss.append(row)
+            passers.append(row)
         except Exception:
             continue
 
-    # Rank passers per spec; keep best 3 per ticker. Mark top as recommended.
+    # Rank passers per spec; return only the SINGLE best passing trade per ticker.
+    # Near-misses are intentionally discarded — main view only, blank if none pass.
+    if not passers:
+        return []
     passers.sort(key=_cvx_rank_key)
-    top_pass = passers[:3]
-    for i, x in enumerate(top_pass):
-        x["is_recommended"] = (i == 0)
-
-    # Near-misses: rank by how close they are (fewest fails, then lowest CAGR).
-    # Keep best 5 for the diagnostics panel.
-    nearmiss.sort(key=lambda x: (len(x["fail_reasons"]), x["required_cagr"],
-                                 -x["convexity_score"]))
-    top_nm = nearmiss[:5]
-    for x in top_nm:
-        x["is_recommended"] = False
-
-    return top_pass + top_nm
+    best = passers[0]
+    best["is_recommended"] = True
+    return [best]
 
 
 def find_best_leaps(ticker, price, contracts, ivdata, pir):
@@ -4649,7 +4625,7 @@ def run_scanner():
             contracts_convex_raw = schwab_get_option_chain(ticker, from_d, to_d_convex)
             convex_contracts = [c for c in contracts_convex_raw
                                 if c.get("option_type") == "C"
-                                and CVX_NEARMISS_DTE_MIN <= (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days <= CVX_DTE_MAX]
+                                and CVX_DTE_MIN <= (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days <= CVX_DTE_MAX]
             convex_cache[ticker] = convex_contracts
             # Merge: use short for CSP/CC (more contracts, faster), add leaps-range
             leaps_contracts = [c for c in contracts_leaps
