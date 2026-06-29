@@ -4038,6 +4038,25 @@ def fmt_leaps(opp) -> str:
     ])
 
 
+def fmt_convex(o) -> str:
+    """Format a Cheap Convexity LEAP alert (Grade A only). Flat field schema."""
+    grade = "💎 EXCELLENT (A)" if o.get("classification") == "A" else "✅ GOOD (B)"
+    cov20 = o.get("cov20"); cov25 = o.get("cov25"); cov30 = o.get("cov30")
+    def _c(v): return f"{v:.2f}" if isinstance(v, (int, float)) else "—"
+    return "\n".join([
+        f"🎲 *CHEAP CONVEXITY — {o['ticker']} @ ${o['price']}*",
+        f"_{grade} — Req CAGR {o['required_cagr']}% | Convexity {o['convexity_score']}x_",
+        f"  Buy Call ${o['strike']} | {o['expiry']} | {o['dte']} DTE",
+        f"  Ask ${o['premium']} / Mid ${o['mid']} | Premium {o['premium_pct']}% of stock",
+        f"  Breakeven ${o['breakeven']} (needs {o['required_cagr']}%/yr to win)",
+        f"  Strike {o['strike_pct']}% of spot | Burden {o['ann_burden_pct']}%/yr",
+        f"  Coverage — 20%: {_c(cov20)} | 25%: {_c(cov25)} | 30%: {_c(cov30)}",
+        f"  OI {o['open_interest']} | Spread {o['spread_pct']}% | Max loss = premium",
+        f"_Use limit near mid; do not pay ask blindly_" if o.get("spread_pct", 0) > 8 else "",
+        f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
+    ]).replace("\n\n_Scanned", "\n_Scanned")
+
+
 def fmt_pmcc(opp) -> str:
     t = opp["pmcc"]["timing"]; p = opp["pmcc"]; l = opp["existing_leaps"]
     d = f" | δ{p['delta']}" if p.get('delta') else ""
@@ -5902,6 +5921,33 @@ def run_scanner():
     dashboard_convexity.sort(key=lambda x: (x.get("is_nearmiss", False),
                                             x.get("required_cagr", 99),
                                             -x.get("cov30", 0)))
+
+    # ── Cheap Convexity → Telegram (Grade A only) ──────────────
+    # Dashboard is authoritative; Telegram is derived. Convexity is built after
+    # the main Telegram block, so it sends here. Only Grade A (Excellent) passers
+    # alert — these are rare by design, so this won't flood.
+    tg_convex = [o for o in dashboard_convexity
+                 if o.get("classification") == "A" and not o.get("is_nearmiss")]
+    if STRICT_ZONE_TELEGRAM and tg_convex:
+        _pre = len(tg_convex)
+        _kept = []
+        for o in tg_convex:
+            _bu = SYMBOL_SETTINGS.get(o.get("ticker",""), {}).get("buy_under", 0) or 0
+            _iz, _rsn = compute_in_zone("LEAPS", o.get("price",0) or 0, _bu, 0,
+                                        o.get("ivp",0) or 0, 0)
+            if _iz:
+                _kept.append(o)
+            else:
+                print(f"   📵 TG SUPPRESS {o.get('ticker','')} CONVEXITY: {_rsn}")
+        tg_convex = _kept
+        print(f"   📵 STRICT_ZONE_TELEGRAM convexity: {_pre}→{len(tg_convex)}")
+    if tg_convex:
+        print(f"   📱 Sending {len(tg_convex)} Grade-A convexity alert(s)...")
+        send_telegram("━━━ *🎲 CHEAP CONVEXITY (Grade A)* ━━━"); time.sleep(1)
+        for o in tg_convex:
+            send_telegram(fmt_convex(o)); time.sleep(2)
+    else:
+        print(f"   🎲 Convexity: no Grade-A passers → no Telegram")
 
     # Sort by canonical score descending — never by annualized return
     dashboard_csps = csp_promote_best(dashboard_csps)
