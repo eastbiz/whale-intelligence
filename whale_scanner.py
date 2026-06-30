@@ -2203,7 +2203,8 @@ SPECULATIVE = {"IBIT", "CLS", "GRBK", "KNX", "LULU", "NBIS", "NVO", "POWL"}
 # LEAPS/CSP only — no CC income generation
 LEAPS_ONLY = {"IBIT"}
 
-# Volatility spike CC candidates — sell calls when stock spikes 8%+ upward
+# DEPRECATED — spike CC now fires for ANY held 100+ share position, not a fixed
+# list. Kept for reference only; no longer gates the spike scanner.
 SPIKE_CC_CANDIDATES = {"IBIT", "PLTR"}
 
 # Positions dashboard exclusion list — non-tradable, synthetic, or explicitly excluded
@@ -4779,11 +4780,12 @@ def run_scanner():
                       f"IVP {ivdata['ivp']:.0f}%")
 
         # ── Opportunistic Spike CC ────────────────────────
-        # Triggered BY gap moves — opposite of income mode which skips them
-        # Only for SPIKE_CC_CANDIDATES where you hold shares
+        # Triggered BY gap moves — opposite of income mode which skips them.
+        # Fires for ANY ticker where you hold 100+ shares and it spikes 8%+.
+        # A spike CC is COVERED (you own the shares), so it intentionally
+        # overrides spreads_only — selling a call on owned stock is not naked.
         spike_info = detect_price_spike(ticker, md)
-        if (ticker in SPIKE_CC_CANDIDATES
-                and spike_info["is_spike"]
+        if (spike_info["is_spike"]
                 and qty >= 100
                 and (quality.get("days_to_earnings") is None
                      or quality["days_to_earnings"] > OPP_EARNINGS_MIN)):
@@ -5042,15 +5044,16 @@ def run_scanner():
               f"{_pre_counts[2]}→{len(tg_leaps)} LEAPS")
 
     # PMCC and BCS: dashboard only — too complex/optional for a ping
-    # Spike CCs (opp_opps + tg_spikes): dashboard only — NOTABLE MOVES briefing already signals them
+    # Spike CCs: NOW sent to Telegram (covered calls into a spike — the low-risk,
+    # high-priority move). Drops also sent.
 
     has_real_opps = any([top_csps, top_ccs, top_leaps, top_pmccs, top_bcss, top_drops, top_spikes])
-    tg_any        = any([tg_csps, tg_ccs, tg_leaps, tg_drops])
+    tg_any        = any([tg_csps, tg_ccs, tg_leaps, tg_drops, tg_spikes])
 
     print(f"   Telegram filter: {len(tg_csps)} CSPs | {len(tg_ccs)} CCs | "
-          f"{len(tg_leaps)} LEAPS | {len(tg_drops)} Drops "
+          f"{len(tg_leaps)} LEAPS | {len(tg_drops)} Drops | {len(tg_spikes)} Spike CCs "
           f"(from {len(top_csps)}+{len(top_ccs)}+{len(top_leaps)} before filter) | "
-          f"{len(opp_opps)} spike opps + {len(tg_spikes)} spike CCs → dashboard only")
+          f"{len(opp_opps)} spike opps")
 
     # ── Telegram — ORDER: Summary → Trades ───────────────
     print("\n📱 Sending...")
@@ -5061,8 +5064,12 @@ def run_scanner():
         send_telegram(f"🧠 *CLAUDE SUMMARY*\n\n{analysis}")
         time.sleep(2)
 
-    # 2. Green-light trade alerts only (>= 75% score)
-    #    Spikes and drops: drops kept (direct entry signal), spikes removed (briefing covers them)
+    # 2. Green-light trade alerts.
+    #    Spike CC sent FIRST — it's the low-risk, time-sensitive priority (sell
+    #    calls into a spike on shares you already own).
+    if tg_spikes:
+        send_telegram("━━━ *⚡ SPIKE CC (sell into strength)* ━━━"); time.sleep(1)
+        for o in tg_spikes: send_telegram(fmt_spike_cc(o)); time.sleep(2)
     if tg_drops:
         send_telegram("━━━ *🔻 POST-DROP CSP* ━━━"); time.sleep(1)
         for o in tg_drops: send_telegram(fmt_drop_csp(o)); time.sleep(2)
