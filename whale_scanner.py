@@ -1919,6 +1919,7 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
     expiry_str    = pos.get("expiry", "")
     prem_received = abs(pos.get("premium_received", 0))
     mark          = pos.get("mark", 0)
+    mark_src      = pos.get("mark_src", "chain")   # 'chain' = live, else may be stale
     tier          = pos.get("tier", "Opportunistic")
     earn_days     = pos.get("days_to_earnings", 999)
     assignment_intent = pos.get("assignment_intent", False)
@@ -1966,6 +1967,15 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
         breakeven          = round(strike + prem_received, 2)
         dist_to_breakeven  = round((breakeven - underlying) / underlying * 100, 1) if underlying > 0 else 99
         dist_to_strike     = round((strike - underlying) / underlying * 100, 1) if underlying > 0 else 99
+
+    # ── Mark credibility check ─────────────────────────────────────────
+    # A deep-OTM short option should be nearly worthless → near-fully profitable.
+    # If the mark says otherwise (low/negative profit while >20% OTM), the quote
+    # is stale/bad regardless of source. Treat as unreliable so we don't print a
+    # confident-but-false P&L.
+    if dist_to_strike >= 20 and profit_pct < 60:
+        # deep OTM but mark implies <60% captured — quote not credible
+        mark_src = "incredible"
 
     # Velocity signals — only meaningful when risk is present
     is_fast_drop       = day_chg <= -0.020
@@ -2022,6 +2032,7 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
             "remaining_prem":  remaining_prem,
             "earn_zone":       earn_zone,
             "earn_days":       earn_days,
+            "mark_src":        mark_src,
             "sort_priority":   priority.get(action, 3),
         }
 
@@ -2031,6 +2042,12 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
     # are shown as context so you can decide, but they do NOT gate the alert.
     if big_move_review:
         _close_cost = round(mark * contracts * 100, 0)
+        _stale = mark_src not in ("chain", "chain_near")
+        if _stale:
+            return R("BIG MOVE",
+                     f"{ticker} {_move_desc} — your {pos_type} ${strike:g} is {_pos_ctx}, "
+                     f"{dte}d left. Big move — check the live option price and review "
+                     f"whether to close (position mark may be stale).")
         _pl_txt = (f"{profit_pct:.0f}% profit" if profit_pct >= 0
                    else f"{abs(profit_pct):.0f}% loss")
         return R("BIG MOVE",
@@ -6493,6 +6510,7 @@ def run_scanner():
         _strike = _pos.get("strike", 0)
         _expiry = _pos.get("expiry", "")
         _mark = 0
+        _mark_src = "none"
         # Normalize expiry to YYYY-MM-DD for comparison
         _exp_norm = str(_expiry).replace("-","")[:8]  # YYYYMMDD
         for _c in _contracts_opt:
@@ -6502,8 +6520,9 @@ def run_scanner():
                     _c.get("option_type") == "P"):
                 _b = float(_c.get("nbbo_bid",0) or 0)
                 _a = float(_c.get("nbbo_ask",0) or 0)
-                if _b > 0 or _a > 0:
-                    _mark = (_b + _a) / 2
+                if _a > 0:
+                    _mark = (_b + _a) / 2 if _b > 0 else _a
+                    _mark_src = "chain"
                 break
         # If still 0, find closest strike
         if _mark == 0:
@@ -6513,16 +6532,19 @@ def run_scanner():
                 _c = _puts[0]
                 _b = float(_c.get("nbbo_bid",0) or 0)
                 _a = float(_c.get("nbbo_ask",0) or 0)
-                _mark = (_b + _a) / 2 if (_b > 0 or _a > 0) else 0
-        # Final fallback: use mark derived from IBKR market_value
+                if _a > 0:
+                    _mark = (_b + _a) / 2 if _b > 0 else _a
+                    _mark_src = "chain_near"
+        # Final fallback: use mark derived from IBKR market_value (may be stale)
         if _mark == 0:
             _mark = _pos.get("mark_from_mv", 0)
+            _mark_src = "position_mv" if _mark > 0 else "none"
         # Earnings
         _earn = get_earnings_date(_ticker)
         _earn_days = (_earn - datetime.now()).days if _earn else 999
 
         _result = position_management_engine(
-            {**_pos, "type": "CSP", "tier": _tier, "mark": _mark,
+            {**_pos, "type": "CSP", "tier": _tier, "mark": _mark, "mark_src": _mark_src,
              "days_to_earnings": _earn_days},
             mkt, PORTFOLIO_SIZE, _total_cso, _spy_day
         )
@@ -6537,6 +6559,7 @@ def run_scanner():
             "dte":            _result["dte"],
             "underlying":     round(mkt.get(_ticker,{}).get("price",0),2),
             "mark":           round(_mark,2),
+            "mark_src":       _mark_src,
             "premium_received": round(_pos.get("premium_received",0),2),
             "profit_pct":     _result["profit_pct"],
             "pnl_dollar":     _result["pnl_dollar"],
@@ -6561,24 +6584,32 @@ def run_scanner():
                  "Cyclical" if _ticker in CYCLICAL_STOCKS else "Opportunistic")
         _strike = _pos.get("strike", 0)
         _expiry = _pos.get("expiry", "")
-        _mark_cc = _pos.get("mark", 0)
-        if not _mark_cc:
-            _contracts_opt = contracts_cache.get(_ticker, [])
-            _exp_norm_cc = str(_expiry).replace("-","")[:8]
-            for _c in _contracts_opt:
-                _c_exp = str(_c.get("expiry","")).replace("-","")[:8]
-                if (abs(float(_c.get("strike",0)) - _strike) < 0.5 and
-                        _c_exp == _exp_norm_cc and
-                        _c.get("option_type") == "C"):
-                    _b = float(_c.get("nbbo_bid",0) or 0)
-                    _a = float(_c.get("nbbo_ask",0) or 0)
-                    if _b > 0 or _a > 0:
-                        _mark_cc = (_b + _a) / 2
-                    break
+        # Prefer the LIVE chain NBBO (fresh Schwab quote this scan) over the
+        # position feed's market-value mark, which can be badly stale on a fast
+        # intraday move. Fall back to the stale mark only if no chain quote.
+        _mark_cc = 0
+        _mark_src = "none"
+        _contracts_opt = contracts_cache.get(_ticker, [])
+        _exp_norm_cc = str(_expiry).replace("-","")[:8]
+        for _c in _contracts_opt:
+            _c_exp = str(_c.get("expiry","")).replace("-","")[:8]
+            if (abs(float(_c.get("strike",0)) - _strike) < 0.5 and
+                    _c_exp == _exp_norm_cc and
+                    _c.get("option_type") == "C"):
+                _b = float(_c.get("nbbo_bid",0) or 0)
+                _a = float(_c.get("nbbo_ask",0) or 0)
+                if _a > 0:   # need a real ask for a usable mark
+                    _mark_cc = (_b + _a) / 2 if _b > 0 else _a
+                    _mark_src = "chain"
+                break
+        if _mark_cc <= 0:
+            # Fallback: position feed market-value mark (may be stale)
+            _mark_cc = _pos.get("mark", 0)
+            _mark_src = "position_mv" if _mark_cc > 0 else "none"
         _earn = get_earnings_date(_ticker)
         _earn_days = (_earn - datetime.now()).days if _earn else 999
         _result = position_management_engine(
-            {**_pos, "type": "CC", "tier": _tier, "mark": _mark_cc,
+            {**_pos, "type": "CC", "tier": _tier, "mark": _mark_cc, "mark_src": _mark_src,
              "days_to_earnings": _earn_days},
             mkt, PORTFOLIO_SIZE, _total_cso, _spy_day
         )
@@ -6593,6 +6624,7 @@ def run_scanner():
             "dte":            _result["dte"],
             "underlying":     round(mkt.get(_ticker,{}).get("price",0),2),
             "mark":           round(_mark_cc,2),
+            "mark_src":       _mark_src,
             "premium_received": round(_pos.get("premium_received",0),2),
             "profit_pct":     _result["profit_pct"],
             "pnl_dollar":     _result["pnl_dollar"],
@@ -6625,11 +6657,20 @@ def run_scanner():
         for p in _tg_bigmove:
             _emoji = "🟢" if p["type"] == "CSP" else "🔵"
             _pl = f"{p['profit_pct']:.0f}% profit" if p['profit_pct'] >= 0 else f"{abs(p['profit_pct']):.0f}% loss"
+            _src = p.get("mark_src", "none")
+            # On a fast move, the position-feed mark can lag. Flag it so a
+            # confident-but-stale number isn't taken at face value.
+            if _src in ("position_mv", "none"):
+                _price_line = (f"  ⚠️ Option price may be stale (${p['mark']:.2f}) — "
+                               f"check live quote before acting")
+            else:
+                _price_line = (f"  Premium in: ${p['premium_received']:,.0f} | "
+                               f"now ${p['mark']:.2f} to close ({_pl})")
             _msg = "\n".join([
                 f"{_emoji} *{p['type']} — {p['ticker']} ${p['strike']:g}*",
                 f"  {p['reason']}",
                 f"  Underlying ${p['underlying']} | strike ${p['strike']:g} | {p['dte']}d left",
-                f"  Premium in: ${p['premium_received']:,.0f} | now ${p['mark']:.2f} to close ({_pl})",
+                _price_line,
                 f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
             ])
             send_telegram(_msg); time.sleep(2)
