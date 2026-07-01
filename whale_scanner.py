@@ -46,6 +46,24 @@ PORTFOLIO_SIZE = 7_000_000  # fallback — overridden at runtime by live account
 # ── Sizing limits (configurable) ─────────────────────────────
 MAX_CSP_ALLOCATION_PCT = 0.25   # max 25% of portfolio in CSP obligations
 MAX_CC_COVERAGE_PCT    = 0.50   # max 50% of owned shares covered by calls
+# ── Favorable-Move Close Alert (CLOSE NOW) ──
+# Ping when a big favorable underlying move makes a short option cheap to close:
+#   CC (short call)  benefits when the stock DROPS   → is_fast_drop / 3-day drop
+#   CSP (short put)  benefits when the stock RISES   → is_fast_rally / 3-day rally
+# Requires solid profit already captured so it's a real exit, not a wiggle on a
+# contested (near-strike / ITM) position — those stay the user's discretion.
+CLOSE_MOVE_1D          = 0.05   # big favorable move: >=5% in one day
+CLOSE_MOVE_3D          = 0.08   # or >=8% over three days
+CLOSE_MIN_PROFIT       = 50.0   # option must be >=50% captured to fire
+# ── Escape-Assignment Alert (CC only, no profit requirement) ──
+# A CC near/through strike + a big DOWN day = a temporary window to buy the call
+# back cheaply and keep the shares, before a volatile name reverses. Fires
+# regardless of profit (you're often closing at a loss to protect the shares).
+# Rarer by nature (near-strike AND big drop same day), so a higher threshold
+# keeps it low-noise. All editable to tune.
+ESCAPE_DROP_1D         = 0.07   # >=7% drop in one day
+ESCAPE_DROP_3D         = 0.10   # or >=10% drop over three days
+ESCAPE_STRIKE_PROX     = 0.05   # CC "at risk": ITM or within 5% below strike
 
 # ── Schwab account number → label mapping ────────────────────
 # Format: last 4 digits or full number (dashes optional)
@@ -1961,6 +1979,39 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
     is_accelerating    = chg_3d  <= -0.040
     is_fast_rally      = day_chg >= 0.020
 
+    # ── Favorable-move detection (CLOSE NOW alert) ─────────────────────
+    # A "favorable" move is one that makes the SHORT option cheaper to buy back.
+    if pos_type == "CC":
+        # short call benefits from the stock falling
+        big_favorable_move = (day_chg <= -CLOSE_MOVE_1D) or (chg_3d <= -CLOSE_MOVE_3D)
+        _move_desc = (f"dropped {abs(day_chg)*100:.1f}% today"
+                      if day_chg <= -CLOSE_MOVE_1D
+                      else f"fell {abs(chg_3d)*100:.1f}% over 3 days")
+    else:  # CSP
+        # short put benefits from the stock rising
+        big_favorable_move = (day_chg >= CLOSE_MOVE_1D) or (chg_3d >= CLOSE_MOVE_3D)
+        _move_desc = (f"rose {day_chg*100:.1f}% today"
+                      if day_chg >= CLOSE_MOVE_1D
+                      else f"gained {chg_3d*100:.1f}% over 3 days")
+
+    # ── Escape-assignment detection (CC only, no profit floor) ─────────
+    # Big DOWN day while the CC is near/through strike = window to buy the call
+    # back cheaply and keep the shares. dist_to_strike (CC) is (strike-price)/price:
+    # <=0 means ITM, >0 means OTM. "At risk" = ITM or within ESCAPE_STRIKE_PROX.
+    escape_assignment = False
+    _escape_desc = ""
+    if pos_type == "CC":
+        _cc_at_risk = (dist_to_strike / 100.0) <= ESCAPE_STRIKE_PROX
+        _big_drop   = (day_chg <= -ESCAPE_DROP_1D) or (chg_3d <= -ESCAPE_DROP_3D)
+        if _cc_at_risk and _big_drop:
+            escape_assignment = True
+            _drop_txt = (f"dropped {abs(day_chg)*100:.1f}% today"
+                         if day_chg <= -ESCAPE_DROP_1D
+                         else f"fell {abs(chg_3d)*100:.1f}% over 3 days")
+            _pos_txt = ("ITM" if dist_to_strike <= 0
+                        else f"within {dist_to_strike:.1f}% of strike")
+            _escape_desc = f"{_drop_txt}, call {_pos_txt}"
+
     # Safe zone: long DTE + good cushion → cannot be DEFENSIVE, ignore velocity
     in_safe_zone = dte > 30 and dist_to_breakeven >= 10
 
@@ -1978,7 +2029,8 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
 
     # ── Helper to return result ────────────────────────────────────────
     def R(action, reason):
-        priority = {"TAKE PROFIT": 0, "EARNINGS WARNING": 1, "HOLD": 2}
+        priority = {"ESCAPE ASSIGNMENT": 0, "CLOSE NOW": 0, "TAKE PROFIT": 1,
+                    "EARNINGS WARNING": 2, "HOLD": 3}
         return {
             "action":          action,
             "reason":          reason,
@@ -1991,8 +2043,30 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
             "remaining_prem":  remaining_prem,
             "earn_zone":       earn_zone,
             "earn_days":       earn_days,
-            "sort_priority":   priority.get(action, 2),
+            "sort_priority":   priority.get(action, 3),
         }
+
+    # ── ESCAPE ASSIGNMENT (CC near strike + big drop, no profit floor) ─
+    # A volatile name that's been hovering near your call strike just had a big
+    # down day — the call is temporarily cheap to buy back. Close to keep the
+    # shares before it reverses. Fires regardless of profit/loss.
+    if escape_assignment:
+        _close_cost = round(mark * contracts * 100, 0)
+        return R("ESCAPE ASSIGNMENT",
+                 f"{ticker} {_escape_desc} — call cheaper to buy back now "
+                 f"(${_close_cost:,.0f} to close, {dte}d left). Close to keep your "
+                 f"shares before it reverses.")
+
+    # ── CLOSE NOW (favorable-move exit) ────────────────────────────────
+    # Highest priority. A big favorable underlying move (CC: stock down /
+    # CSP: stock up) has made the short option cheap to buy back while it's
+    # already at solid profit — grab it before a volatile name reverses.
+    if big_favorable_move and profit_pct >= CLOSE_MIN_PROFIT:
+        _close_cost = round(mark * contracts * 100, 0)
+        return R("CLOSE NOW",
+                 f"{ticker} {_move_desc} — {pos_type} now {profit_pct:.0f}% profit "
+                 f"(${_close_cost:,.0f} to close, {dte}d left). Big favorable move — "
+                 f"capture it before it reverses.")
 
     # ── TAKE PROFIT ────────────────────────────────────────────────────
     # Act now — premium has decayed enough, risk/reward favours closing
@@ -6570,6 +6644,41 @@ def run_scanner():
     _def_count   = sum(1 for p in _pos_actions if p["action"] == "DEFENSIVE")
     _close_count = sum(1 for p in _pos_actions if p["action"] == "CLOSE NOW")
     print(f"   📋 Position actions: {len(_pos_actions)} total | {_def_count} DEFENSIVE | {_close_count} CLOSE NOW")
+
+    # ── CLOSE NOW / ESCAPE ASSIGNMENT → Telegram ──────────────────────
+    # Both are time-sensitive CC/CSP exits driven by a big move. Built after the
+    # main Telegram block, so they send here. Separate labels so you know why.
+    _tg_close  = [p for p in _pos_actions if p["action"] == "CLOSE NOW"]
+    _tg_escape = [p for p in _pos_actions if p["action"] == "ESCAPE ASSIGNMENT"]
+    if _tg_escape:
+        print(f"   📱 Sending {len(_tg_escape)} ESCAPE ASSIGNMENT alert(s)...")
+        send_telegram("━━━ *🛡️ ESCAPE ASSIGNMENT (CC — big drop)* ━━━"); time.sleep(1)
+        for p in _tg_escape:
+            _msg = "\n".join([
+                f"🛡️ *CLOSE CC — {p['ticker']} ${p['strike']}*",
+                f"  {p['reason']}",
+                f"  Underlying ${p['underlying']} | strike ${p['strike']} | {p['dte']}d left",
+                f"  Premium in: ${p['premium_received']:,.0f} | now ${p['mark']:.2f} to close "
+                f"(P&L {p['profit_pct']:.0f}%)",
+                f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
+            ])
+            send_telegram(_msg); time.sleep(2)
+    if _tg_close:
+        print(f"   📱 Sending {len(_tg_close)} CLOSE NOW alert(s)...")
+        send_telegram("━━━ *⚡ CLOSE NOW (favorable move)* ━━━"); time.sleep(1)
+        for p in _tg_close:
+            _emoji = "🟢" if p["type"] == "CSP" else "🔵"
+            _msg = "\n".join([
+                f"{_emoji} *CLOSE {p['type']} — {p['ticker']} ${p['strike']}*",
+                f"  {p['reason']}",
+                f"  Underlying ${p['underlying']} | {p['dte']}d left | "
+                f"{p['profit_pct']:.0f}% captured",
+                f"  Premium in: ${p['premium_received']:,.0f} | now ${p['mark']:.2f} to close",
+                f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
+            ])
+            send_telegram(_msg); time.sleep(2)
+    if not _tg_close and not _tg_escape:
+        print(f"   ⚡ No CLOSE NOW / ESCAPE ASSIGNMENT exits this scan")
 
     results = {
         "scan_time":           now_et().strftime("%Y-%m-%d %H:%M ET"),
