@@ -148,9 +148,12 @@ call still marked at its pre-drop price). The engine guards against this:
 - **Schwab token expires every 7 days.** Refresh on Windows only:
   `python refresh_token.py` in `C:\Users\John\scanner`, App Key
   `ZMZSlpMaNaFGSbIvJFb3pxNlOxwFFUPzgPtOevHgrj3zmAHj`, callback
-  `https://127.0.0.1:8182`. After renewal, update both `SCHWAB_REFRESH_TOKEN`
-  and `SCHWAB_ACCESS_TOKEN` in GitHub Actions secrets. Chrome SSL bypass:
-  "Insecure origins treated as secure" flag → enter the callback URL.
+  `https://127.0.0.1:8182`. Chrome SSL bypass: "Insecure origins treated as
+  secure" flag → enter the callback URL. After renewal, run
+  `python push_schwab_secrets.py` to auto-push the new
+  `SCHWAB_REFRESH_TOKEN`/`SCHWAB_ACCESS_TOKEN` to GitHub Actions secrets
+  (no more copy-paste) — requires a `GITHUB_TOKEN` env var holding a
+  fine-grained PAT scoped to this repo with "Secrets: Read and write".
 - **IVP ≠ IV Rank.** The scanner only has IVP (percentile), computed as
   `100 * (1 - exp(-atm_iv / 0.25))`. Never use "IV Rank" language. IVP can be
   stale on weekends.
