@@ -1747,17 +1747,13 @@ def csp_engine(opp: dict, spy_day_chg: float = 0,
     # Only apply top 2 penalties max
     flags.extend(penalties[:2])
 
-    # Downgrades: only if strongest penalty present
+    # Downgrades: only if strongest penalty present (applies to all tiers,
+    # including Opportunistic — previously Opportunistic was hard-skipped
+    # here, which meant high-IVP setups on speculative names were discarded
+    # before yield was ever checked)
     if below_200 or at_lows:
         if action == "BUY":
             action = "WAIT"
-
-    # Hard skip for Opportunistic at lows
-    if at_lows and tier == "Opportunistic":
-        yield_30d = (premium / strike) * (30 / dte) if strike > 0 and dte > 0 else 0
-        return {"action": "SKIP", "drop_type": drop_type,
-                "yield_30d": round(yield_30d*100, 2),
-                "flags": ["AT LOWS — SKIP"], "sort_key": 0}
 
     # ── Step 3: Yield validation ───────────────────────────────
     yield_30d = (premium / strike) * (30 / dte) if strike > 0 and dte > 0 else 0
