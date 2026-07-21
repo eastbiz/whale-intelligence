@@ -446,3 +446,10 @@ rich-but-quiet opportunity (high IVP, no big move today) deserve a ping or not?
   Zero installation for John — runs in the same cloud as the scanner. No
   Schwab/IBKR usage. Validated: alert content, dedup, escalation, weekend
   guard (4/4 scenarios). Built 2026-07-21 with John's go-ahead.
+- **A8 — Watchdog self-heal for scheduled scans.** Run-history analysis
+  showed every scheduled scan 60-105 min late + occasional drops (GitHub
+  scheduler under load, scanner itself 29/30 healthy). The Move Watcher now
+  re-dispatches scanner.yml when an expected slot is >10 min overdue; the
+  scanner skips late-arriving schedule duplicates (<100 min freshness).
+  Directly serves P10 (fresh data when John sits down to trade) — this was
+  why he kept pushing manual scans. Validated 10/10. Built 2026-07-21.

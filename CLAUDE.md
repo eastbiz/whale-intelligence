@@ -47,6 +47,17 @@ independently.**
   Dedup: one alert per ticker/direction/day, re-alerts only when the move
   crosses the next 5% bucket (state in `move_watcher_state.json`, committed
   only when an alert fired). NO Schwab/IBKR calls — never burns tokens.
+- **Watchdog self-heal** (inside the Move Watcher): GitHub's cron delivered
+  every scheduled scan 60-105 min late in Jul 2026 and occasionally dropped
+  runs. The watcher checks each expected slot (13:47/16:41/18:47 UTC — keep
+  `SCAN_TIMES_UTC` in `move_watcher.py` in sync with `scanner.yml` crons!)
+  and fires a `workflow_dispatch` on scanner.yml if a slot is >10 min overdue
+  with no scan landed. The scanner's `skip_redundant_scheduled_run()` makes
+  the late-arriving cron duplicate exit quietly (schedule-event runs skip if
+  a scan completed <100 min ago; manual/dispatch runs ALWAYS execute).
+  Worst-case scan lateness: ~20-30 min. If a watchdog dispatch ever returns
+  HTTP 403 (GITHUB_TOKEN restriction), swap in a fine-grained PAT secret with
+  Actions write — John has made PATs before (push_schwab_secrets.py).
 
 ---
 
