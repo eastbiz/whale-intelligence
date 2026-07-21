@@ -295,7 +295,7 @@ if __name__ == "__main__":
         ("BABA", "CSP", 60, "lower_band", False, "BABA leaps_only blocks CSP"),
         ("BABA", "LEAPS", 20, "lower_band", True, "BABA LEAPS at low IVR OK"),
         ("BABA", "LEAPS", 80, "lower_band", False, "BABA LEAPS at high IVR blocked"),
-        ("NBIS", "CSP", 65, "lower_band", False, "NBIS spreads_only blocks CSP"),
+        ("NBIS", "CSP", 65, "lower_band", True, "NBIS CSP OK at IVR>50 (spreads_only removed)"),
         ("NBIS", "PUT_SPREAD", 65, "lower_band", True, "NBIS spread OK"),
         ("META", "CSP", 60, "mid_low", False, "META watchlist blocks mid-zone"),
         ("META", "CSP", 60, "lower_band", True, "META CSP OK in lower"),
