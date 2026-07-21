@@ -17,6 +17,13 @@ open positions for exits, and delivers everything to a dashboard + Telegram.
 **Owner:** John. Active options trader. Direct, blunt communication preferred —
 no filler, facts first, say "uncertain" rather than guess.
 
+**`TRADING_PRINCIPLES.md`** (same repo) is the living log of John's real trade
+examples and the principles distilled from them. Workflow: John shares trades →
+Claude asks follow-ups / challenges from a trader viewpoint → principles
+accumulate → system changes happen only after patterns are confirmed (candidates
+listed there as C1, C2, …). Read it before proposing changes to entry/exit or
+alert logic, and append new examples/principles to it as they come up.
+
 ### Two repositories (tightly coupled)
 - **`eastbiz/whale-intelligence`** — Python scanner. `whale_scanner.py` (~6,700
   lines) is the core. This is where ~95% of work happens.
