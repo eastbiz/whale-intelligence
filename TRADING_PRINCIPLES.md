@@ -66,9 +66,38 @@ Trigger: I see the stock rise. I check IVP and my sell-above target.
 Some positions I close before expiry, timing the close to the most favorable
 price swing for profitability. Even closing at a **loss** can be worth it when a
 swing has substantially reduced the loss (vs. risking it widening again).
-- Evidence: stated workflow (2026-07-21); EX-1 (breakeven exit window).
+- Evidence: stated workflow (2026-07-21); EX-1/EX-3 (closed the $180 put at
+  ~breakeven on the spike — a completed example, was −35% the day before).
 - System status: **Candidate C2** — swing-aware close framing / loss-reduction
   exit prompts. Needs more examples to define thresholds.
+
+### P7 — React to huge moves; don't wait for stabilization
+In the current market, waiting for prices to stabilize is not the ideal
+strategy. Big moves ARE the opportunities — react to them. What separates a
+real opportunity from noise: how substantial the price move is, how high IVP
+is, the stock's own history of price movements, and **distance from my
+buy-below / sell-above targets** (that's why I maintain those targets — they're
+the anchor the system should measure moves against).
+- Evidence: stated 2026-07-22 (rejecting "wait for day-3 stabilization"
+  framing); EX-2 ($140 put written into a −19% day, +37% one day later).
+- System status: consistent with A3 (at-lows hard-skip removed). Open question:
+  whether WAIT labels should downgrade high-IVP big-drop setups at all —
+  collect more examples (Candidate C5).
+
+### P8 — The spike-close → re-write-lower cycle (rolling with the swings)
+On volatile names the position is not one trade, it's a cycle: write the CSP,
+and if a big favorable spike pulls it back to breakeven/profit — close it if I
+don't specifically want assignment at that strike. Then when the stock drops
+again (likely, at this volatility), write a NEW put at a LOWER strike. Each
+swing ratchets the strike down and harvests premium twice. Strike choice is
+always "how much do I want to own at this price" — high vol argues for lower
+strikes, not no trade.
+- Evidence: EX-3 (closed $180 put on +17% day, already holding the $140 written
+  the prior day; expects to write below $180 on the next drop — logged as a
+  prediction to check).
+- System status: not built. The scanner treats entries and exits as unrelated
+  events. Candidate C6: after a spike-close on a name, watch for the next drop
+  and surface the lower-strike re-entry.
 
 ---
 
@@ -98,6 +127,25 @@ swing has substantially reduced the loss (vs. risking it widening again).
 - Short 10, avg premium $9.19, mark ~$12.85 → ~ **−40%** (real loss), 29% OTM.
 - Same guard misfire: real −40% would be hidden as "stale." Useful as the
   loss-side counterpart to EX-2.
+- Day 2 update (+17% day): mark $12.70 → loss narrowed to ~−36.5%. A
+  loss-reduction close candidate under P6 if the recovery extends.
+
+### EX-3 — NBIS $180 put CLOSED at $10.00 on the spike (completes EX-1)
+- 2026-07-22, NBIS +17% second day of rally (~$213.67). Closed the Jul31 $180
+  put at **$10.00** vs $10.50 received → small profit (~5% of premium), after
+  being ~**35% underwater the day before**.
+- Stated rationale: (a) earnings can go either way, prefer not to carry the
+  $180 obligation through that uncertainty; (b) at this volatility, if short a
+  put at all, it should be at a LOWER strike — and the $140 (written the prior
+  day, now +37%) already fills that role; (c) the decision hinge is "how much
+  do I want to own at $180" → answer: less than at lower strikes.
+- Prediction logged: John expects a drop after this spike and plans to write a
+  new CSP below $180 — watch whether this plays out (P8 evidence).
+- What John wants from the system for this case: a notification in the
+  **CSP/CC Actions** view when a short-option position makes a big favorable
+  day-over-day swing (e.g., substantially negative → positive/breakeven), so
+  it's obvious WHICH position produced the exit window. 17%/day is huge; the
+  card should make the swing visible, not just current P&L.
 
 ---
 
@@ -129,6 +177,22 @@ a selectable posture in the CC engine. Needs confirmation of how to expose it.
 The 3×/weekday scan can miss a fast intraday spike entirely (it can fade before
 a scan runs). Bigger build — already on the CLAUDE.md backlog. Tracked here
 because it directly limits P1 (BIG MOVE can only fire if a scan catches the move).
+
+### C5 — Rethink WAIT labels for high-IVP big-drop setups (P7)
+Current csp_engine downgrades BUY→WAIT on below-200DMA / at-lows. John's actual
+behavior (EX-2) is to SELL into exactly those conditions when the move is big,
+IVP is extreme, and the strike sits well under his buy-below target. Possible
+direction: when IVP is very high AND effective entry is comfortably below
+buy_under, don't downgrade — or show a distinct label ("RICH PREMIUM — BIG
+MOVE") instead of WAIT. Needs more examples before touching risk logic.
+
+### C6 — Spike-close → re-entry-lower tracking (P8)
+After a position is closed into a spike (or BIG MOVE fires), track the name for
+the follow-on drop and surface the lower-strike CSP re-entry. Also: make the
+BIG MOVE / Actions card show the day-over-day P&L swing ("was −35% yesterday →
+breakeven now"), not just current P&L, so the position that produced the exit
+window is unmistakable. Depends on C1 (real P&L must be shown for the swing to
+be visible) and is limited by C4 (cadence).
 
 ---
 
