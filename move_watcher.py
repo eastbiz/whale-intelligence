@@ -21,7 +21,7 @@ P&L (BIG MOVE / P&L SWING alerts) — this is just the early-warning bell.
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import requests
@@ -30,6 +30,19 @@ MOVE_ALERT_PCT   = 5.0                        # |day move| that triggers an aler
 STATE_FILE       = "move_watcher_state.json"  # dedup state, committed on change
 RESULTS_FILE     = "results.json"             # last full scan (for held positions)
 ET               = ZoneInfo("America/New_York")
+PT               = ZoneInfo("America/Los_Angeles")
+
+# ── Watchdog: rescue late/dropped scheduled scans ────────────────────────
+# GitHub's cron ran 60-105 min late on EVERY scheduled scan in Jul 2026 and
+# occasionally dropped runs entirely. Since this watcher wakes every 15 min
+# anyway, it checks whether each expected scan actually happened and fires a
+# workflow_dispatch on scanner.yml if not. The scanner itself skips
+# late-arriving schedule duplicates (see skip_redundant_scheduled_run there).
+SCAN_TIMES_UTC     = ["13:47", "16:41", "18:47"]  # KEEP IN SYNC with scanner.yml crons
+WATCHDOG_GRACE_MIN = 10                            # give the real cron this head start
+SCANNER_WORKFLOW   = "scanner.yml"
+GITHUB_TOKEN       = os.environ.get("GITHUB_TOKEN", "")
+GITHUB_REPOSITORY  = os.environ.get("GITHUB_REPOSITORY", "eastbiz/whale-intelligence")
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID   = os.environ.get("TELEGRAM_CHAT_ID", "")
@@ -145,6 +158,66 @@ def build_line(tk, price, chg, targets, short_pos):
     return line
 
 
+def last_scan_utc():
+    """When the last full scan completed, as UTC. None if unknown.
+    NOTE: results.json scan_time strings end in 'ET' but the scanner's
+    now_et() actually produces Pacific time — parse with PT."""
+    try:
+        with open(RESULTS_FILE) as f:
+            st = json.load(f).get("scan_time", "")
+        return (datetime.strptime(st, "%Y-%m-%d %H:%M ET")
+                .replace(tzinfo=PT).astimezone(timezone.utc))
+    except Exception:
+        return None
+
+
+def dispatch_scanner(reason: str) -> bool:
+    """Fire scanner.yml via workflow_dispatch. Returns True on success."""
+    if not GITHUB_TOKEN:
+        print("watchdog: no GITHUB_TOKEN — cannot dispatch")
+        return False
+    try:
+        r = requests.post(
+            f"https://api.github.com/repos/{GITHUB_REPOSITORY}/actions/"
+            f"workflows/{SCANNER_WORKFLOW}/dispatches",
+            headers={"Authorization": f"Bearer {GITHUB_TOKEN}",
+                     "Accept": "application/vnd.github+json"},
+            json={"ref": "main", "inputs": {"reason": reason}},
+            timeout=15,
+        )
+        ok = r.status_code == 204
+        print(f"watchdog dispatch: HTTP {r.status_code}"
+              + ("" if ok else f" — {r.text[:200]}"))
+        return ok
+    except Exception as e:
+        print(f"watchdog dispatch failed: {e}")
+        return False
+
+
+def run_watchdog(state: dict) -> bool:
+    """Check each expected scan slot; dispatch a replacement if missed.
+    Returns True if state changed (a dispatch was recorded)."""
+    now_utc = datetime.now(timezone.utc)
+    last = last_scan_utc()
+    changed = False
+    dispatched = state.setdefault("dispatched", {})
+    for hhmm in SCAN_TIMES_UTC:
+        h, m = map(int, hhmm.split(":"))
+        slot = now_utc.replace(hour=h, minute=m, second=0, microsecond=0)
+        if now_utc < slot + timedelta(minutes=WATCHDOG_GRACE_MIN):
+            continue                       # slot not due yet (or within grace)
+        if dispatched.get(hhmm):
+            continue                       # already rescued this slot today
+        if last is not None and last >= slot - timedelta(minutes=5):
+            continue                       # a scan at/after this slot exists
+        last_txt = f"last scan {last:%H:%M} UTC" if last else "no scan on record"
+        print(f"watchdog: scan slot {hhmm} UTC missed ({last_txt}) — dispatching scanner")
+        if dispatch_scanner(f"watchdog: {hhmm} UTC slot missed"):
+            dispatched[hhmm] = True
+            changed = True
+    return changed
+
+
 def main():
     dt = now_et()
     if not market_hours(dt):
@@ -190,6 +263,9 @@ def main():
         print(f"alerted {len(lines)} mover(s)")
     else:
         print("no new movers")
+
+    # Watchdog: rescue late/dropped scheduled scans
+    changed = run_watchdog(state) or changed
 
     if changed:
         with open(STATE_FILE, "w") as f:

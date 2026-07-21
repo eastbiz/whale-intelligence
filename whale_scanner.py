@@ -4136,7 +4136,37 @@ def fmt_spike_cc(opp) -> str:
 # MAIN SCANNER
 # ════════════════════════════════════════════════════════════
 
+def skip_redundant_scheduled_run(max_age_min: int = 100) -> bool:
+    """
+    GitHub's cron can deliver a scheduled run 60-105 min late (observed
+    Jul 2026). The Move Watcher's watchdog dispatches a replacement scan
+    ~10-25 min after a missed slot, so when the original late run finally
+    arrives it would duplicate everything (double Telegram batch).
+    Rule: a SCHEDULE-event run exits quietly if a scan completed within
+    max_age_min. Manual runs and watchdog dispatches (workflow_dispatch)
+    always execute. 100 min is safely below the tightest slot spacing
+    (16:41→18:47 UTC = 126 min), so legitimate slots are never skipped —
+    and if one ever were, the watchdog would rescue it anyway.
+    NOTE: scan_time strings say "ET" but now_et() actually returns Pacific —
+    parse with PT (see now_et()).
+    """
+    if os.environ.get("GITHUB_EVENT_NAME") != "schedule":
+        return False
+    try:
+        with open("results.json") as f:
+            st = json.load(f).get("scan_time", "")
+        last = datetime.strptime(st, "%Y-%m-%d %H:%M ET").replace(tzinfo=PT)
+        age_min = (datetime.now(tz.utc).astimezone(PT) - last).total_seconds() / 60
+        return 0 <= age_min < max_age_min
+    except Exception:
+        return False
+
+
 def run_scanner():
+    if skip_redundant_scheduled_run():
+        print("⏭  Late-arriving scheduled run — a scan already completed within "
+              "100 min (watchdog or earlier slot). Skipping duplicate.")
+        return
     print(f"\n{'='*60}")
     print(f"🐋 WHALE INTELLIGENCE v5 — {now_et().strftime('%Y-%m-%d %H:%M')} ET")
     print(f"   Framework: Quality → Pullback → Option Yield")

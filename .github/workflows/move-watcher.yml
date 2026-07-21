@@ -20,6 +20,7 @@ concurrency:
 
 permissions:
   contents: write
+  actions: write   # watchdog: dispatch scanner.yml when a scheduled scan is missed
 
 jobs:
   watch:
@@ -44,6 +45,7 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_TOKEN:       ${{ secrets.GITHUB_TOKEN }}
         run: python move_watcher.py
 
       - name: Commit dedup state (only when an alert fired)
