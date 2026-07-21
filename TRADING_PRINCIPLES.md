@@ -78,7 +78,7 @@ real opportunity from noise: how substantial the price move is, how high IVP
 is, the stock's own history of price movements, and **distance from my
 buy-below / sell-above targets** (that's why I maintain those targets — they're
 the anchor the system should measure moves against).
-- Evidence: stated 2026-07-22 (rejecting "wait for day-3 stabilization"
+- Evidence: stated 2026-07-21 (rejecting "wait for day-3 stabilization"
   framing); EX-2 ($140 put written into a −19% day, +37% one day later).
 - System status: consistent with A3 (at-lows hard-skip removed). Open question:
   whether WAIT labels should downgrade high-IVP big-drop setups at all —
@@ -100,7 +100,7 @@ strikes, not no trade.
   and surface the lower-strike re-entry.
 
 ### P9 — Carry earnings risk only at strikes I'd happily own through the event
-Confirmed 2026-07-22 (EX-3 follow-up): the $180 close wasn't about the $180
+Confirmed 2026-07-21 (EX-3 follow-up): the $180 close wasn't about the $180
 put's own earnings exposure (it expired Jul 31, before Aug 6 earnings) — it was
 about locking the recovery at a strike I didn't love, while **deliberately
 keeping** the Aug 21 $140/$150 puts that DO sit through earnings, because at
@@ -118,20 +118,20 @@ CSPs/CCs. Then check **5-day and 30-day** movement for context. Then **IVP —
 drives the review of open positions for closes. **If the market isn't moving,
 I don't trade at all** — and I only want to be notified on days when the
 opportunity conditions are actually there.
-- Evidence: stated workflow 2026-07-22.
+- Evidence: stated workflow 2026-07-21.
 - System status: partially aligned (BIG MOVE for positions). The scanner scans
   everything every run and the dashboard always fills; there's no "today is
   (not) a trading day" gate on notifications. See C8.
-- Tension RESOLVED (2026-07-22): **IVP is a quick reference, not a gate — if
+- Tension RESOLVED (2026-07-21): **IVP is a quick reference, not a gate — if
   the price is right, price overrides IVP.** Any future encoding of P10 must
   treat IVP as a soft ranking input, never a hard filter.
 
 ### P11 — Direction disqualifiers: don't sell INTO the move that just paid
 On a big up-day, no CSP on that name (premium is momentarily poor + reversal
 risk); a deeply negative 30-day trend disqualifies the CC side. Worked example
-(2026-07-22): NBIS +7.5% today but 5d −25% → **disqualifies BOTH**: no CSP
+(2026-07-21): NBIS +7.5% today but 5d −25% → **disqualifies BOTH**: no CSP
 (just rose 7.5% today), no CC (30d −25%).
-- Evidence: stated workflow with NBIS example, 2026-07-22.
+- Evidence: stated workflow with NBIS example, 2026-07-21.
 - System status: largely built — csp_engine's rebound suppression (skip CSP on
   ≥7% up-day, downgrade at ≥5%) covers the CSP side; zone-first CC gating
   covers the CC side. Keep both when refactoring.
@@ -140,7 +140,7 @@ risk); a deeply negative 30-day trend disqualifies the CC side. Worked example
 LEAPS candidates come from the opposite screen as premium selling: stocks with
 LOW IVP that dropped recently — buy cheap optionality on quality names after
 the fall, sell expensive premium elsewhere.
-- Evidence: stated workflow 2026-07-22; sheet shows 99 LEAP entries (MSFT
+- Evidence: stated workflow 2026-07-21; sheet shows 99 LEAP entries (MSFT
   after drops, LULU, NVDA...).
 - System status: aligned — strategy_allowed blocks LEAPS at elevated/extreme
   IVR and in upper price zones.
@@ -151,7 +151,7 @@ history: what premium did I get last time, at what delta, at what stock price.
 It doesn't produce hard rules, but it's the context for judging whether
 today's premium is rich or poor **for this name**. The scanner is isolated at
 the moment of scan — it has no memory of what I've been paid before.
-- Evidence: stated 2026-07-22; the Options Trades sheet is maintained largely
+- Evidence: stated 2026-07-21; the Options Trades sheet is maintained largely
   for this purpose.
 - System status: not built. See C7. First fruits of the analysis in EX-4 —
   e.g., the Jul 20 CRDO $175 CSPs (74–81% ann, IVP 94) are richer than ALL six
@@ -162,7 +162,7 @@ the moment of scan — it has no memory of what I've been paid before.
 When I WANT to sell the shares (exit-waiting), I write CCs even at very low
 IVP — the premium is a bonus on a sale I want anyway, not the reason for the
 trade. IV-richness rules apply to income CCs, not exit CCs.
-- Evidence: confirmed 2026-07-22 — the 10 IBIT CCs at median IVP 13 (EX-4)
+- Evidence: confirmed 2026-07-21 — the 10 IBIT CCs at median IVP 13 (EX-4)
   were deliberate rule-breaks because "IBIT I want to sell."
 - System status: partially encoded — cc_only tickers (MSTR, OWL) already skip
   zone gating. But IBIT is NOT cc_only, so the scanner can't tell John's exit
@@ -170,7 +170,7 @@ trade. IV-richness rules apply to income CCs, not exit CCs.
   exit changes acceptable delta AND acceptable IVP).
 
 ### P15 — "Good day to close" is a confluence, not a single threshold
-The CLS case (EX-5): what made 2026-07-22 a flag-worthy exit day was the
+The CLS case (EX-5): what made 2026-07-21 a flag-worthy exit day was the
 COMBINATION — a big spike day (+9.6%, the puts lost ~half their value in one
 session), earnings inside the expiry window (5 days away), a strike close to
 the money (10.9% OTM), decent profit available (+34%/+48%), and genuine
@@ -183,14 +183,14 @@ alone; together they say "if you want out, today is the day."
   BIG MOVE would have fired and SUPPRESSED the earnings context (engine
   returns one action per position). See C2 (extended).
 - UPDATE: built same day as A6 — 5% threshold, stacked reason lines, and the
-  P&L SWING action all shipped 2026-07-22.
+  P&L SWING action all shipped 2026-07-21.
 
 ### P16 — LEAPS are long-term investments, exempt from event-day logic
 The deep-ITM LEAPS (e.g. 10× CLS Jan'28 $180) are stock replacement held for
 years. Earnings calls don't factor into them — no trimming logic, no P15
 confluence application. Event-day exit thinking applies to SHORT premium
 positions only.
-- Evidence: stated 2026-07-22 in response to Claude's challenge on the CLS
+- Evidence: stated 2026-07-21 in response to Claude's challenge on the CLS
   LEAPS riding through earnings.
 - System status: consistent with current behavior (position engine only acts
   on short options). Encoded here so nobody "improves" LEAPS with exit alerts.
@@ -227,7 +227,7 @@ positions only.
   loss-reduction close candidate under P6 if the recovery extends.
 
 ### EX-3 — NBIS $180 put CLOSED at $10.00 on the spike (completes EX-1)
-- 2026-07-22, NBIS +17% second day of rally (~$213.67). Closed the Jul31 $180
+- 2026-07-21, NBIS +17% second day of rally (~$213.67). Closed the Jul31 $180
   put at **$10.00** vs $10.50 received → small profit (~5% of premium), after
   being ~**35% underwater the day before**.
 - Stated rationale: (a) earnings can go either way, prefer not to carry the
@@ -235,7 +235,7 @@ positions only.
   put at all, it should be at a LOWER strike — and the $140 (written the prior
   day, now +37%) already fills that role; (c) the decision hinge is "how much
   do I want to own at $180" → answer: less than at lower strikes.
-- Follow-up confirmed (2026-07-22): the earnings logic was strike-depth logic
+- Follow-up confirmed (2026-07-21): the earnings logic was strike-depth logic
   (the $180/Jul31 expired BEFORE the 8/6 earnings; the kept $140/$150 Aug21
   puts sit THROUGH it). The principle is P9: keep earnings exposure only at
   strikes worth owning through the event; the $180 close was locking the
@@ -248,7 +248,7 @@ positions only.
   it's obvious WHICH position produced the exit window. 17%/day is huge; the
   card should make the swing visible, not just current P&L.
 
-### EX-4 — Analysis of the Options Trades sheet (2026-07-22)
+### EX-4 — Analysis of the Options Trades sheet (2026-07-21)
 Parsed John's Google Sheet ("Options Trades", 348 usable trades: 159 CSP,
 87 CC, 99 LEAP, 3 Bull Call). Delta/IVP-at-entry recorded from Dec 15 2025 on.
 
@@ -277,7 +277,7 @@ Parsed John's Google Sheet ("Options Trades", 348 usable trades: 159 CSP,
   (med 82–84) — P7/P10 in the data.
 - But plenty of good entries happened at IVP 26–40 (NBIS, MSFT, CRDO, NVDA,
   GOOGL) — the "IVP≥50" funnel bar is soft in practice (see P10 tension).
-- IBIT CCs were written at med IVP 13 — very low vol. RESOLVED 2026-07-22:
+- IBIT CCs were written at med IVP 13 — very low vol. RESOLVED 2026-07-21:
   deliberate — "IBIT I want to sell", exit intent overrides IV richness (P14).
 - Jul 20 2026 CRDO $175 CSPs (IVP 94, 74–81% ann) beat all six prior CRDO
   entries — first concrete case where history context would have upgraded a
@@ -294,7 +294,7 @@ Parsed John's Google Sheet ("Options Trades", 348 usable trades: 159 CSP,
 - Closed Fill price exists on 138 rows → win/loss analysis is possible later
   (deferred to the Trading Performance Review project).
 
-### EX-5 — CLS spike day: the exit flag that SHOULD have fired (2026-07-22)
+### EX-5 — CLS spike day: the exit flag that SHOULD have fired (2026-07-21)
 Positions: short 3× Jul31 $300 puts (prem $16.31, mark $11.06 → **+34.0%**)
 and short 3× Jul31 $280 puts (prem $11.55, mark $6.05 → **+48.1%**). Also
 long 10× Jan'28 $180 LEAPS calls + 1 share. Stock **+9.57%** to $336.75.
@@ -314,7 +314,7 @@ long 10× Jan'28 $180 LEAPS calls + 1 share. Stock **+9.57%** to $336.75.
   closer, so the exit-on-spike reads consistent with P9, not contradictory.
 - Also note (P10 funnel): +9.57% would have made CLS a "today's mover" name
   under his ≥5% daily screen — the funnel catches what the 10% alert missed.
-- **OUTCOME (2026-07-22): CLOSED both puts into the spike**, same day —
+- **OUTCOME (2026-07-21): CLOSED both puts into the spike**, same day —
   P15 executed in real time (fills recorded in the Options Trades sheet per
   John's practice; Drive export truncation currently hides those rows from
   Claude — grab them when C7's sync path is built; marks at decision time
@@ -328,7 +328,7 @@ long 10× Jan'28 $180 LEAPS calls + 1 share. Stock **+9.57%** to $336.75.
 
 ## Candidate system changes (pending — do NOT implement without go-ahead)
 
-### ~~C1~~ — GRADUATED → A5 (built 2026-07-22)
+### ~~C1~~ — GRADUATED → A5 (built 2026-07-21)
 ### C1 (original text) — Mark-credibility guard misfires on high-IVP names
 `position_management_engine` line ~1971:
 `if dist_to_strike >= 20 and profit_pct < 60: mark_src = "incredible"`.
@@ -341,13 +341,13 @@ deep-OTM options legitimately hold value (P2). It hides real P&L behind
 - Guardrail: CLAUDE.md flags stale-mark logic as the #1 historical source of
   wrong alerts — preserve protection for genuinely stale position-feed marks.
 
-### ~~C2~~ — GRADUATED → A6 (built 2026-07-22)
+### ~~C2~~ — GRADUATED → A6 (built 2026-07-21)
 ### C2 (original text) — Swing-aware / loss-reduction close prompts (P6, P15)
 Frame BIG MOVE (and maybe a new prompt) around the swing: "this move cut your
 cost-to-close from $X to $Y." Consider surfacing loss-reduction exits ("a swing
 has cut this loss from −X% to −Y%; close window before it widens"). Needs more
 examples to set thresholds.
-- EX-5 learnings (2026-07-22): (1) the hard 10.0% BIGMOVE_1D threshold missed
+- EX-5 learnings (2026-07-21): (1) the hard 10.0% BIGMOVE_1D threshold missed
   a +9.57% CLS day John considered flag-worthy — threshold should be softer
   and/or per-name (P7 already says judge moves against the name's own history;
   his manual screen uses ≥5%). (2) BIG MOVE and EARNINGS WARNING are mutually
@@ -361,7 +361,7 @@ examples to set thresholds.
 Encode "don't want to sell → 0.20–0.25 delta / do want to sell → 0.25–0.30" as
 a selectable posture in the CC engine. Needs confirmation of how to expose it.
 
-### ~~C4~~ — GRADUATED → A7 (built 2026-07-22)
+### ~~C4~~ — GRADUATED → A7 (built 2026-07-21)
 ### C4 (original text) — Intraday move-watcher (detection cadence)
 The 3×/weekday scan can miss a fast intraday spike entirely (it can fade before
 a scan runs). Bigger build — already on the CLAUDE.md backlog. Tracked here
@@ -382,7 +382,7 @@ BIG MOVE / Actions card show the day-over-day P&L swing ("was −35% yesterday �
 breakeven now"), not just current P&L, so the position that produced the exit
 window is unmistakable. Depends on C1 (real P&L must be shown for the swing to
 be visible) and is limited by C4 (cadence).
-- Trigger confirmed 2026-07-22: **volatility / price action**, not P&L
+- Trigger confirmed 2026-07-21: **volatility / price action**, not P&L
   thresholds. What John wants highlighted on the Dashboard: a position that
   was hugely negative one day and is positive/breakeven the next — so if he
   decides to close, he immediately knows WHICH position today's move made
@@ -426,7 +426,7 @@ rich-but-quiet opportunity (high IVP, no big move today) deserve a ping or not?
   "deep OTM but low profit ⇒ stale" heuristic applies only to
   `position_mv`/`none` sources. Real P&L now shows on NBIS/CRDO/CLS-style
   deep-OTM puts (EX-2, EX-2b). Guard protection retained for genuinely
-  stale-prone marks (validated: T3/T8). Supports P2. Built 2026-07-22 with
+  stale-prone marks (validated: T3/T8). Supports P2. Built 2026-07-21 with
   John's go-ahead.
 - **A6 — Swing-aware exit alerts** (P6, P15). Three parts: (1) `BIGMOVE_1D`
   0.10 → 0.05, matching John's manual ≥5% daily screen (the +9.57% CLS day
@@ -438,11 +438,11 @@ rich-but-quiet opportunity (high IVP, no big move today) deserve a ping or not?
   since the last scan, even on a quiet day (catches EX-3's "−35% yesterday →
   breakeven today"). P&L history source: the previous scan's committed
   results.json; only credible (chain) marks feed it. Validated 8/8 against
-  EX-2/EX-3/EX-5 scenarios. Built 2026-07-22 with John's go-ahead.
+  EX-2/EX-3/EX-5 scenarios. Built 2026-07-21 with John's go-ahead.
 - **A7 — Move Watcher** (P10, C4). New `move_watcher.py` + 15-min GitHub
   Actions workflow: Yahoo-quote-only check of watchlist + held-short-option
   names during market hours; ≥5% day moves → one compact Telegram message
   with target/position context; 5%-bucket dedup per ticker/direction/day.
   Zero installation for John — runs in the same cloud as the scanner. No
   Schwab/IBKR usage. Validated: alert content, dedup, escalation, weekend
-  guard (4/4 scenarios). Built 2026-07-22 with John's go-ahead.
+  guard (4/4 scenarios). Built 2026-07-21 with John's go-ahead.
