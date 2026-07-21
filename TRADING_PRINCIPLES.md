@@ -315,7 +315,9 @@ long 10× Jan'28 $180 LEAPS calls + 1 share. Stock **+9.57%** to $336.75.
 - Also note (P10 funnel): +9.57% would have made CLS a "today's mover" name
   under his ≥5% daily screen — the funnel catches what the 10% alert missed.
 - **OUTCOME (2026-07-22): CLOSED both puts into the spike**, same day —
-  P15 executed in real time (fills not recorded here; marks at decision time
+  P15 executed in real time (fills recorded in the Options Trades sheet per
+  John's practice; Drive export truncation currently hides those rows from
+  Claude — grab them when C7's sync path is built; marks at decision time
   ~$11.06 / ~$6.05 → roughly +34% / +48% of premium captured, 9 days early,
   ahead of 7/27 earnings). Second completed spike-close after EX-3 — the
   pattern is now 2-for-2 on spike days. Open thread: the 10× Jan'28 $180
