@@ -1,0 +1,61 @@
+name: Move Watcher
+
+# Lightweight intraday price-move alerts between full scans.
+# Every 15 minutes on weekdays; the script itself exits instantly outside
+# 9:25-16:05 ET, so the UTC window below just needs to COVER market hours
+# in both EDT (13:30-20:00 UTC) and EST (14:30-21:00 UTC) — no seasonal edit.
+on:
+  schedule:
+    - cron: '*/15 13-21 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual run (optional)'
+        required: false
+        default: 'manual trigger'
+
+concurrency:
+  group: move-watcher
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Python 3.11
+        uses: actions/setup-python@v5.4.0
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run move watcher
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python move_watcher.py
+
+      - name: Commit dedup state (only when an alert fired)
+        run: |
+          git config user.name "move-watcher"
+          git config user.email "watcher@whale-intelligence"
+          if [ -f move_watcher_state.json ]; then
+            git add -f move_watcher_state.json
+            if git diff --staged --quiet; then
+              echo "No state change"
+            else
+              git commit -m "move watcher state $(date -u '+%Y-%m-%d %H:%M UTC')"
+              git push origin main || (git pull --rebase origin main && git push origin main)
+            fi
+          fi

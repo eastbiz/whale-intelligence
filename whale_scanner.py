@@ -2,7 +2,7 @@
 Whale Intelligence — Personal Options Trading Scanner
 v5 — Full framework implementation:
      Earnings blackout, pullback filter, 200MA, PMCC detection,
-     Bull Call Spread, tiered position sizing, IVP, deep ITM LEAPS,
+     tiered position sizing, IVP, deep ITM LEAPS,
      deal quality checklist, Peter Lynch discovery
 """
 
@@ -55,8 +55,16 @@ MAX_CC_COVERAGE_PCT    = 0.50   # max 50% of owned shares covered by calls
 #   CSP (short put)  + stock RISES big  → put cheap  → review to close
 # No profit floor, no strike-proximity gate. Deep-OTM at 41% (today's NBIS)
 # fires just the same as near-strike at a loss.
-BIGMOVE_1D             = 0.10   # >=10% move in one day (favorable direction)
+BIGMOVE_1D             = 0.05   # >=5% move in one day (favorable direction) —
+                                # matches John's manual daily screen; 0.10 missed
+                                # a +9.57% CLS day that was a real exit window
 BIGMOVE_3D             = 0.99   # 3-day trigger OFF by default (set e.g. 0.15 to enable)
+# P&L SWING alert: fires when a position's P&L improved sharply since the last
+# scan (even if today's underlying move alone is under BIGMOVE_1D). Catches
+# "hugely negative yesterday → positive today" across scans.
+PNLSWING_MIN_IMPROVE   = 30.0   # >=30 percentage points of premium recovered
+PNLSWING_FLIP_FROM     = -15.0  # or: was at least this deep in loss...
+PNLSWING_FLIP_TO       = 0.0    # ...and is now at/above breakeven
 
 # ── Schwab account number → label mapping ────────────────────
 # Format: last 4 digits or full number (dashes optional)
@@ -345,7 +353,6 @@ MIN_PREMIUM_PCT_30_45 = 0.015 # 1.5% for 30-45 DTE
 MIN_PREMIUM_PCT_45_60 = 0.020 # 2.0% for 45-60 DTE
 # Sector exposure cap
 MAX_SECTOR_PCT        = 0.25  # 25% max per sector
-BCS_MIN_ROR           = 0.80  # Bull Call Spread min return on risk
 
 # ── Stock universe defined below at canonical location ──────
 # (see CORE_STOCKS / GROWTH_STOCKS / CYCLICAL_STOCKS / OPPORTUNISTIC_STOCKS)
@@ -1747,17 +1754,13 @@ def csp_engine(opp: dict, spy_day_chg: float = 0,
     # Only apply top 2 penalties max
     flags.extend(penalties[:2])
 
-    # Downgrades: only if strongest penalty present
+    # Downgrades: only if strongest penalty present (applies to all tiers,
+    # including Opportunistic — previously Opportunistic was hard-skipped
+    # here, which meant high-IVP setups on speculative names were discarded
+    # before yield was ever checked)
     if below_200 or at_lows:
         if action == "BUY":
             action = "WAIT"
-
-    # Hard skip for Opportunistic at lows
-    if at_lows and tier == "Opportunistic":
-        yield_30d = (premium / strike) * (30 / dte) if strike > 0 and dte > 0 else 0
-        return {"action": "SKIP", "drop_type": drop_type,
-                "yield_30d": round(yield_30d*100, 2),
-                "flags": ["AT LOWS — SKIP"], "sort_key": 0}
 
     # ── Step 3: Yield validation ───────────────────────────────
     yield_30d = (premium / strike) * (30 / dte) if strike > 0 and dte > 0 else 0
@@ -1969,12 +1972,16 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
         dist_to_strike     = round((strike - underlying) / underlying * 100, 1) if underlying > 0 else 99
 
     # ── Mark credibility check ─────────────────────────────────────────
-    # A deep-OTM short option should be nearly worthless → near-fully profitable.
-    # If the mark says otherwise (low/negative profit while >20% OTM), the quote
-    # is stale/bad regardless of source. Treat as unreliable so we don't print a
-    # confident-but-false P&L.
-    if dist_to_strike >= 20 and profit_pct < 60:
-        # deep OTM but mark implies <60% captured — quote not credible
+    # Guard against STALE marks only. A live chain NBBO fetched this scan is
+    # trusted as-is: on extreme-vol names (NBIS, CRDO, CLS) a put 30%+ OTM can
+    # legitimately be worth $10+ because the stock moves 15%+ in a day — deep
+    # OTM does NOT imply near-worthless there (P2 in TRADING_PRINCIPLES.md).
+    # Only the position-feed fallback ('position_mv'/'none') can lag a fast
+    # move, so the "deep OTM but low profit ⇒ not credible" heuristic applies
+    # to those sources alone.
+    if (mark_src not in ("chain", "chain_near")
+            and dist_to_strike >= 20 and profit_pct < 60):
+        # deep OTM but stale-prone mark implies <60% captured — not credible
         mark_src = "incredible"
 
     # Velocity signals — only meaningful when risk is present
@@ -2017,9 +2024,27 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
     is_speculative = tier in ("Opportunistic",) or pos.get("speculative", False)
     take_profit_threshold = 80.0 if is_speculative else 90.0
 
+    # ── P&L swing since last scan (prev value injected by caller) ──────
+    # prev_profit_pct comes from the previous scan's results.json. None if the
+    # position wasn't in the last scan (new position / first run).
+    prev_profit = pos.get("prev_profit_pct", None)
+    pnl_swing_txt = ""
+    big_swing = False
+    if prev_profit is not None and prem_received > 0 and mark_src != "incredible":
+        _improve = profit_pct - prev_profit
+        if (_improve >= PNLSWING_MIN_IMPROVE or
+                (prev_profit <= PNLSWING_FLIP_FROM and profit_pct >= PNLSWING_FLIP_TO)):
+            big_swing = True
+        if abs(_improve) >= 10:
+            def _pl_word(p):
+                return f"{p:.0f}% profit" if p >= 0 else f"{abs(p):.0f}% loss"
+            pnl_swing_txt = (f" Swing since last scan: {_pl_word(prev_profit)} → "
+                             f"{_pl_word(profit_pct)}.")
+
     # ── Helper to return result ────────────────────────────────────────
     def R(action, reason):
-        priority = {"BIG MOVE": 0, "TAKE PROFIT": 1, "EARNINGS WARNING": 2, "HOLD": 3}
+        priority = {"BIG MOVE": 0, "P&L SWING": 1, "TAKE PROFIT": 2,
+                    "EARNINGS WARNING": 3, "HOLD": 4}
         return {
             "action":          action,
             "reason":          reason,
@@ -2033,8 +2058,19 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
             "earn_zone":       earn_zone,
             "earn_days":       earn_days,
             "mark_src":        mark_src,
-            "sort_priority":   priority.get(action, 3),
+            "prev_profit_pct": prev_profit,
+            "sort_priority":   priority.get(action, 4),
         }
+
+    # ── Stackable context notes (P15: a good exit day is a CONFLUENCE —
+    # the alert reason carries every active factor, not just the top one) ──
+    earn_note = ""
+    if earn_days <= 7:
+        _inside = " — inside this expiry" if earn_days <= dte else ""
+        earn_note = f" ⚠ Earnings in {earn_days}d{_inside}."
+    tp_note = (f" ✅ {profit_pct:.0f}% captured (≥{take_profit_threshold:.0f}% take-profit level)."
+               if prem_received > 0 and mark_src != "incredible"
+               and profit_pct >= take_profit_threshold else "")
 
     # ── BIG MOVE — REVIEW (event-driven, highest priority) ─────────────
     # A big favorable move (CC: stock down / CSP: stock up) on a name you hold
@@ -2047,13 +2083,29 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
             return R("BIG MOVE",
                      f"{ticker} {_move_desc} — your {pos_type} ${strike:g} is {_pos_ctx}, "
                      f"{dte}d left. Big move — check the live option price and review "
-                     f"whether to close (position mark may be stale).")
+                     f"whether to close (position mark may be stale)." + earn_note)
         _pl_txt = (f"{profit_pct:.0f}% profit" if profit_pct >= 0
                    else f"{abs(profit_pct):.0f}% loss")
         return R("BIG MOVE",
                  f"{ticker} {_move_desc} — your {pos_type} ${strike:g} is {_pos_ctx}, "
                  f"now at {_pl_txt} (${_close_cost:,.0f} to close, {dte}d left). "
-                 f"Big move — review whether to close before it reverses.")
+                 f"Big move — review whether to close before it reverses."
+                 + pnl_swing_txt + earn_note + tp_note)
+
+    # ── P&L SWING — the position itself recovered hard since last scan ─
+    # Catches "hugely negative yesterday → positive/breakeven today" even when
+    # today's underlying move alone is below BIGMOVE_1D (e.g. the recovery
+    # happened across two days). Only fires on credible marks.
+    if big_swing:
+        _close_cost = round(mark * contracts * 100, 0)
+        _pl_txt = (f"{profit_pct:.0f}% profit" if profit_pct >= 0
+                   else f"{abs(profit_pct):.0f}% loss")
+        return R("P&L SWING",
+                 f"{ticker} {pos_type} ${strike:g} recovered hard:"
+                 + pnl_swing_txt +
+                 f" Now {_pos_ctx}, ${_close_cost:,.0f} to close, {dte}d left — "
+                 f"exit window if you don't want this position."
+                 + earn_note + tp_note)
 
     # ── TAKE PROFIT ────────────────────────────────────────────────────
     # Act now — premium has decayed enough, risk/reward favours closing
@@ -2840,7 +2892,7 @@ def timing_score(strategy, pir, ivp, is_spec=False, ivp_override=None) -> dict:
     """
     Score timing quality for a trade setup.
     Returns dict with: score (0-100), recommend (bool), signal (str)
-    strategy: CSP, CC, LEAPS, PMCC, BCS
+    strategy: CSP, CC, LEAPS, PMCC
     pir: position in 52w range (0=at low, 1=at high)
     ivp: IV percentile (0-100)
     """
@@ -2926,20 +2978,6 @@ def timing_score(strategy, pir, ivp, is_spec=False, ivp_override=None) -> dict:
         else:
             return {"score":40,"recommend":False,
                     "signal":f"⚠️ WEAK — Low IVP {ivp:.0f}% for PMCC short call"}
-
-    elif strategy == "BCS":
-        if near_low and not high_ivp:
-            return {"score":88,"recommend":True,
-                    "signal":f"✅ GOOD — Near lows + IVP {ivp:.0f}%, directional setup"}
-        elif near_low and high_ivp:
-            return {"score":70,"recommend":True,
-                    "signal":f"✅ OK — Near lows but IVP {ivp:.0f}% makes spread wider"}
-        elif near_high:
-            return {"score":20,"recommend":False,
-                    "signal":"❌ AVOID — Don't buy bull spreads near 52w highs"}
-        else:
-            return {"score":55,"recommend":True,
-                    "signal":f"✅ NEUTRAL — Mid-range entry, moderate setup"}
 
     return {"score":50,"recommend":True,"signal":"—"}
 
@@ -3631,125 +3669,6 @@ def find_pmcc_short_call(ticker, price, existing_leaps, contracts, ivdata, pir):
     return best, timing
 
 
-def find_bull_call_spread(ticker, price, contracts, ivdata, pir, quality):
-    """
-    Bull Call Spread — Final Rules:
-    - DTE: 500-800 days (2-year LEAPS spreads only)
-    - IVP: 20-80 (reject <20 or >80)
-    - Short call delta: 0.25-0.40
-    - Spread width: min $10 or 1-2% of stock price
-    - Distance to short strike: 3-5% at 45-60 DTE, 5-8% at 60-90, 8-10% at 90-120
-    - ROR: min 80%, preferred 80-200% (not driven by short DTE)
-    - Trend filter: stock above 50 DMA OR within 20% of 52w low
-    """
-    timing = timing_score("BCS", pir, ivdata["ivp"])
-    # IVP filter: reject <20 or >80
-    if ivdata["ivp"] < 20 or ivdata["ivp"] > 80: return None, {"score":0,"recommend":False,"signal":f"❌ IVP {ivdata['ivp']:.0f}% out of range (need 20-80)"}
-    if not timing["recommend"]: return None, timing
-    if not contracts or price <= 0: return None, timing
-    # Trend filter: above 50 DMA or within 20% of 52w low
-    pct_above_ma50 = quality.get("pct_above_ma50", 0)
-    pullback = quality.get("pullback_pct", 0)
-    trend_ok = pct_above_ma50 >= 0 or pullback >= 80  # above 50MA or near 52w low
-    if not trend_ok: return None, {"score":0,"recommend":False,"signal":"❌ Below 50 DMA and not near 52w low"}
-
-    atm_iv = ivdata["iv_current"]
-    today  = datetime.now()
-    best   = None; best_score = 0
-
-    # Get calls in 30-60 DTE range
-    calls = []
-    for c in contracts:
-        try:
-            opt_type = c.get("option_type", "")
-            if opt_type != "C": continue
-            strike = float(c.get("strike", 0) or 0)
-            if strike <= 0: continue
-            expiry = datetime.strptime(c["expiry"], "%Y-%m-%d")
-            dte = (expiry - today).days
-        except Exception: continue
-        if not (LEAPS_DTE_MIN <= dte <= LEAPS_DTE_MIN + 300): continue  # LEAPS BCS: 500-800 DTE
-        bid = float(c.get("nbbo_bid",0) or 0)
-        ask = float(c.get("nbbo_ask",0) or 0)
-        mid = (bid + ask) / 2
-        if mid < 0.10: continue
-        calls.append({"strike":strike,"dte":dte,"expiry":expiry,
-                      "bid":bid,"ask":ask,"mid":mid})
-
-    # Try all ITM long + OTM short combinations
-    for long_c in calls:
-        if long_c["strike"] >= price: continue  # long must be ITM
-        for short_c in calls:
-            if short_c["strike"] <= price: continue  # short must be OTM
-            if short_c["strike"] <= long_c["strike"]: continue
-            if short_c["dte"] != long_c["dte"]: continue  # same expiry
-
-            dte = long_c["dte"]
-            width = short_c["strike"] - long_c["strike"]
-
-            # Spread width: min $10 or 1-2% of stock price
-            min_width = max(10, price * 0.01)
-            if width < min_width: continue
-            if width > price * 0.15: continue  # not too wide
-
-            # Distance to short strike based on DTE
-            dist_pct = (short_c["strike"] - price) / price * 100
-            if 45 <= dte < 60:
-                if dist_pct > 5: continue   # max 3-5% away
-            elif 60 <= dte < 90:
-                if dist_pct > 8: continue   # max 5-8% away
-            elif dte >= 90:
-                if dist_pct > 10: continue  # max 8-10% away
-
-            # Short call delta: 0.25-0.40
-            short_delta = estimate_delta(price, short_c["strike"], dte, atm_iv, "C")
-            if short_delta is None or not (0.25 <= short_delta <= 0.40): continue
-
-            debit = long_c["mid"] - short_c["mid"]
-            if debit <= 0: continue
-            max_profit = width - debit
-            if max_profit <= 0: continue
-            ror = max_profit / debit  # return on risk
-
-            # ROR: min 80%, reject if inflated by very short DTE
-            if ror < BCS_MIN_ROR: continue
-
-            # Quality tier label
-            if ror >= 1.5 and dte >= 90 and 30 <= ivdata["ivp"] <= 70:
-                tier_label = "A"
-            elif ror >= 1.0 and dte >= 60:
-                tier_label = "B"
-            elif ror >= 0.8:
-                tier_label = "C"
-            else:
-                tier_label = "D"
-
-            if tier_label == "D": continue
-
-            score = (timing["score"]/100) * (quality["quality_score"]/5) * ror * quality["pullback"]
-            if score > best_score:
-                best_score = score
-                best = {
-                    "long_strike": long_c["strike"],
-                    "short_strike": short_c["strike"],
-                    "expiry": long_c["expiry"].strftime("%Y-%m-%d"),
-                    "dte": long_c["dte"],
-                    "debit": round(debit,2),
-                    "max_profit": round(max_profit,2),
-                    "max_risk": round(debit,2),
-                    "ror": round(ror*100,1),
-                    "breakeven": round(long_c["strike"] + debit, 2),
-                    "iv": round(atm_iv*100,1),
-                    "ivp": ivdata["ivp"],
-                    "timing": timing,
-                    "tier_label": tier_label,
-                    "dist_pct": round(dist_pct, 1),
-                    "short_delta": round(short_delta, 2),
-                }
-    return best, timing
-
-
-# ════════════════════════════════════════════════════════════
 # OPPORTUNISTIC VOLATILITY SCANNER
 # ════════════════════════════════════════════════════════════
 
@@ -3911,9 +3830,9 @@ def peter_lynch_screen(known_tickers, flow_data) -> list:
 # CLAUDE ANALYSIS
 # ════════════════════════════════════════════════════════════
 
-def claude_analyze(csps, ccs, leaps_list, pmccs, bcss, discoveries, spikes=None, drops=None, pio=None) -> str:
+def claude_analyze(csps, ccs, leaps_list, pmccs, discoveries, spikes=None, drops=None, pio=None) -> str:
     if not ANTHROPIC_API_KEY: return ""
-    all_opps = csps + ccs + leaps_list + pmccs + bcss
+    all_opps = csps + ccs + leaps_list + pmccs
     if not all_opps: return ""
 
     prompt = f"""Expert options income trader, $7M portfolio. Framework:
@@ -3922,7 +3841,6 @@ def claude_analyze(csps, ccs, leaps_list, pmccs, bcss, discoveries, spikes=None,
 - CC: delta 0.15-0.25, ≥10% annualized, only when not near 52w low
 - LEAPS: delta ≥0.75 (no upper cap), deep ITM, <25% extrinsic, 2+ years
 - PMCC: sell 30-45 DTE calls against existing LEAPS
-- Bull Call Spread: ROR≥80%, rank by quality→pullback→ROR
 - Earnings blackout: no CSP/CC within 14 days of earnings
 
 Deal quality checklist:
@@ -3936,7 +3854,6 @@ CSPs (Income Mode): {json.dumps(csps,indent=2)}
 CCs (Income Mode): {json.dumps(ccs,indent=2)}
 LEAPS: {json.dumps(leaps_list,indent=2)}
 PMCCs: {json.dumps(pmccs,indent=2)}
-Bull Call Spreads: {json.dumps(bcss,indent=2)}
 Post-Drop CSPs (Sell Fear Mode): {json.dumps(drops,indent=2) if drops else 'None'}
 Post-Spike CCs (Sell Strength Mode): {json.dumps(spikes,indent=2) if spikes else 'None'}
 Position Income CCs (Existing Holdings): {json.dumps(pio,indent=2) if pio else 'None'}
@@ -3949,8 +3866,7 @@ Give:
 1. Best CSP — ticker, exact strike, EXACT expiry date (YYYY-MM-DD), DTE, bid/ask, delta, annualized return
 2. Best CC — same format (if any)
 3. Best LEAPS or PMCC — same format (if any)
-4. Best Bull Call Spread — long strike / short strike, EXACT expiry (YYYY-MM-DD), debit, max profit, ROR%
-5. One-line IVP environment summary
+4. One-line IVP environment summary
 
 Only list items that actually have qualifying trades. Skip any category with nothing. Be concise. Every trade must include the full YYYY-MM-DD expiry date."""
 
@@ -4217,27 +4133,6 @@ def fmt_spike_cc(opp) -> str:
     return "\n".join([l for l in lines if l is not None])
 
 
-def fmt_bcs(opp) -> str:
-    t = opp["bcs"]["timing"]; b = opp["bcs"]; q = opp["quality"]
-    tier = b.get("tier_label","B")
-    tier_emoji = {"A":"🟢","B":"🟡","C":"🟠","D":"🔴"}.get(tier,"⚪")
-    width = b["short_strike"] - b["long_strike"]
-    return "\n".join([
-        f"📊 *Bull Call Spread — {opp['ticker']} @ ${opp['price']}*",
-        f"_{t['signal']}_",
-        f"  {fmt_quality(q)}",
-        f"  Quality: {tier_emoji} Tier {tier}",
-        f"  Buy ${b['long_strike']} Call / Sell ${b['short_strike']} Call",
-        f"  Spread width: ${width:.0f} | Short δ{b.get('short_delta',0)} | {b.get('dist_pct',0):.1f}% OTM",
-        f"  Expiry: {b['expiry']} | {b['dte']} DTE",
-        f"  Debit: ${b['debit']} | Max Profit: ${b['max_profit']} | Max Risk: ${b['max_risk']}",
-        f"  Return on Risk: {b['ror']}% | Breakeven: ${b['breakeven']}",
-        f"  IVP: {b['ivp']:.0f}% | IV: {b['iv']}%",
-        f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
-    ])
-
-
-# ════════════════════════════════════════════════════════════
 # MAIN SCANNER
 # ════════════════════════════════════════════════════════════
 
@@ -4661,7 +4556,7 @@ def run_scanner():
     # Scanner always runs — IVP filters individual trades
 
     csp_opps = []; cc_opps  = []; leaps_opps = []
-    pmcc_opps= []; bcs_opps = []; spike_opps = []; drop_opps = []; pio_opps = []
+    pmcc_opps= []; spike_opps = []; drop_opps = []; pio_opps = []
     # Caches for dashboard reuse — avoid re-fetching chains
     contracts_cache = {}
     convex_cache = {}    # ticker -> far-OTM long-dated calls for Cheap Convexity scan
@@ -4937,32 +4832,19 @@ def run_scanner():
                                       "breakeven":pmcc.get("pmcc_breakeven",0)})})
                 print(f"  {ticker}: ⚡ PMCC ${pmcc['strike']} {pmcc['annualized_return']}% ann")
 
-        # ── Bull Call Spread ──────────────────────────────
-        if quality["passes"] and pullback >= PULLBACK_MIN:
-            bcs, _ = find_bull_call_spread(ticker, price, contracts, ivdata, pir, quality)
-            if bcs:
-                bcs_opps.append({**base,"bcs":bcs,
-                    "score":score_csp({"tier":base.get("tier","Opportunistic"),
-                                     "delta":bcs.get("short_delta",0.30),"ivp":base.get("ivp",50),
-                                     "annualized_return":bcs.get("ror",0),
-                                     "pullback_pct":base.get("pullback_pct",0),
-                                     "warnings":[]})})
-                print(f"  {ticker}: 📊 BCS ROR {bcs['ror']}% | debit ${bcs['debit']}")
-
     # ── Sort & top 3 each ─────────────────────────────────
-    for lst in [csp_opps,cc_opps,leaps_opps,pmcc_opps,bcs_opps]:
+    for lst in [csp_opps,cc_opps,leaps_opps,pmcc_opps]:
         lst.sort(key=lambda x: x["score"], reverse=True)
 
     top_csps  = csp_opps[:3];  top_ccs   = cc_opps[:3]
     top_leaps = leaps_opps[:5];top_pmccs = pmcc_opps[:3]  # top_leaps capped for Telegram only; dashboard shows all
-    top_bcss  = bcs_opps[:3]
     top_spikes = spike_opps[:3]
     top_drops  = drop_opps[:3]
     top_pio    = pio_opps[:5]  # show up to 5 position income trades
 
-    total = sum(len(x) for x in [top_csps,top_ccs,top_leaps,top_pmccs,top_bcss,top_spikes,top_drops,top_pio])
+    total = sum(len(x) for x in [top_csps,top_ccs,top_leaps,top_pmccs,top_spikes,top_drops,top_pio])
     print(f"\n🏆 {len(top_csps)} CSPs | {len(top_ccs)} CCs | {len(top_leaps)} LEAPS | "
-          f"{len(top_pmccs)} PMCCs | {len(top_bcss)} Spreads")
+          f"{len(top_pmccs)} PMCCs")
 
     if total == 0:
         print("✅ No qualifying opportunities today.")
@@ -5035,12 +4917,12 @@ def run_scanner():
 
     # ── Claude analysis ───────────────────────────────────
     print("\n🧠 Claude analysis...")
-    analysis = claude_analyze(top_csps,top_ccs,top_leaps,top_pmccs,top_bcss,[],top_spikes,top_drops,top_pio)
+    analysis = claude_analyze(top_csps,top_ccs,top_leaps,top_pmccs,[],top_spikes,top_drops,top_pio)
     if analysis: print(f"\n{analysis}")
 
     # ── Telegram green-light filter ───────────────────────
     # Philosophy: Telegram = take action NOW. Only high-conviction trades get a ping.
-    # Dashboard always shows everything (review + execution). PMCC/BCS are dashboard-only.
+    # Dashboard always shows everything (review + execution). PMCC is dashboard-only.
     # Spikes and drops skip the score gate — they are time-sensitive by nature.
     def _tg_green(opps: list, mode: str) -> list:
         """Return only trades scoring >= TELEGRAM_MIN_SCORE_PCT of SCORE_MAX[mode]."""
@@ -5104,11 +4986,11 @@ def run_scanner():
               f"{_pre_counts[1]}→{len(tg_ccs)} CCs, "
               f"{_pre_counts[2]}→{len(tg_leaps)} LEAPS")
 
-    # PMCC and BCS: dashboard only — too complex/optional for a ping
+    # PMCC: dashboard only — too complex/optional for a ping
     # Spike CCs: NOW sent to Telegram (covered calls into a spike — the low-risk,
     # high-priority move). Drops also sent.
 
-    has_real_opps = any([top_csps, top_ccs, top_leaps, top_pmccs, top_bcss, top_drops, top_spikes])
+    has_real_opps = any([top_csps, top_ccs, top_leaps, top_pmccs, top_drops, top_spikes])
     tg_any        = any([tg_csps, tg_ccs, tg_leaps, tg_drops, tg_spikes])
 
     print(f"   Telegram filter: {len(tg_csps)} CSPs | {len(tg_ccs)} CCs | "
@@ -5144,7 +5026,7 @@ def run_scanner():
         send_telegram("━━━ *✅ LEAPS* ━━━"); time.sleep(1)
         for o in tg_leaps: send_telegram(fmt_leaps(o)); time.sleep(2)
 
-    # PMCC / BCS — dashboard only (never sent to Telegram)
+    # PMCC — dashboard only (never sent to Telegram)
 
     # ── Save results.json for dashboard ─────────────────────
     def opp_to_dict(o, strategy_key):
@@ -5365,7 +5247,6 @@ def run_scanner():
     dashboard_csps  = []
     dashboard_ccs   = []
     dashboard_leaps = []
-    dashboard_bcss  = []
     dashboard_convexity = []
 
     for ticker in all_tickers:
@@ -6022,63 +5903,15 @@ def run_scanner():
     dashboard_csps.sort(key=lambda x: x.get("sort_key", x.get("score",0)), reverse=True)
     dashboard_ccs.sort(key=lambda x: x.get("score", 0), reverse=True)
     dashboard_leaps.sort(key=lambda x: x.get("score", 0), reverse=True)
-    # Build dashboard BCS list from ALL bcs_opps (not just top 3)
-    dashboard_bcss = []
-    for o in bcs_opps:
-        b = o.get("bcs", {})
-        if not b: continue
-        ppd = round(b.get("debit", 0) / max(1, b.get("dte", 1)), 2)
-        dashboard_bcss.append({
-            "ticker": o.get("ticker",""), "tier": o.get("tier",""),
-            "price": o.get("price",0), "ivp": round(o.get("ivp",0),1),
-            "mode": "BCS", "strike": b.get("long_strike",0),
-            "long_strike": b.get("long_strike",0), "short_strike": b.get("short_strike",0),
-            "expiry": b.get("expiry",""), "dte": b.get("dte",0),
-            "premium": b.get("debit",0), "annualized_return": b.get("ror",0),
-            "delta": b.get("short_delta",0), "breakeven": b.get("breakeven",0),
-            "premium_per_day": ppd,
-            "signal": b.get("timing",{}).get("signal","") or f"LEAPS spread | {b.get('tier_label','')} | ROR {b.get('ror',0):.0f}%",
-            "below_min": b.get("ror",0) < BCS_MIN_ROR * 100,
-            "risk_note": f"Max profit: ${b.get('max_profit',0):.0f} | Max risk: ${b.get('max_risk',0):.0f}",
-            "risk_level": "Medium" if b.get("tier_label","C") in ("A","B") else "Elevated",
-            "passes_quality": b.get("tier_label","D") in ("A","B"),
-            "warnings": [] if b.get("tier_label","D") in ("A","B") else [f"Tier {b.get('tier_label','C')} quality"],
-            "score": o.get("score",0),
-            "quality_label": "Strong" if b.get("tier_label")=="A" else "Acceptable" if b.get("tier_label")=="B" else "Review",
-        })
-    dashboard_bcss.sort(key=lambda x: x.get("score",0), reverse=True)
-
     pio_count = sum(1 for o in dashboard_ccs if o.get("mode") == "PIO")
     cc_count  = sum(1 for o in dashboard_ccs if o.get("mode") == "CC")
-    print(f"   📊 Dashboard: {len(dashboard_csps)} CSPs | {cc_count} CCs | {pio_count} PIOs | {len(dashboard_leaps)} LEAPS | {len(dashboard_convexity)} CVX | {len(dashboard_bcss)} BCS")
+    print(f"   📊 Dashboard: {len(dashboard_csps)} CSPs | {cc_count} CCs | {pio_count} PIOs | {len(dashboard_leaps)} LEAPS | {len(dashboard_convexity)} CVX")
 
     all_opps = []
     for o in top_csps:   all_opps.append(opp_to_dict(o, "csp"))
     for o in top_ccs:    all_opps.append(opp_to_dict(o, "cc"))
     for o in top_leaps:  all_opps.append(opp_to_dict(o, "leaps"))
     for o in top_pmccs:  all_opps.append(opp_to_dict(o, "pmcc"))
-    for o in top_bcss:
-        b = o.get("bcs", {})
-        all_opps.append({
-            "ticker":            o.get("ticker",""),
-            "tier":              o.get("tier",""),
-            "price":             o.get("price",0),
-            "ivp":               round(o.get("ivp",0),1),
-            "mode":              "BCS",
-            "strike":            b.get("long_strike",0),
-            "long_strike":       b.get("long_strike",0),
-            "short_strike":      b.get("short_strike",0),
-            "expiry":            b.get("expiry",""),
-            "dte":               b.get("dte",0),
-            "premium":           b.get("debit",0),
-            "annualized_return": b.get("ror",0),
-            "delta":             b.get("short_delta",0),
-            "signal":            b.get("timing",{}).get("signal","") or "",
-            "below_min":         b.get("ror",0) < BCS_MIN_ROR * 100,
-            "risk_note":         f"Max profit: ${b.get('max_profit',0)} | Breakeven: ${b.get('breakeven',0)}",
-            "passes_quality":    True,
-            "warnings":          [],
-        })
     for o in spike_opps:
         s = o.get("spike_cc", {})
         all_opps.append({
@@ -6458,7 +6291,7 @@ def run_scanner():
     # dashboard_leaps has all three bands with full extrinsic/BE fields — always prefer it.
     leaps_from_opps = [o for o in all_opps if o.get("mode") == "LEAPS"]
     review_candidates = []
-    for o in dashboard_csps + dashboard_ccs + dashboard_leaps + dashboard_convexity + dashboard_bcss + dash_spikes + dash_drops + dash_pio:
+    for o in dashboard_csps + dashboard_ccs + dashboard_leaps + dashboard_convexity + dash_spikes + dash_drops + dash_pio:
         o["candidate_type"] = "execution" if o.get("passes_quality") and not o.get("below_min") and not o.get("warnings") else "review"
         review_candidates.append(o)
 
@@ -6499,6 +6332,26 @@ def run_scanner():
     _spy_day = spy_regime.get("day_change", 0)
     _total_cso = portfolio_exposure.get("total_csp_obligation", 0)
     _pos_actions = []
+
+    # Previous scan's per-position P&L (results.json is committed back by the
+    # workflow every run, so the last scan's file is on disk at startup).
+    # Keyed by (ticker, type, strike, expiry) → profit_pct. Feeds the
+    # P&L SWING alert and the "swing since last scan" context line.
+    _prev_pnl = {}
+    _prev_scan_time = ""
+    try:
+        with open("results.json") as _pf:
+            _prev_res = json.load(_pf)
+        _prev_scan_time = _prev_res.get("scan_time", "")
+        for _pa in _prev_res.get("position_actions", []):
+            if _pa.get("mark_src") in ("chain", "chain_near"):  # only credible P&L
+                _key = (_pa.get("ticker",""), _pa.get("type",""),
+                        round(float(_pa.get("strike",0) or 0), 2),
+                        str(_pa.get("expiry",""))[:10])
+                _prev_pnl[_key] = _pa.get("profit_pct")
+        print(f"   📈 Prev-scan P&L loaded: {len(_prev_pnl)} positions ({_prev_scan_time})")
+    except Exception as _pe:
+        print(f"   📈 No prev-scan P&L available ({_pe})")
 
     for _pos in portfolio_exposure.get("csp_positions", []):
         _ticker = _pos.get("ticker","")
@@ -6543,9 +6396,11 @@ def run_scanner():
         _earn = get_earnings_date(_ticker)
         _earn_days = (_earn - datetime.now()).days if _earn else 999
 
+        _prev_pp = _prev_pnl.get((_ticker, "CSP", round(float(_strike or 0), 2),
+                                  str(_expiry)[:10]))
         _result = position_management_engine(
             {**_pos, "type": "CSP", "tier": _tier, "mark": _mark, "mark_src": _mark_src,
-             "days_to_earnings": _earn_days},
+             "days_to_earnings": _earn_days, "prev_profit_pct": _prev_pp},
             mkt, PORTFOLIO_SIZE, _total_cso, _spy_day
         )
         _pos_actions.append({
@@ -6562,6 +6417,7 @@ def run_scanner():
             "mark_src":       _mark_src,
             "premium_received": round(_pos.get("premium_received",0),2),
             "profit_pct":     _result["profit_pct"],
+            "prev_profit_pct": _result["prev_profit_pct"],
             "pnl_dollar":     _result["pnl_dollar"],
             "breakeven":      _result["breakeven"],
             "dist_to_be_pct": _result["dist_to_be_pct"],
@@ -6608,9 +6464,11 @@ def run_scanner():
             _mark_src = "position_mv" if _mark_cc > 0 else "none"
         _earn = get_earnings_date(_ticker)
         _earn_days = (_earn - datetime.now()).days if _earn else 999
+        _prev_pp = _prev_pnl.get((_ticker, "CC", round(float(_strike or 0), 2),
+                                  str(_expiry)[:10]))
         _result = position_management_engine(
             {**_pos, "type": "CC", "tier": _tier, "mark": _mark_cc, "mark_src": _mark_src,
-             "days_to_earnings": _earn_days},
+             "days_to_earnings": _earn_days, "prev_profit_pct": _prev_pp},
             mkt, PORTFOLIO_SIZE, _total_cso, _spy_day
         )
         _pos_actions.append({
@@ -6627,6 +6485,7 @@ def run_scanner():
             "mark_src":       _mark_src,
             "premium_received": round(_pos.get("premium_received",0),2),
             "profit_pct":     _result["profit_pct"],
+            "prev_profit_pct": _result["prev_profit_pct"],
             "pnl_dollar":     _result["pnl_dollar"],
             "breakeven":      _result["breakeven"],
             "dist_to_be_pct": _result["dist_to_be_pct"],
@@ -6644,13 +6503,13 @@ def run_scanner():
 
     _pos_actions.sort(key=lambda x: x.get("sort_priority", 3))
     _def_count   = sum(1 for p in _pos_actions if p["action"] == "DEFENSIVE")
-    _close_count = sum(1 for p in _pos_actions if p["action"] == "BIG MOVE")
+    _close_count = sum(1 for p in _pos_actions if p["action"] in ("BIG MOVE", "P&L SWING"))
     print(f"   📋 Position actions: {len(_pos_actions)} total | {_def_count} DEFENSIVE | {_close_count} BIG MOVE")
 
     # ── BIG MOVE — REVIEW → Telegram ──────────────────────────────────
     # Event-driven: a big favorable move on a name you hold a short option.
     # Built after the main Telegram block, so it sends here.
-    _tg_bigmove = [p for p in _pos_actions if p["action"] == "BIG MOVE"]
+    _tg_bigmove = [p for p in _pos_actions if p["action"] in ("BIG MOVE", "P&L SWING")]
     if _tg_bigmove:
         print(f"   📱 Sending {len(_tg_bigmove)} BIG MOVE alert(s)...")
         send_telegram("━━━ *🚨 BIG MOVE — REVIEW YOUR SHORT OPTION* ━━━"); time.sleep(1)
