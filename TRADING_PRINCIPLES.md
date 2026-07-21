@@ -122,10 +122,9 @@ opportunity conditions are actually there.
 - System status: partially aligned (BIG MOVE for positions). The scanner scans
   everything every run and the dashboard always fills; there's no "today is
   (not) a trading day" gate on notifications. See C8.
-- Note / tension flagged by Claude: the trade history (EX-4) shows many good
-  entries at IVP 26–40 (Dec NBIS CSPs at 34–38, MSFT at 34, CRDO at 27–35).
-  The IVP≥50 bar may be a current-market preference, not a hard rule — to
-  clarify with more examples.
+- Tension RESOLVED (2026-07-22): **IVP is a quick reference, not a gate — if
+  the price is right, price overrides IVP.** Any future encoding of P10 must
+  treat IVP as a soft ranking input, never a hard filter.
 
 ### P11 — Direction disqualifiers: don't sell INTO the move that just paid
 On a big up-day, no CSP on that name (premium is momentarily poor + reversal
@@ -158,6 +157,31 @@ the moment of scan — it has no memory of what I've been paid before.
   e.g., the Jul 20 CRDO $175 CSPs (74–81% ann, IVP 94) are richer than ALL six
   prior CRDO CSP entries (46–64% ann, IVP 27–35): the history would have
   screamed "take this one."
+
+### P14 — Intent to exit overrides IV-richness on the CC side
+When I WANT to sell the shares (exit-waiting), I write CCs even at very low
+IVP — the premium is a bonus on a sale I want anyway, not the reason for the
+trade. IV-richness rules apply to income CCs, not exit CCs.
+- Evidence: confirmed 2026-07-22 — the 10 IBIT CCs at median IVP 13 (EX-4)
+  were deliberate rule-breaks because "IBIT I want to sell."
+- System status: partially encoded — cc_only tickers (MSTR, OWL) already skip
+  zone gating. But IBIT is NOT cc_only, so the scanner can't tell John's exit
+  CCs from income CCs on regular names. Relates to C3 (posture: income vs
+  exit changes acceptable delta AND acceptable IVP).
+
+### P15 — "Good day to close" is a confluence, not a single threshold
+The CLS case (EX-5): what made 2026-07-22 a flag-worthy exit day was the
+COMBINATION — a big spike day (+9.6%, the puts lost ~half their value in one
+session), earnings inside the expiry window (5 days away), a strike close to
+the money (10.9% OTM), decent profit available (+34%/+48%), and genuine
+directional uncertainty (analysts calling the name overpriced). None of these
+alone; together they say "if you want out, today is the day."
+- Evidence: EX-5.
+- System status: NOT served today. Verified against the real engine: both CLS
+  puts fire a generic EARNINGS WARNING with no mention of the spike; BIG MOVE
+  misses because +9.57% < the hard 10.0% threshold — and had it been +10.1%,
+  BIG MOVE would have fired and SUPPRESSED the earnings context (engine
+  returns one action per position). See C2 (extended).
 
 ---
 
@@ -241,8 +265,8 @@ Parsed John's Google Sheet ("Options Trades", 348 usable trades: 159 CSP,
   (med 82–84) — P7/P10 in the data.
 - But plenty of good entries happened at IVP 26–40 (NBIS, MSFT, CRDO, NVDA,
   GOOGL) — the "IVP≥50" funnel bar is soft in practice (see P10 tension).
-- IBIT CCs were written at med IVP 13 — very low vol. Open question for John
-  (conflicts with "is IV high enough?" step; may be exit-waiting/income logic).
+- IBIT CCs were written at med IVP 13 — very low vol. RESOLVED 2026-07-22:
+  deliberate — "IBIT I want to sell", exit intent overrides IV richness (P14).
 - Jul 20 2026 CRDO $175 CSPs (IVP 94, 74–81% ann) beat all six prior CRDO
   entries — first concrete case where history context would have upgraded a
   scanner signal (P13).
@@ -257,6 +281,27 @@ Parsed John's Google Sheet ("Options Trades", 348 usable trades: 159 CSP,
   John's screenshots). Multi-tab layouts differ; parse per-header.
 - Closed Fill price exists on 138 rows → win/loss analysis is possible later
   (deferred to the Trading Performance Review project).
+
+### EX-5 — CLS spike day: the exit flag that SHOULD have fired (2026-07-22)
+Positions: short 3× Jul31 $300 puts (prem $16.31, mark $11.06 → **+34.0%**)
+and short 3× Jul31 $280 puts (prem $11.55, mark $6.05 → **+48.1%**). Also
+long 10× Jan'28 $180 LEAPS calls + 1 share. Stock **+9.57%** to $336.75.
+- Context: CLS earnings **7/27** — INSIDE the puts' expiry window (7/31),
+  5 days away. Some analysts call CLS overpriced; John genuinely unsure of
+  direction. $300 strike is only **10.9% OTM**.
+- John's read: today's spike halved the puts' value in one session (−46%/−52%
+  on the day). "If I want out, this is a good day to do it profitably" —
+  wants the system to FLAG this day on these positions.
+- What the engine actually does (verified by running it): both puts →
+  "EARNINGS WARNING — decide before event (32%/48% profit captured)". No
+  mention of the spike. BIG MOVE silent: +9.57% < hard 10.0% BIGMOVE_1D. Had
+  the move been +10.1%, BIG MOVE would have fired but suppressed the earnings
+  line (one action per position).
+- Contrast with EX-3/P9: on NBIS he KEPT the through-earnings puts because
+  strikes were 30%+ OTM. Here the $300 is 10.9% OTM through earnings — much
+  closer, so the exit-on-spike reads consistent with P9, not contradictory.
+- Also note (P10 funnel): +9.57% would have made CLS a "today's mover" name
+  under his ≥5% daily screen — the funnel catches what the 10% alert missed.
 
 ---
 
@@ -274,11 +319,20 @@ deep-OTM options legitimately hold value (P2). It hides real P&L behind
 - Guardrail: CLAUDE.md flags stale-mark logic as the #1 historical source of
   wrong alerts — preserve protection for genuinely stale position-feed marks.
 
-### C2 — Swing-aware / loss-reduction close prompts (P6)
+### C2 — Swing-aware / loss-reduction close prompts (P6, P15)
 Frame BIG MOVE (and maybe a new prompt) around the swing: "this move cut your
 cost-to-close from $X to $Y." Consider surfacing loss-reduction exits ("a swing
 has cut this loss from −X% to −Y%; close window before it widens"). Needs more
 examples to set thresholds.
+- EX-5 learnings (2026-07-22): (1) the hard 10.0% BIGMOVE_1D threshold missed
+  a +9.57% CLS day John considered flag-worthy — threshold should be softer
+  and/or per-name (P7 already says judge moves against the name's own history;
+  his manual screen uses ≥5%). (2) BIG MOVE and EARNINGS WARNING are mutually
+  exclusive (one action per position), but the CLS case needed BOTH in one
+  alert: "spike day + earnings in 5d inside expiry + strike 11% away + +34%
+  available = good exit day if you want out." Direction: a confluence-scored
+  exit flag whose reason line stacks every active factor, instead of a
+  priority ladder that shows only the top one.
 
 ### C3 — Map CC entry deltas to intent (P5)
 Encode "don't want to sell → 0.20–0.25 delta / do want to sell → 0.25–0.30" as
