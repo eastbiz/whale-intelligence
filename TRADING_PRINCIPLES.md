@@ -99,6 +99,66 @@ strikes, not no trade.
   events. Candidate C6: after a spike-close on a name, watch for the next drop
   and surface the lower-strike re-entry.
 
+### P9 — Carry earnings risk only at strikes I'd happily own through the event
+Confirmed 2026-07-22 (EX-3 follow-up): the $180 close wasn't about the $180
+put's own earnings exposure (it expired Jul 31, before Aug 6 earnings) — it was
+about locking the recovery at a strike I didn't love, while **deliberately
+keeping** the Aug 21 $140/$150 puts that DO sit through earnings, because at
+30%+ lower strikes I'm comfortable owning through any outcome. Earnings risk
+is acceptable — but only at strikes where assignment is welcome.
+- Evidence: EX-3 (closed $180/Jul31; kept $140+$150/Aug21 through 8/6 earnings).
+- System status: not encoded. The scanner's earnings logic is a blanket
+  "warn/skip near earnings" — it doesn't distinguish by strike depth.
+
+### P10 — The daily funnel: big movers → trend context → IVP → trades; quiet day = no trades
+How a trading day actually starts: check the brokerage for **daily moves ≥5%**
+(ideally more on the volatile names). Only those names get attention for
+CSPs/CCs. Then check **5-day and 30-day** movement for context. Then **IVP —
+50%+ preferred**. Only then look at actual chains. The same big-mover list
+drives the review of open positions for closes. **If the market isn't moving,
+I don't trade at all** — and I only want to be notified on days when the
+opportunity conditions are actually there.
+- Evidence: stated workflow 2026-07-22.
+- System status: partially aligned (BIG MOVE for positions). The scanner scans
+  everything every run and the dashboard always fills; there's no "today is
+  (not) a trading day" gate on notifications. See C8.
+- Note / tension flagged by Claude: the trade history (EX-4) shows many good
+  entries at IVP 26–40 (Dec NBIS CSPs at 34–38, MSFT at 34, CRDO at 27–35).
+  The IVP≥50 bar may be a current-market preference, not a hard rule — to
+  clarify with more examples.
+
+### P11 — Direction disqualifiers: don't sell INTO the move that just paid
+On a big up-day, no CSP on that name (premium is momentarily poor + reversal
+risk); a deeply negative 30-day trend disqualifies the CC side. Worked example
+(2026-07-22): NBIS +7.5% today but 5d −25% → **disqualifies BOTH**: no CSP
+(just rose 7.5% today), no CC (30d −25%).
+- Evidence: stated workflow with NBIS example, 2026-07-22.
+- System status: largely built — csp_engine's rebound suppression (skip CSP on
+  ≥7% up-day, downgrade at ≥5%) covers the CSP side; zone-first CC gating
+  covers the CC side. Keep both when refactoring.
+
+### P12 — LEAPS: low IVP + recent price drop
+LEAPS candidates come from the opposite screen as premium selling: stocks with
+LOW IVP that dropped recently — buy cheap optionality on quality names after
+the fall, sell expensive premium elsewhere.
+- Evidence: stated workflow 2026-07-22; sheet shows 99 LEAP entries (MSFT
+  after drops, LULU, NVDA...).
+- System status: aligned — strategy_allowed blocks LEAPS at elevated/extreme
+  IVR and in upper price zones.
+
+### P13 — Past trades on the same name are entry context (the "personal premium book")
+When repeating an action (CSP/CC on a name I've traded before), I look at my
+history: what premium did I get last time, at what delta, at what stock price.
+It doesn't produce hard rules, but it's the context for judging whether
+today's premium is rich or poor **for this name**. The scanner is isolated at
+the moment of scan — it has no memory of what I've been paid before.
+- Evidence: stated 2026-07-22; the Options Trades sheet is maintained largely
+  for this purpose.
+- System status: not built. See C7. First fruits of the analysis in EX-4 —
+  e.g., the Jul 20 CRDO $175 CSPs (74–81% ann, IVP 94) are richer than ALL six
+  prior CRDO CSP entries (46–64% ann, IVP 27–35): the history would have
+  screamed "take this one."
+
 ---
 
 ## Trade Examples (raw log)
@@ -139,6 +199,11 @@ strikes, not no trade.
   put at all, it should be at a LOWER strike — and the $140 (written the prior
   day, now +37%) already fills that role; (c) the decision hinge is "how much
   do I want to own at $180" → answer: less than at lower strikes.
+- Follow-up confirmed (2026-07-22): the earnings logic was strike-depth logic
+  (the $180/Jul31 expired BEFORE the 8/6 earnings; the kept $140/$150 Aug21
+  puts sit THROUGH it). The principle is P9: keep earnings exposure only at
+  strikes worth owning through the event; the $180 close was locking the
+  recovery at a strike he didn't love.
 - Prediction logged: John expects a drop after this spike and plans to write a
   new CSP below $180 — watch whether this plays out (P8 evidence).
 - What John wants from the system for this case: a notification in the
@@ -146,6 +211,52 @@ strikes, not no trade.
   day-over-day swing (e.g., substantially negative → positive/breakeven), so
   it's obvious WHICH position produced the exit window. 17%/day is huge; the
   card should make the swing visible, not just current P&L.
+
+### EX-4 — Analysis of the Options Trades sheet (2026-07-22)
+Parsed John's Google Sheet ("Options Trades", 348 usable trades: 159 CSP,
+87 CC, 99 LEAP, 3 Bull Call). Delta/IVP-at-entry recorded from Dec 15 2025 on.
+
+**Personal premium book — entry stats for the most-traded names (CSP/CC):**
+
+| Name / strat | Trades | Delta at entry (med) | IVP at entry (med) | Annualized (med) | OTM% at entry (med) |
+|---|---|---|---|---|---|
+| NBIS CC | 32 | 0.20–0.38 (0.28) | 32–96 (43) | 26–77% (42%) | 12–60% (23%) |
+| IBIT CSP | 31 | 0.13–0.37 (0.30) | 26–74 (39) | 11–62% (38%) | — |
+| MU CSP | 17 | 0.17–0.38 (0.27) | 49–93 (82) | 26%+ (55%) | 4–19% (11%) |
+| LULU CSP | 14 | 0.23–0.34 (0.31) | 54–86 (84) | 25–61% (35%) | 5–11% (9%) |
+| AMZN CSP | 13 | 0.26–0.68 (0.30) | 25–65 (51) | 17–93% (30%) | ~7% |
+| NVO CSP | 11 | 0.27–0.36 (0.29) | 38–48 (40) | 31%+ (44%) | — |
+| MSFT CSP | 10 | 0.22–0.37 (0.23) | 34–42 (34) | 15–31% (20%) | 1–6% (6%) |
+| IBIT CC | 10 | 0.21–0.31 (0.27) | 5–25 (13) | 12–30% (19%) | 8–15% (11%) |
+| NBIS CSP | 8 | 0.21–0.29 (0.29) | 34–38 (34) | 48–86% (72%) | — |
+| OWL CSP | 8 | 0.25–0.34 (0.31) | 37–83 (63) | 37–65% (57%) | ~17% |
+| NVDA CSP | 7 | 0.15–0.27 (0.22) | 23–39 (26) | 18–97% (22%) | 6–11% (10%) |
+| CRDO CSP | 6 | 0.16–0.26 (0.20) | 27–35 (30) | 46–64% (50%) | 13–18% (17%) |
+| GOOGL CSP | 6 | 0.18–0.30 (0.29) | 19–66 (26) | 16–31% (30%) | 4–12% (5%) |
+
+**Patterns visible in the history (not yet rules):**
+- CSP deltas cluster 0.21–0.31 across nearly every name (med ~0.27–0.30) —
+  remarkably consistent, and a bit higher than the scanner's Bucket D bands.
+- On the highest-vol names (MU, LULU) entries cluster at very high IVP
+  (med 82–84) — P7/P10 in the data.
+- But plenty of good entries happened at IVP 26–40 (NBIS, MSFT, CRDO, NVDA,
+  GOOGL) — the "IVP≥50" funnel bar is soft in practice (see P10 tension).
+- IBIT CCs were written at med IVP 13 — very low vol. Open question for John
+  (conflicts with "is IV high enough?" step; may be exit-waiting/income logic).
+- Jul 20 2026 CRDO $175 CSPs (IVP 94, 74–81% ann) beat all six prior CRDO
+  entries — first concrete case where history context would have upgraded a
+  scanner signal (P13).
+
+**Data-quality caveats for any future automation:**
+- The sheet's "Stock Price" column is a LIVE formula (shows today's price on
+  old rows) — entry price is "Stock price at purchase" / "Spot Price at
+  Entry", only filled on some rows (134 of 348).
+- Delta/IVP at entry recorded only from Dec 15 2025 onward (184/155 rows).
+- The Drive export truncates/mangles some recent rows (Jun 26 + Jul 19-20 2026
+  NBIS/CRDO entries missing from export despite existing — confirmed via
+  John's screenshots). Multi-tab layouts differ; parse per-header.
+- Closed Fill price exists on 138 rows → win/loss analysis is possible later
+  (deferred to the Trading Performance Review project).
 
 ---
 
@@ -193,6 +304,30 @@ BIG MOVE / Actions card show the day-over-day P&L swing ("was −35% yesterday �
 breakeven now"), not just current P&L, so the position that produced the exit
 window is unmistakable. Depends on C1 (real P&L must be shown for the swing to
 be visible) and is limited by C4 (cadence).
+- Trigger confirmed 2026-07-22: **volatility / price action**, not P&L
+  thresholds. What John wants highlighted on the Dashboard: a position that
+  was hugely negative one day and is positive/breakeven the next — so if he
+  decides to close, he immediately knows WHICH position today's move made
+  beneficial to close. Implementation direction: persist each position's P&L
+  per scan (results.json already regenerates; needs a small history store) and
+  highlight sign-flips / large day-over-day P&L swings on the CSP/CC Actions
+  cards.
+
+### C7 — Per-ticker trade-history context on opportunity cards (P13)
+The scanner knows nothing about what John was paid before on the same name.
+Candidate: keep a normalized copy of the Options Trades history (or a distilled
+per-ticker stats file — see EX-4 table) in the repo, and show a context line on
+CSP/CC cards: "Your CRDO CSP history: 6 entries, med δ0.20, med IVP 30, med
+50% ann → today's 81% is your richest." Needs: a sync path from the Google
+Sheet (manual export is fine to start), and the EX-4 data-quality caveats
+handled.
+
+### C8 — "Is today a trading day?" notification gate (P10)
+John only wants pings on days when conditions exist: at least one watchlist
+name moving ≥5% (or an open-position BIG MOVE). Quiet market → no Telegram at
+all, regardless of what the strict filters found. The dashboard can still fill
+for browsing; Telegram is the "today matters" channel. Needs decision: does a
+rich-but-quiet opportunity (high IVP, no big move today) deserve a ping or not?
 
 ---
 
