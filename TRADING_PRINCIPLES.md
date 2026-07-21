@@ -361,7 +361,8 @@ examples to set thresholds.
 Encode "don't want to sell → 0.20–0.25 delta / do want to sell → 0.25–0.30" as
 a selectable posture in the CC engine. Needs confirmation of how to expose it.
 
-### C4 — Intraday move-watcher (detection cadence)
+### ~~C4~~ — GRADUATED → A7 (built 2026-07-22)
+### C4 (original text) — Intraday move-watcher (detection cadence)
 The 3×/weekday scan can miss a fast intraday spike entirely (it can fade before
 a scan runs). Bigger build — already on the CLAUDE.md backlog. Tracked here
 because it directly limits P1 (BIG MOVE can only fire if a scan catches the move).
@@ -438,3 +439,10 @@ rich-but-quiet opportunity (high IVP, no big move today) deserve a ping or not?
   breakeven today"). P&L history source: the previous scan's committed
   results.json; only credible (chain) marks feed it. Validated 8/8 against
   EX-2/EX-3/EX-5 scenarios. Built 2026-07-22 with John's go-ahead.
+- **A7 — Move Watcher** (P10, C4). New `move_watcher.py` + 15-min GitHub
+  Actions workflow: Yahoo-quote-only check of watchlist + held-short-option
+  names during market hours; ≥5% day moves → one compact Telegram message
+  with target/position context; 5%-bucket dedup per ticker/direction/day.
+  Zero installation for John — runs in the same cloud as the scanner. No
+  Schwab/IBKR usage. Validated: alert content, dedup, escalation, weekend
+  guard (4/4 scenarios). Built 2026-07-22 with John's go-ahead.

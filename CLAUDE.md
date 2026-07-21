@@ -40,6 +40,13 @@ independently.**
 - GitHub Actions runs the scan ~3× per weekday (approx 6:43, 9:37, 11:43 AM ET).
 - Results publish to `results.json`; alerts fire via Telegram (the primary
   action channel — John does NOT check the dashboard daily).
+- **Move Watcher** (`move_watcher.py` + `move-watcher.yml`): every 15 min
+  during market hours, Yahoo-quotes-only check of the watchlist + names with
+  open short options (from last `results.json`). Any ≥5% day move → one
+  compact Telegram message with buy/sell-target and held-position context.
+  Dedup: one alert per ticker/direction/day, re-alerts only when the move
+  crosses the next 5% bucket (state in `move_watcher_state.json`, committed
+  only when an alert fired). NO Schwab/IBKR calls — never burns tokens.
 
 ---
 
@@ -179,9 +186,10 @@ call still marked at its pre-drop price). The engine guards against this:
 - **IVP ≠ IV Rank.** The scanner only has IVP (percentile), computed as
   `100 * (1 - exp(-atm_iv / 0.25))`. Never use "IV Rank" language. IVP can be
   stale on weekends.
-- **Scan cadence limitation** — 3×/weekday cron misses fast intraday moves. A
-  10% spike can happen and fade between scans. Open architectural item (an
-  intraday lightweight move-watcher was discussed, not built).
+- **Scan cadence limitation** — full scans run 3×/weekday; the Move Watcher
+  (15-min, price-only) now covers spike/drop DETECTION between scans, but
+  P&L, chains, and trade candidates still refresh only at full scans. GitHub
+  cron has jitter — worst-case detection is ~20-30 min after a move.
 
 ---
 
@@ -223,7 +231,6 @@ call still marked at its pre-drop price). The engine guards against this:
   (`spread_scanner.py`), never integrated.
 - Grade B convexity → Telegram (currently Grade A only).
 - PATH / cheap-stock spike-CC filters too strict (premium floor, liquidity).
-- Intraday move-watcher for faster spike/drop detection.
 - Trade journaling + performance analysis (deferred; see the separate
   "Trading Performance Review" handoff John maintains for the analysis spec —
   benchmarks vs SPY/QQQ, CSP/CC efficiency, DTE-bucket comparison).
