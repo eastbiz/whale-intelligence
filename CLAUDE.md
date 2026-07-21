@@ -86,16 +86,26 @@ The engine returns ONE action per position, priority order:
 
 1. **BIG MOVE** (priority 0, event-driven) — the main one. Fires when a big
    FAVORABLE move happens on a name you hold a short option:
-   - CC + stock drops ≥10% in a day (or ≥ `BIGMOVE_3D`, off by default)
-   - CSP + stock rises ≥10% in a day
+   - CC + stock drops ≥5% in a day (or ≥ `BIGMOVE_3D`, off by default)
+   - CSP + stock rises ≥5% in a day
    - **No profit floor, no strike gate.** The move alone triggers it. Profit %,
      strike distance, cost-to-close are shown as CONTEXT, not gates. This
      replaced two earlier gated alerts (CLOSE NOW + ESCAPE ASSIGNMENT).
-   - Goes to Telegram. Editable constants: `BIGMOVE_1D` (0.10), `BIGMOVE_3D`
-     (0.99 = off).
-2. **TAKE PROFIT** — profit ≥ 80% (speculative/trading) or 90% (core/growth).
-3. **EARNINGS WARNING** — earnings inside the danger window.
-4. **HOLD** — default.
+   - The reason line STACKS context (P15 in TRADING_PRINCIPLES.md): P&L swing
+     since last scan, earnings proximity (⚠ if ≤7d, flags inside-expiry),
+     take-profit level reached. Confluence in one message, not a priority pick.
+   - Goes to Telegram. Editable constants: `BIGMOVE_1D` (0.05 — was 0.10; a
+     +9.57% CLS exit-window day was missed at 0.10), `BIGMOVE_3D` (0.99 = off).
+2. **P&L SWING** — the position itself recovered hard since the last scan
+   (≥30 points of premium recovered, or flipped from ≤−15% loss to ≥breakeven)
+   even when today's underlying move is under 5%. Catches "hugely negative
+   yesterday → positive today" across scans. Uses the previous `results.json`
+   (committed each run) as P&L history; only fires on credible (chain) marks.
+   Goes to Telegram with BIG MOVE. Constants: `PNLSWING_MIN_IMPROVE` (30),
+   `PNLSWING_FLIP_FROM` (−15), `PNLSWING_FLIP_TO` (0).
+3. **TAKE PROFIT** — profit ≥ 80% (speculative/trading) or 90% (core/growth).
+4. **EARNINGS WARNING** — earnings inside the danger window.
+5. **HOLD** — default.
 
 ### Mark credibility check (critical — prevents false P&L)
 Broker position marks can be STALE on a fast intraday move (e.g. a deep-OTM
@@ -103,12 +113,16 @@ call still marked at its pre-drop price). The engine guards against this:
 - Option mark is sourced **live chain NBBO first**, position-feed mark only as
   fallback (`mark_src` tracks the source: `chain` / `chain_near` / `position_mv`
   / `none` / `incredible`).
-- **Sanity check:** if a short option is >20% OTM but the mark implies <60%
-  profit, that's not physically credible → `mark_src = "incredible"`. The alert
-  then says "check the live option price (mark may be stale)" instead of printing
-  a false P&L. Dashboard shows "⚠ price stale — check live".
-- If you touch mark logic, preserve this. A confident-but-wrong P&L is worse
-  than no number.
+- **Sanity check (position-feed marks ONLY):** if a short option is >20% OTM
+  but a `position_mv`/`none` mark implies <60% profit, treat as stale →
+  `mark_src = "incredible"`. The alert then says "check the live option price"
+  instead of printing a false P&L. Dashboard shows "⚠ price stale — check live".
+- **Live chain NBBO is trusted as-is** — on extreme-vol names (NBIS/CRDO/CLS)
+  a put 30%+ OTM legitimately holds real value (a 16%/day stock keeps deep-OTM
+  premium bid). The guard used to fire on those and hide REAL P&L — that was
+  the bug fixed 2026-07 (P2 in TRADING_PRINCIPLES.md).
+- If you touch mark logic, preserve both halves. A confident-but-wrong P&L is
+  worse than no number; a hidden real P&L is nearly as bad.
 
 ---
 
@@ -127,6 +141,7 @@ call still marked at its pre-drop price). The engine guards against this:
 - **Feature flags:** `ENABLE_PIO = False` (Position Income Optimization, noisy),
   `STRICT_ZONE_TELEGRAM = False`.
 - **Editable alert thresholds** (top of file): `BIGMOVE_1D`, `BIGMOVE_3D`,
+  `PNLSWING_MIN_IMPROVE` / `PNLSWING_FLIP_FROM` / `PNLSWING_FLIP_TO`,
   convexity `CVX_*` constants, `MAX_CC_COVERAGE_PCT`.
 
 ---

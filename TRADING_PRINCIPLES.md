@@ -182,6 +182,18 @@ alone; together they say "if you want out, today is the day."
   misses because +9.57% < the hard 10.0% threshold — and had it been +10.1%,
   BIG MOVE would have fired and SUPPRESSED the earnings context (engine
   returns one action per position). See C2 (extended).
+- UPDATE: built same day as A6 — 5% threshold, stacked reason lines, and the
+  P&L SWING action all shipped 2026-07-22.
+
+### P16 — LEAPS are long-term investments, exempt from event-day logic
+The deep-ITM LEAPS (e.g. 10× CLS Jan'28 $180) are stock replacement held for
+years. Earnings calls don't factor into them — no trimming logic, no P15
+confluence application. Event-day exit thinking applies to SHORT premium
+positions only.
+- Evidence: stated 2026-07-22 in response to Claude's challenge on the CLS
+  LEAPS riding through earnings.
+- System status: consistent with current behavior (position engine only acts
+  on short options). Encoded here so nobody "improves" LEAPS with exit alerts.
 
 ---
 
@@ -314,7 +326,8 @@ long 10× Jan'28 $180 LEAPS calls + 1 share. Stock **+9.57%** to $336.75.
 
 ## Candidate system changes (pending — do NOT implement without go-ahead)
 
-### C1 — Mark-credibility guard misfires on high-IVP names *(highest priority)*
+### ~~C1~~ — GRADUATED → A5 (built 2026-07-22)
+### C1 (original text) — Mark-credibility guard misfires on high-IVP names
 `position_management_engine` line ~1971:
 `if dist_to_strike >= 20 and profit_pct < 60: mark_src = "incredible"`.
 Assumes deep-OTM ⇒ near-worthless ⇒ high profit. False on NBIS/CRDO/CLS, where
@@ -326,7 +339,8 @@ deep-OTM options legitimately hold value (P2). It hides real P&L behind
 - Guardrail: CLAUDE.md flags stale-mark logic as the #1 historical source of
   wrong alerts — preserve protection for genuinely stale position-feed marks.
 
-### C2 — Swing-aware / loss-reduction close prompts (P6, P15)
+### ~~C2~~ — GRADUATED → A6 (built 2026-07-22)
+### C2 (original text) — Swing-aware / loss-reduction close prompts (P6, P15)
 Frame BIG MOVE (and maybe a new prompt) around the swing: "this move cut your
 cost-to-close from $X to $Y." Consider surfacing loss-reduction exits ("a swing
 has cut this loss from −X% to −Y%; close window before it widens"). Needs more
@@ -404,3 +418,21 @@ rich-but-quiet opportunity (high IVP, no big move today) deserve a ping or not?
   was checked; now they surface as WAIT with flags. Supports P4.
 - **A4 — Removed the unused Bull Call Spread opportunity scanner** (never
   produced results; decluttered). Not a principle — housekeeping.
+- **A5 — Mark-credibility guard scoped to position-feed marks only**
+  (`position_management_engine`). Live chain NBBO is now trusted as-is; the
+  "deep OTM but low profit ⇒ stale" heuristic applies only to
+  `position_mv`/`none` sources. Real P&L now shows on NBIS/CRDO/CLS-style
+  deep-OTM puts (EX-2, EX-2b). Guard protection retained for genuinely
+  stale-prone marks (validated: T3/T8). Supports P2. Built 2026-07-22 with
+  John's go-ahead.
+- **A6 — Swing-aware exit alerts** (P6, P15). Three parts: (1) `BIGMOVE_1D`
+  0.10 → 0.05, matching John's manual ≥5% daily screen (the +9.57% CLS day
+  was missed at 0.10 — EX-5). (2) BIG MOVE reason now STACKS context: P&L
+  swing since last scan, earnings ≤7d (flags inside-expiry), take-profit
+  level reached — confluence in one message instead of a priority pick.
+  (3) New **P&L SWING** action + Telegram alert: fires when a position
+  recovered ≥30 points of premium or flipped from ≤−15% loss to breakeven
+  since the last scan, even on a quiet day (catches EX-3's "−35% yesterday →
+  breakeven today"). P&L history source: the previous scan's committed
+  results.json; only credible (chain) marks feed it. Validated 8/8 against
+  EX-2/EX-3/EX-5 scenarios. Built 2026-07-22 with John's go-ahead.

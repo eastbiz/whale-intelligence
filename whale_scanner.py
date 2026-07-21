@@ -55,8 +55,16 @@ MAX_CC_COVERAGE_PCT    = 0.50   # max 50% of owned shares covered by calls
 #   CSP (short put)  + stock RISES big  → put cheap  → review to close
 # No profit floor, no strike-proximity gate. Deep-OTM at 41% (today's NBIS)
 # fires just the same as near-strike at a loss.
-BIGMOVE_1D             = 0.10   # >=10% move in one day (favorable direction)
+BIGMOVE_1D             = 0.05   # >=5% move in one day (favorable direction) —
+                                # matches John's manual daily screen; 0.10 missed
+                                # a +9.57% CLS day that was a real exit window
 BIGMOVE_3D             = 0.99   # 3-day trigger OFF by default (set e.g. 0.15 to enable)
+# P&L SWING alert: fires when a position's P&L improved sharply since the last
+# scan (even if today's underlying move alone is under BIGMOVE_1D). Catches
+# "hugely negative yesterday → positive today" across scans.
+PNLSWING_MIN_IMPROVE   = 30.0   # >=30 percentage points of premium recovered
+PNLSWING_FLIP_FROM     = -15.0  # or: was at least this deep in loss...
+PNLSWING_FLIP_TO       = 0.0    # ...and is now at/above breakeven
 
 # ── Schwab account number → label mapping ────────────────────
 # Format: last 4 digits or full number (dashes optional)
@@ -1964,12 +1972,16 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
         dist_to_strike     = round((strike - underlying) / underlying * 100, 1) if underlying > 0 else 99
 
     # ── Mark credibility check ─────────────────────────────────────────
-    # A deep-OTM short option should be nearly worthless → near-fully profitable.
-    # If the mark says otherwise (low/negative profit while >20% OTM), the quote
-    # is stale/bad regardless of source. Treat as unreliable so we don't print a
-    # confident-but-false P&L.
-    if dist_to_strike >= 20 and profit_pct < 60:
-        # deep OTM but mark implies <60% captured — quote not credible
+    # Guard against STALE marks only. A live chain NBBO fetched this scan is
+    # trusted as-is: on extreme-vol names (NBIS, CRDO, CLS) a put 30%+ OTM can
+    # legitimately be worth $10+ because the stock moves 15%+ in a day — deep
+    # OTM does NOT imply near-worthless there (P2 in TRADING_PRINCIPLES.md).
+    # Only the position-feed fallback ('position_mv'/'none') can lag a fast
+    # move, so the "deep OTM but low profit ⇒ not credible" heuristic applies
+    # to those sources alone.
+    if (mark_src not in ("chain", "chain_near")
+            and dist_to_strike >= 20 and profit_pct < 60):
+        # deep OTM but stale-prone mark implies <60% captured — not credible
         mark_src = "incredible"
 
     # Velocity signals — only meaningful when risk is present
@@ -2012,9 +2024,27 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
     is_speculative = tier in ("Opportunistic",) or pos.get("speculative", False)
     take_profit_threshold = 80.0 if is_speculative else 90.0
 
+    # ── P&L swing since last scan (prev value injected by caller) ──────
+    # prev_profit_pct comes from the previous scan's results.json. None if the
+    # position wasn't in the last scan (new position / first run).
+    prev_profit = pos.get("prev_profit_pct", None)
+    pnl_swing_txt = ""
+    big_swing = False
+    if prev_profit is not None and prem_received > 0 and mark_src != "incredible":
+        _improve = profit_pct - prev_profit
+        if (_improve >= PNLSWING_MIN_IMPROVE or
+                (prev_profit <= PNLSWING_FLIP_FROM and profit_pct >= PNLSWING_FLIP_TO)):
+            big_swing = True
+        if abs(_improve) >= 10:
+            def _pl_word(p):
+                return f"{p:.0f}% profit" if p >= 0 else f"{abs(p):.0f}% loss"
+            pnl_swing_txt = (f" Swing since last scan: {_pl_word(prev_profit)} → "
+                             f"{_pl_word(profit_pct)}.")
+
     # ── Helper to return result ────────────────────────────────────────
     def R(action, reason):
-        priority = {"BIG MOVE": 0, "TAKE PROFIT": 1, "EARNINGS WARNING": 2, "HOLD": 3}
+        priority = {"BIG MOVE": 0, "P&L SWING": 1, "TAKE PROFIT": 2,
+                    "EARNINGS WARNING": 3, "HOLD": 4}
         return {
             "action":          action,
             "reason":          reason,
@@ -2028,8 +2058,19 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
             "earn_zone":       earn_zone,
             "earn_days":       earn_days,
             "mark_src":        mark_src,
-            "sort_priority":   priority.get(action, 3),
+            "prev_profit_pct": prev_profit,
+            "sort_priority":   priority.get(action, 4),
         }
+
+    # ── Stackable context notes (P15: a good exit day is a CONFLUENCE —
+    # the alert reason carries every active factor, not just the top one) ──
+    earn_note = ""
+    if earn_days <= 7:
+        _inside = " — inside this expiry" if earn_days <= dte else ""
+        earn_note = f" ⚠ Earnings in {earn_days}d{_inside}."
+    tp_note = (f" ✅ {profit_pct:.0f}% captured (≥{take_profit_threshold:.0f}% take-profit level)."
+               if prem_received > 0 and mark_src != "incredible"
+               and profit_pct >= take_profit_threshold else "")
 
     # ── BIG MOVE — REVIEW (event-driven, highest priority) ─────────────
     # A big favorable move (CC: stock down / CSP: stock up) on a name you hold
@@ -2042,13 +2083,29 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
             return R("BIG MOVE",
                      f"{ticker} {_move_desc} — your {pos_type} ${strike:g} is {_pos_ctx}, "
                      f"{dte}d left. Big move — check the live option price and review "
-                     f"whether to close (position mark may be stale).")
+                     f"whether to close (position mark may be stale)." + earn_note)
         _pl_txt = (f"{profit_pct:.0f}% profit" if profit_pct >= 0
                    else f"{abs(profit_pct):.0f}% loss")
         return R("BIG MOVE",
                  f"{ticker} {_move_desc} — your {pos_type} ${strike:g} is {_pos_ctx}, "
                  f"now at {_pl_txt} (${_close_cost:,.0f} to close, {dte}d left). "
-                 f"Big move — review whether to close before it reverses.")
+                 f"Big move — review whether to close before it reverses."
+                 + pnl_swing_txt + earn_note + tp_note)
+
+    # ── P&L SWING — the position itself recovered hard since last scan ─
+    # Catches "hugely negative yesterday → positive/breakeven today" even when
+    # today's underlying move alone is below BIGMOVE_1D (e.g. the recovery
+    # happened across two days). Only fires on credible marks.
+    if big_swing:
+        _close_cost = round(mark * contracts * 100, 0)
+        _pl_txt = (f"{profit_pct:.0f}% profit" if profit_pct >= 0
+                   else f"{abs(profit_pct):.0f}% loss")
+        return R("P&L SWING",
+                 f"{ticker} {pos_type} ${strike:g} recovered hard:"
+                 + pnl_swing_txt +
+                 f" Now {_pos_ctx}, ${_close_cost:,.0f} to close, {dte}d left — "
+                 f"exit window if you don't want this position."
+                 + earn_note + tp_note)
 
     # ── TAKE PROFIT ────────────────────────────────────────────────────
     # Act now — premium has decayed enough, risk/reward favours closing
@@ -6276,6 +6333,26 @@ def run_scanner():
     _total_cso = portfolio_exposure.get("total_csp_obligation", 0)
     _pos_actions = []
 
+    # Previous scan's per-position P&L (results.json is committed back by the
+    # workflow every run, so the last scan's file is on disk at startup).
+    # Keyed by (ticker, type, strike, expiry) → profit_pct. Feeds the
+    # P&L SWING alert and the "swing since last scan" context line.
+    _prev_pnl = {}
+    _prev_scan_time = ""
+    try:
+        with open("results.json") as _pf:
+            _prev_res = json.load(_pf)
+        _prev_scan_time = _prev_res.get("scan_time", "")
+        for _pa in _prev_res.get("position_actions", []):
+            if _pa.get("mark_src") in ("chain", "chain_near"):  # only credible P&L
+                _key = (_pa.get("ticker",""), _pa.get("type",""),
+                        round(float(_pa.get("strike",0) or 0), 2),
+                        str(_pa.get("expiry",""))[:10])
+                _prev_pnl[_key] = _pa.get("profit_pct")
+        print(f"   📈 Prev-scan P&L loaded: {len(_prev_pnl)} positions ({_prev_scan_time})")
+    except Exception as _pe:
+        print(f"   📈 No prev-scan P&L available ({_pe})")
+
     for _pos in portfolio_exposure.get("csp_positions", []):
         _ticker = _pos.get("ticker","")
         _tier = ("Core" if _ticker in CORE_STOCKS else
@@ -6319,9 +6396,11 @@ def run_scanner():
         _earn = get_earnings_date(_ticker)
         _earn_days = (_earn - datetime.now()).days if _earn else 999
 
+        _prev_pp = _prev_pnl.get((_ticker, "CSP", round(float(_strike or 0), 2),
+                                  str(_expiry)[:10]))
         _result = position_management_engine(
             {**_pos, "type": "CSP", "tier": _tier, "mark": _mark, "mark_src": _mark_src,
-             "days_to_earnings": _earn_days},
+             "days_to_earnings": _earn_days, "prev_profit_pct": _prev_pp},
             mkt, PORTFOLIO_SIZE, _total_cso, _spy_day
         )
         _pos_actions.append({
@@ -6338,6 +6417,7 @@ def run_scanner():
             "mark_src":       _mark_src,
             "premium_received": round(_pos.get("premium_received",0),2),
             "profit_pct":     _result["profit_pct"],
+            "prev_profit_pct": _result["prev_profit_pct"],
             "pnl_dollar":     _result["pnl_dollar"],
             "breakeven":      _result["breakeven"],
             "dist_to_be_pct": _result["dist_to_be_pct"],
@@ -6384,9 +6464,11 @@ def run_scanner():
             _mark_src = "position_mv" if _mark_cc > 0 else "none"
         _earn = get_earnings_date(_ticker)
         _earn_days = (_earn - datetime.now()).days if _earn else 999
+        _prev_pp = _prev_pnl.get((_ticker, "CC", round(float(_strike or 0), 2),
+                                  str(_expiry)[:10]))
         _result = position_management_engine(
             {**_pos, "type": "CC", "tier": _tier, "mark": _mark_cc, "mark_src": _mark_src,
-             "days_to_earnings": _earn_days},
+             "days_to_earnings": _earn_days, "prev_profit_pct": _prev_pp},
             mkt, PORTFOLIO_SIZE, _total_cso, _spy_day
         )
         _pos_actions.append({
@@ -6403,6 +6485,7 @@ def run_scanner():
             "mark_src":       _mark_src,
             "premium_received": round(_pos.get("premium_received",0),2),
             "profit_pct":     _result["profit_pct"],
+            "prev_profit_pct": _result["prev_profit_pct"],
             "pnl_dollar":     _result["pnl_dollar"],
             "breakeven":      _result["breakeven"],
             "dist_to_be_pct": _result["dist_to_be_pct"],
@@ -6420,13 +6503,13 @@ def run_scanner():
 
     _pos_actions.sort(key=lambda x: x.get("sort_priority", 3))
     _def_count   = sum(1 for p in _pos_actions if p["action"] == "DEFENSIVE")
-    _close_count = sum(1 for p in _pos_actions if p["action"] == "BIG MOVE")
+    _close_count = sum(1 for p in _pos_actions if p["action"] in ("BIG MOVE", "P&L SWING"))
     print(f"   📋 Position actions: {len(_pos_actions)} total | {_def_count} DEFENSIVE | {_close_count} BIG MOVE")
 
     # ── BIG MOVE — REVIEW → Telegram ──────────────────────────────────
     # Event-driven: a big favorable move on a name you hold a short option.
     # Built after the main Telegram block, so it sends here.
-    _tg_bigmove = [p for p in _pos_actions if p["action"] == "BIG MOVE"]
+    _tg_bigmove = [p for p in _pos_actions if p["action"] in ("BIG MOVE", "P&L SWING")]
     if _tg_bigmove:
         print(f"   📱 Sending {len(_tg_bigmove)} BIG MOVE alert(s)...")
         send_telegram("━━━ *🚨 BIG MOVE — REVIEW YOUR SHORT OPTION* ━━━"); time.sleep(1)
