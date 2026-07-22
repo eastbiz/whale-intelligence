@@ -135,6 +135,37 @@ risk); a deeply negative 30-day trend disqualifies the CC side. Worked example
 - System status: largely built — csp_engine's rebound suppression (skip CSP on
   ≥7% up-day, downgrade at ≥5%) covers the CSP side; zone-first CC gating
   covers the CC side. Keep both when refactoring.
+- **Gap (EX-7):** the CSP disqualifier is 1-DAY only. A multi-day RALLY
+  (NBIS +31%/5d) is not caught and even gets promoted to BUY. Extension in
+  P19.
+
+### P19 — Measure moves in units of the stock's own normal movement (IV-scaled), soft not hard
+The core design principle for "is this a good day to trade this name." Do NOT
+hard-code percentage thresholds — they can't fit both a 90%-IV NBIS and a
+25%-IV MSFT. Instead: options price a "normal" move for each name right now
+(≈ IV × √(days/252)). Judge the recent move as a MULTIPLE of that normal.
+- NBIS ~90% IV → normal 5d ≈ ±13%; a +31% run is ~2.4× normal → wrong side.
+- MSFT ~25% IV → normal 5d ≈ ±3.5%; a +8% run is ~2.3× normal → same rule
+  catches it, with no MSFT-specific number.
+- One relative rule ("recent up-move ≳ 1.2× normal → not a CSP day"),
+  self-adjusting per name and per regime; nothing to re-tune as vol changes.
+Two firm sub-decisions (2026-07-22):
+  (a) **Soft, never hard.** A post-rally setup is downgraded to WAIT with a
+      plain flag ("+31%/5d ≈ 2.4× normal — wrong side of the swing"), never
+      SKIP-hidden. A wrong WAIT costs nothing (John sees it, overrides); a
+      wrong SKIP hides a deal (the CRDO/NBIS bug we spent a week undoing).
+      Timing = a visible judgment; strict filters stay only for premium
+      QUALITY, not deletion.
+  (b) **Calibrate by John's verdicts, not invented boundaries.** John reviews
+      real cards and says "I'd take this / not today because…"; each is logged
+      as an example; any proposed rule must reproduce ALL logged verdicts
+      before shipping (same method that produced the 9/9-validated P17 gate).
+      Rules become regression-tested descriptions of John's judgment.
+- Evidence: EX-7 (NBIS certain no-CSP at +31%/5d); generalizes P7 ("judge by
+  the stock's own history of price movements") and P11 (1-day → multi-day).
+- System status: **Candidate C10** — agreed direction, NOT yet built. Needs a
+  handful more "good day / bad day" verdicts across DIFFERENT-vol names to
+  confirm the ~1.2× multiple and the WAIT vs SKIP line before coding.
 
 ### P12 — LEAPS: low IVP + recent price drop
 LEAPS candidates come from the opposite screen as premium selling: stocks with
@@ -288,6 +319,21 @@ positions only.
   stayed over 5%. Distilled into P17; gate calibrated so that every alert he
   acted on (PATH, CLS ×2, NBIS $180 swing) passes and both NBIS noise alerts
   fail (9/9 test cases).
+
+### EX-7 — NBIS post-rally: attractive premium, wrong day to write (2026-07-22)
+- NBIS $225.64, **+4.02% today, +31.36% over 5 days**. Dashboard showed CSP
+  cards as BUY (RISKY) at 110-117% annualized (the $170/$195 strikes).
+- John: "I would NOT write CSP today for NBIS due to the huge run-up 35% in 5
+  days. This is not a day to write CSP and I am certain." Premium looks great;
+  timing is wrong — he's at the SPIKE end of the P8 swing, not the drop end.
+- Engine gap (verified in code): csp_engine only guards the UP side on a
+  1-DAY basis (≥7% skip / ≥5% downgrade). The 5-day check `rebound_relative`
+  is computed ONLY when 5d change is negative (recovery-inside-a-drop). A
+  sustained multi-day rally is invisible, and the pullback-from-52wk-high
+  rule actively promotes it to BUY (RISKY) because NBIS is still ~30% below
+  its high. The +4% day slips under the 1-day bar.
+- **Design decision (2026-07-22): don't hard-code thresholds; measure the
+  move in units of the stock's OWN normal movement (IV-scaled).** See P19.
 
 ### EX-4 — Analysis of the Options Trades sheet (2026-07-21)
 Parsed John's Google Sheet ("Options Trades", 348 usable trades: 159 CSP,
@@ -448,6 +494,17 @@ Telegram CSPs currently come from the strict execution pipeline (score-gated),
 which is separate from the dashboard pipeline that computes BUY/WAIT actions —
 wiring conviction into the Telegram gate needs the two pipelines reconciled.
 Collect a few more "I'd act on this / noise" examples first.
+
+### C10 — IV-scaled, soft "wrong side of the swing" CSP timing gate (P19)
+Replace/extend the 1-day-only up-move suppression in csp_engine with an
+IV-scaled multi-day check: compute normal move = IV × √(days/252), express
+the recent 1d and 5d moves as multiples of normal, and DOWNGRADE (BUY→WAIT,
+never SKIP) when the up-move multiple exceeds ~1.2×. Data available: ATM IV
+per name from the chain fetch; 1d and 5d changes already in mkt/trend_state.
+Flag text names the reason in John's terms ("+31%/5d ≈ 2.4× normal"). Same
+machinery could later flag the CC side symmetrically (drop that's already
+overextended) and inform C5. BUILD ONLY after enough cross-vol verdicts
+validate the multiple — see P19(b).
 
 ### C8 — "Is today a trading day?" notification gate (P10)
 John only wants pings on days when conditions exist: at least one watchlist
