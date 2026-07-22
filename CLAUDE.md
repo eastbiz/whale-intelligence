@@ -112,8 +112,15 @@ The engine returns ONE action per position, priority order:
    - The reason line STACKS context (P15 in TRADING_PRINCIPLES.md): P&L swing
      since last scan, earnings proximity (⚠ if ≤7d, flags inside-expiry),
      take-profit level reached. Confluence in one message, not a priority pick.
-   - Goes to Telegram. Editable constants: `BIGMOVE_1D` (0.05 — was 0.10; a
-     +9.57% CLS exit-window day was missed at 0.10), `BIGMOVE_3D` (0.99 = off).
+   - Editable constants: `BIGMOVE_1D` (0.05 — was 0.10; a +9.57% CLS
+     exit-window day was missed at 0.10), `BIGMOVE_3D` (0.99 = off).
+   - **Telegram gate (P17):** BIG MOVE / P&L SWING reach Telegram only under
+     decision pressure — P&L SWING itself, earnings ≤7d inside expiry, ≤15%
+     from strike, or credible profit ≥60% (`TG_POS_MIN_PROFIT`,
+     `TG_POS_NEAR_STRIKE`) — and once per position per day (dedup key
+     `tg_position_alerts` in results.json). Dashboard always shows ALL
+     actions; the gate is Telegram-only. Calibrated on EX-6 (PATH wanted,
+     NBIS 52%/36%-OTM noise).
 2. **P&L SWING** — the position itself recovered hard since the last scan
    (≥30 points of premium recovered, or flipped from ≤−15% loss to ≥breakeven)
    even when today's underlying move is under 5%. Catches "hugely negative

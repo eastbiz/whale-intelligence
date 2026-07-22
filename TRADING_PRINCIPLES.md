@@ -185,6 +185,19 @@ alone; together they say "if you want out, today is the day."
 - UPDATE: built same day as A6 — 5% threshold, stacked reason lines, and the
   P&L SWING action all shipped 2026-07-21.
 
+### P17 — Position alerts need decision pressure; the move alone is name-level news
+The Move Watcher tells me a NAME moved (once/day) — that's enough awareness.
+A POSITION alert on Telegram is only valuable when there's something to
+decide: profit high enough to close and be done (~60%+), price near the
+strike (~15%), earnings inside the option's window, or a big P&L swing.
+A favorable move on a position I'm comfortable holding is noise, even at
++52% profit — and repeating it every scan makes it worse.
+- Evidence: EX-6 — PATH CC alert (65% profit) acted on within minutes;
+  NBIS $140 (+52%, 36% OTM) and $150 (−30%, 31% OTM) alerts explicitly
+  called "not valuable"; NBIS re-alerted every scan for 2 days.
+- System status: **Actioned** — A9 (Telegram gate + once-per-position-per-day
+  dedup; dashboard unchanged, shows everything).
+
 ### P16 — LEAPS are long-term investments, exempt from event-day logic
 The deep-ITM LEAPS (e.g. 10× CLS Jan'28 $180) are stock replacement held for
 years. Earnings calls don't factor into them — no trimming logic, no P15
@@ -247,6 +260,19 @@ positions only.
   day-over-day swing (e.g., substantially negative → positive/breakeven), so
   it's obvious WHICH position produced the exit window. 17%/day is huge; the
   card should make the swing visible, not just current P&L.
+
+### EX-6 — PATH close + Telegram noise feedback (2026-07-21, evening)
+- **PATH CC $13**: alert "PATH dropped 10.3% — your CC $13 is 20% OTM, now at
+  65% profit ($260 to close, 29d left)" → John closed at **$0.21 fill**
+  within minutes. First fully-validated A5/A6 alert → action → fill cycle.
+  (Also note: 10.3% would have fired even at the old 0.10 threshold, but the
+  real P&L display and stacked framing are new.)
+- **Noise complaint**: same evening, NBIS $140 (+52%, 36% OTM) and NBIS $150
+  (−30%, 31% OTM) BIG MOVE alerts judged "not valuable" — he wanted ONLY the
+  PATH-style ping. NBIS had also re-alerted on every scan while its day move
+  stayed over 5%. Distilled into P17; gate calibrated so that every alert he
+  acted on (PATH, CLS ×2, NBIS $180 swing) passes and both NBIS noise alerts
+  fail (9/9 test cases).
 
 ### EX-4 — Analysis of the Options Trades sheet (2026-07-21)
 Parsed John's Google Sheet ("Options Trades", 348 usable trades: 159 CSP,
@@ -453,3 +479,10 @@ rich-but-quiet opportunity (high IVP, no big move today) deserve a ping or not?
   scanner skips late-arriving schedule duplicates (<100 min freshness).
   Directly serves P10 (fresh data when John sits down to trade) — this was
   why he kept pushing manual scans. Validated 10/10. Built 2026-07-21.
+- **A9 — Telegram decision-pressure gate for position alerts** (P17, EX-6).
+  `tg_position_alert_worthy()`: BIG MOVE / P&L SWING reach Telegram only if
+  P&L SWING, or earnings ≤7d inside expiry, or ≤15% from strike, or credible
+  profit ≥60%. Plus once-per-position-per-day dedup via `tg_position_alerts`
+  in results.json. Dashboard unchanged — every action still visible there.
+  Constants: `TG_POS_MIN_PROFIT` (60), `TG_POS_NEAR_STRIKE` (15). Validated
+  9/9 against every logged real case. Built 2026-07-21.
