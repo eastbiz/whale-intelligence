@@ -65,6 +65,15 @@ BIGMOVE_3D             = 0.99   # 3-day trigger OFF by default (set e.g. 0.15 to
 PNLSWING_MIN_IMPROVE   = 30.0   # >=30 percentage points of premium recovered
 PNLSWING_FLIP_FROM     = -15.0  # or: was at least this deep in loss...
 PNLSWING_FLIP_TO       = 0.0    # ...and is now at/above breakeven
+# ── Telegram gate for position alerts (P17) ──────────────────────────────
+# The Move Watcher already pings the NAME once per day when it moves >=5%.
+# A POSITION alert additionally reaches Telegram only under DECISION PRESSURE
+# (high profit captured / near strike / earnings inside expiry / P&L swing).
+# The dashboard always shows every action — this gates Telegram only.
+# Calibrated on real reactions: PATH CC 65% profit → wanted; CLS put 11% OTM
+# pre-earnings at 32% → wanted; NBIS 52% profit 36% OTM → noise (2026-07-21).
+TG_POS_MIN_PROFIT      = 60.0   # profit% that alone justifies a close ping
+TG_POS_NEAR_STRIKE     = 15.0   # dist-to-strike% that makes any move relevant
 
 # ── Schwab account number → label mapping ────────────────────
 # Format: last 4 digits or full number (dashes optional)
@@ -4136,6 +4145,31 @@ def fmt_spike_cc(opp) -> str:
 # MAIN SCANNER
 # ════════════════════════════════════════════════════════════
 
+def tg_position_alert_worthy(p: dict) -> bool:
+    """
+    P17 Telegram gate for BIG MOVE / P&L SWING position alerts.
+    A bare favorable move on a comfortable position is noise — the Move
+    Watcher already told John the name moved. Telegram gets the position
+    alert only when there's something to DECIDE:
+      - P&L SWING (big recovery since last scan) — always news
+      - earnings within 7d AND inside this option's expiry
+      - price within TG_POS_NEAR_STRIKE % of the strike
+      - credible profit >= TG_POS_MIN_PROFIT % (close-and-be-done territory)
+    Dashboard shows every action regardless of this gate.
+    """
+    if p.get("action") == "P&L SWING":
+        return True
+    earn = p.get("earn_days", 999)
+    if earn <= 7 and earn <= p.get("dte", 0):
+        return True
+    if p.get("dist_to_strike", 99) <= TG_POS_NEAR_STRIKE:
+        return True
+    if (p.get("mark_src") in ("chain", "chain_near")
+            and p.get("profit_pct", 0) >= TG_POS_MIN_PROFIT):
+        return True
+    return False
+
+
 def skip_redundant_scheduled_run(max_age_min: int = 100) -> bool:
     """
     GitHub's cron can deliver a scheduled run 60-105 min late (observed
@@ -6369,10 +6403,12 @@ def run_scanner():
     # P&L SWING alert and the "swing since last scan" context line.
     _prev_pnl = {}
     _prev_scan_time = ""
+    _prev_tg_alerts = {}   # position-key -> date of last Telegram ping (P17 dedup)
     try:
         with open("results.json") as _pf:
             _prev_res = json.load(_pf)
         _prev_scan_time = _prev_res.get("scan_time", "")
+        _prev_tg_alerts = _prev_res.get("tg_position_alerts", {}) or {}
         for _pa in _prev_res.get("position_actions", []):
             if _pa.get("mark_src") in ("chain", "chain_near"):  # only credible P&L
                 _key = (_pa.get("ticker",""), _pa.get("type",""),
@@ -6538,12 +6574,28 @@ def run_scanner():
 
     # ── BIG MOVE — REVIEW → Telegram ──────────────────────────────────
     # Event-driven: a big favorable move on a name you hold a short option.
-    # Built after the main Telegram block, so it sends here.
-    _tg_bigmove = [p for p in _pos_actions if p["action"] in ("BIG MOVE", "P&L SWING")]
+    # P17 gate: only decision-pressure alerts reach Telegram, once per
+    # position per day (the dashboard shows every action regardless).
+    _today_str = now_et().strftime("%Y-%m-%d")
+    # Carry forward keys already pinged today (results.json survives scans)
+    _tg_alert_log = {k: d for k, d in _prev_tg_alerts.items() if d == _today_str}
+    _tg_bigmove = []
+    _tg_suppressed = 0
+    for p in _pos_actions:
+        if p["action"] not in ("BIG MOVE", "P&L SWING"):
+            continue
+        _tgk = f"{p['ticker']}|{p['type']}|{p['strike']:g}|{p['expiry']}"
+        if _tgk in _tg_alert_log or not tg_position_alert_worthy(p):
+            _tg_suppressed += 1
+            continue
+        _tg_bigmove.append((_tgk, p))
+    if _tg_suppressed:
+        print(f"   🔕 {_tg_suppressed} position alert(s) dashboard-only (P17 gate / already pinged today)")
     if _tg_bigmove:
         print(f"   📱 Sending {len(_tg_bigmove)} BIG MOVE alert(s)...")
         send_telegram("━━━ *🚨 BIG MOVE — REVIEW YOUR SHORT OPTION* ━━━"); time.sleep(1)
-        for p in _tg_bigmove:
+        for _tgk, p in _tg_bigmove:
+            _tg_alert_log[_tgk] = _today_str
             _emoji = "🟢" if p["type"] == "CSP" else "🔵"
             _pl = f"{p['profit_pct']:.0f}% profit" if p['profit_pct'] >= 0 else f"{abs(p['profit_pct']):.0f}% loss"
             _src = p.get("mark_src", "none")
@@ -6587,6 +6639,7 @@ def run_scanner():
         "opportunities":  all_opps,
         "positions":      pos_list,
         "position_actions": _pos_actions,
+        "tg_position_alerts": _tg_alert_log,   # P17 dedup: pos-key -> date pinged
         "analysis":       analysis,
         "total_opps":     len(all_opps),
         "price_watch":    price_watch_list,
