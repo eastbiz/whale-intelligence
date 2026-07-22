@@ -12,9 +12,16 @@ Requires:
     scoped to this repo, with "Secrets" repository permission set to
     Read and write).
 
+By default it pushes to BOTH repos that need the Schwab token:
+    - eastbiz/whale-intelligence  (the public scanner)
+    - eastbiz/reports             (the private performance-review system)
+so a single weekly run keeps them in sync. Your PAT must have "Secrets:
+Read and write" on BOTH repos (fine-grained PATs can list multiple repos).
+
 Usage:
     python push_schwab_secrets.py [--token-path schwab_token.json]
-                                   [--repo eastbiz/whale-intelligence]
+                                   [--repo owner/name]   # repeatable; overrides
+                                                          # the default pair
 """
 import argparse
 import base64
@@ -62,8 +69,11 @@ def push_secret(session: requests.Session, repo: str, key_id: str,
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--token-path", default=os.environ.get("SCHWAB_TOKEN_PATH", "schwab_token.json"))
-    ap.add_argument("--repo", default="eastbiz/whale-intelligence")
+    ap.add_argument("--repo", action="append", dest="repos",
+                    help="Repo to update (owner/name). Repeatable. "
+                         "Omit to update both whale-intelligence and reports.")
     args = ap.parse_args()
+    repos = args.repos or ["eastbiz/whale-intelligence", "eastbiz/reports"]
 
     gh_token = os.environ.get("GITHUB_TOKEN")
     if not gh_token:
@@ -83,15 +93,16 @@ def main() -> None:
         "X-GitHub-Api-Version": "2022-11-28",
     })
 
-    r = session.get(f"https://api.github.com/repos/{args.repo}/actions/secrets/public-key", timeout=10)
-    if r.status_code != 200:
-        sys.exit(f"❌ Couldn't fetch repo public key: {r.status_code} {r.text}")
-    key_data = r.json()
+    for repo in repos:
+        r = session.get(f"https://api.github.com/repos/{repo}/actions/secrets/public-key", timeout=10)
+        if r.status_code != 200:
+            sys.exit(f"❌ Couldn't fetch public key for {repo}: {r.status_code} {r.text}")
+        key_data = r.json()
 
-    print(f"   Pushing tokens to {args.repo} secrets...")
-    push_secret(session, args.repo, key_data["key_id"], key_data["key"], "SCHWAB_ACCESS_TOKEN", access_token)
-    push_secret(session, args.repo, key_data["key_id"], key_data["key"], "SCHWAB_REFRESH_TOKEN", refresh_token)
-    print("✅ Done — GitHub Secrets updated.")
+        print(f"   Pushing tokens to {repo} secrets...")
+        push_secret(session, repo, key_data["key_id"], key_data["key"], "SCHWAB_ACCESS_TOKEN", access_token)
+        push_secret(session, repo, key_data["key_id"], key_data["key"], "SCHWAB_REFRESH_TOKEN", refresh_token)
+    print(f"✅ Done — updated {len(repos)} repo(s): {', '.join(repos)}")
 
 
 if __name__ == "__main__":
