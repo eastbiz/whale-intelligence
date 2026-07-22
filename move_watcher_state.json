@@ -1,7 +1,9 @@
 {
   "date": "2026-07-22",
   "alerted": {
-    "PATH:down": 10
+    "PATH:down": 10,
+    "NOW:down": 5,
+    "PLTR:down": 5
   },
   "dispatched": {
     "13:47": true
