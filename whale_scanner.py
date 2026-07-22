@@ -5588,27 +5588,23 @@ def run_scanner():
                 pos_status = "Profit" if pnl_pct_cc>5 else "Loss" if pnl_pct_cc<-5 else "Break-even"
                 ppd_cc = round(best_cc["premium"] / max(1, best_cc["dte"]), 2)
                 ow_warn = ["Overweight — higher delta allowed"] if is_overweight else []
-                # ── Phase 1.5: Build reasoning string for dashboard card ──
+                # ── Card text: short, exceptional-or-nothing (P18 2026-07-22) ──
+                # John: zone %-of-band and cost-basis lines say nothing at a
+                # glance. Lead with sale price vs HIS sell target, then IVP
+                # only when it's a signal, then the income line. Nothing else.
                 _reasoning_parts = []
-                if _cc_band_mid > 0:
-                    _pos_pct = (price - _buy_under_cc) / (_sell_above - _buy_under_cc) * 100
-                    _reasoning_parts.append(
-                        f"✅ Zone: stock at {_pos_pct:.0f}% of band (${_buy_under_cc:.0f}–${_sell_above:.0f}), in upper half"
-                    )
-                if avg_d > 0:
-                    _gain_if_called = (best_cc['strike'] + best_cc['premium'] - avg_d) / avg_d * 100
-                    _reasoning_parts.append(
-                        f"✅ Cost basis ${avg_d:.0f}: strike ${best_cc['strike']:.0f} locks in {_gain_if_called:.0f}% gain if called away"
-                    )
                 if _sell_above > 0:
                     _eff_sale = best_cc['strike'] + best_cc['premium']
-                    _reasoning_parts.append(
-                        f"✅ Effective sale ${_eff_sale:.2f} ≥ Sell Above ${_sell_above:.0f}"
-                    )
+                    if _eff_sale >= _sell_above:
+                        _reasoning_parts.append(
+                            f"✅ Sale ${_eff_sale:.2f} ≥ your sell target ${_sell_above:.0f}")
+                    else:
+                        _reasoning_parts.append(
+                            f"⚠️ Sale ${_eff_sale:.2f} BELOW your sell target ${_sell_above:.0f}")
                 if ivp_d >= 50:
-                    _reasoning_parts.append(f"✅ IVP {ivp_d:.0f}% — premium environment is paying")
+                    _reasoning_parts.append(f"✅ IVP {ivp_d:.0f}%")
                 elif ivp_d < 30:
-                    _reasoning_parts.append(f"⚠️ IVP {ivp_d:.0f}% — premium is light, modest income")
+                    _reasoning_parts.append(f"⚠️ IVP {ivp_d:.0f}% — light premium")
                 _reasoning_parts.append(
                     f"📊 {best_cc['annualized_return']:.0f}% annualized = ${ppd_cc}/day per contract"
                 )
@@ -5705,28 +5701,25 @@ def run_scanner():
                                         "annualized_return":round(ann,1),"avg_cost":round(avg_d,2)}
                     except: continue
                 if best_pio:
-                    # ── Phase 1.5: Build PIO reasoning string ──
+                    # ── PIO card text: same short format as CC (P18) —
+                    # no zone %-of-band, no cost-basis lines ──
                     _ppd_pio = round(best_pio["premium"] / max(1, best_pio["dte"]), 2)
                     _pio_reasoning_parts = []
-                    if _cc_band_mid > 0:
-                        _pos_pct = (price - _buy_under_cc) / (_sell_above - _buy_under_cc) * 100
-                        _pio_reasoning_parts.append(
-                            f"✅ Zone: stock at {_pos_pct:.0f}% of band (${_buy_under_cc:.0f}–${_sell_above:.0f})"
-                        )
-                    _gain_if_called = (best_pio['strike'] + best_pio['premium'] - avg_d) / avg_d * 100
-                    _pio_reasoning_parts.append(
-                        f"✅ Cost basis ${avg_d:.0f}: strike ${best_pio['strike']:.0f} = {_gain_if_called:.0f}% gain if called"
-                    )
-                    if _sell_above > 0 and (best_pio['strike'] + best_pio['premium']) >= _sell_above:
-                        _pio_reasoning_parts.append(
-                            f"✅ Effective sale ${best_pio['strike']+best_pio['premium']:.2f} ≥ Sell Above ${_sell_above:.0f}"
-                        )
-                    _pio_reasoning_parts.append(f"📊 {pnl_lbl} position — {pnl_pct:+.0f}% from cost")
+                    if _sell_above > 0:
+                        _eff_pio = best_pio['strike'] + best_pio['premium']
+                        if _eff_pio >= _sell_above:
+                            _pio_reasoning_parts.append(
+                                f"✅ Sale ${_eff_pio:.2f} ≥ your sell target ${_sell_above:.0f}")
+                        else:
+                            _pio_reasoning_parts.append(
+                                f"⚠️ Sale ${_eff_pio:.2f} BELOW your sell target ${_sell_above:.0f}")
+                    if ivp_d >= 50:
+                        _pio_reasoning_parts.append(f"✅ IVP {ivp_d:.0f}%")
+                    elif ivp_d < 30:
+                        _pio_reasoning_parts.append(f"⚠️ IVP {ivp_d:.0f}% — light premium")
                     _pio_reasoning_parts.append(
                         f"📊 {best_pio['annualized_return']:.0f}% annualized = ${_ppd_pio}/day per contract"
                     )
-                    if ivp_d < 30:
-                        _pio_reasoning_parts.append(f"⚠️ IVP {ivp_d:.0f}% — light premium, modest income")
                     _pio_reasoning = " | ".join(_pio_reasoning_parts)
 
                     dashboard_ccs.append({
@@ -5944,12 +5937,13 @@ def run_scanner():
                                             x.get("required_cagr", 99),
                                             -x.get("cov30", 0)))
 
-    # ── Cheap Convexity → Telegram (Grade A only) ──────────────
+    # ── Cheap Convexity → Telegram (Grades A + B) ──────────────
     # Dashboard is authoritative; Telegram is derived. Convexity is built after
-    # the main Telegram block, so it sends here. Only Grade A (Excellent) passers
-    # alert — these are rare by design, so this won't flood.
+    # the main Telegram block, so it sends here. Strict mode already limits the
+    # dashboard to rare Grade A/B passers — John wants those pinged too
+    # (2026-07-22: an AAPL Grade-B row was the only convexity all week).
     tg_convex = [o for o in dashboard_convexity
-                 if o.get("classification") == "A" and not o.get("is_nearmiss")]
+                 if o.get("classification") in ("A", "B") and not o.get("is_nearmiss")]
     if STRICT_ZONE_TELEGRAM and tg_convex:
         _pre = len(tg_convex)
         _kept = []
@@ -5964,12 +5958,12 @@ def run_scanner():
         tg_convex = _kept
         print(f"   📵 STRICT_ZONE_TELEGRAM convexity: {_pre}→{len(tg_convex)}")
     if tg_convex:
-        print(f"   📱 Sending {len(tg_convex)} Grade-A convexity alert(s)...")
-        send_telegram("━━━ *🎲 CHEAP CONVEXITY (Grade A)* ━━━"); time.sleep(1)
+        print(f"   📱 Sending {len(tg_convex)} convexity alert(s) (A/B)...")
+        send_telegram("━━━ *🎲 CHEAP CONVEXITY* ━━━"); time.sleep(1)
         for o in tg_convex:
             send_telegram(fmt_convex(o)); time.sleep(2)
     else:
-        print(f"   🎲 Convexity: no Grade-A passers → no Telegram")
+        print(f"   🎲 Convexity: no Grade A/B passers → no Telegram")
 
     # Sort by canonical score descending — never by annualized return
     dashboard_csps = csp_promote_best(dashboard_csps)

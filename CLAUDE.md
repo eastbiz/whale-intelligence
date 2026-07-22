@@ -87,7 +87,7 @@ independently.**
   bands (Conservative / Sweet spot / More leverage).
 - **Cheap Convexity LEAPS** (`scan_convexity`) — far-OTM long-dated calls,
   STRICT MODE. Only Grade A/B passers shown, one best row per ticker, near-misses
-  discarded. Distinct from deep-ITM LEAPS. Grade A → Telegram.
+  discarded. Distinct from deep-ITM LEAPS. Grades A+B → Telegram.
 - **Spike CC** (`find_spike_cc`) — sell calls into an 8%+ up-spike on ANY held
   100+ share position. Overrides `spreads_only` (a CC on owned shares isn't
   naked). Goes to Telegram.
@@ -247,7 +247,6 @@ call still marked at its pre-drop price). The engine guards against this:
 
 - Spread scanner for CRDO/NBIS on normal (non-spike) days — built standalone
   (`spread_scanner.py`), never integrated.
-- Grade B convexity → Telegram (currently Grade A only).
 - PATH / cheap-stock spike-CC filters too strict (premium floor, liquidity).
 - Trade journaling + performance analysis (deferred; see the separate
   "Trading Performance Review" handoff John maintains for the analysis spec —

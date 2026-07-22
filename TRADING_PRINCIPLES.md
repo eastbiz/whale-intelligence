@@ -198,6 +198,21 @@ A favorable move on a position I'm comfortable holding is noise, even at
 - System status: **Actioned** — A9 (Telegram gate + once-per-position-per-day
   dedup; dashboard unchanged, shows everything).
 
+### P18 — Card text: short, judged against MY targets, exceptional-or-nothing
+Opportunity card text should let me see in one glance whether something is
+exceptional. "Stock at 79% of band" tells me nothing; "Sale $468.93 ≥ your
+sell target $450" tells me everything. Cost-basis lines: remove from all
+cards. Generic zone narration: remove. What stays: price vs my buy/sell
+target, IVP only when it's a signal (high or warning-low), and the income
+line (annualized + $/day).
+- Evidence: stated 2026-07-22 (TSM CC example). Related preference, logged
+  not yet actioned: Telegram opportunity pings should carry only conviction
+  trades — "I would probably consider only the two BUY (RISKY) cards"
+  (NBIS/CRDO CSPs at 110-117% annualized); LEAPS to Telegram only when
+  genuinely exceptional ("CLS borderline... or none") → Candidate C9.
+- System status: **Actioned** (A10) for CC/PIO card text; convexity → 
+  Telegram now includes Grade B (A10). C9 pending design.
+
 ### P16 — LEAPS are long-term investments, exempt from event-day logic
 The deep-ITM LEAPS (e.g. 10× CLS Jan'28 $180) are stock replacement held for
 years. Earnings calls don't factor into them — no trimming logic, no P15
@@ -426,6 +441,14 @@ CSP/CC cards: "Your CRDO CSP history: 6 entries, med δ0.20, med IVP 30, med
 Sheet (manual export is fine to start), and the EX-4 data-quality caveats
 handled.
 
+### C9 — Conviction-only Telegram for OPPORTUNITY pings (P18)
+John acts on BUY (RISKY)/BUY (SAFE) CSP cards; WAIT cards are dashboard
+material. LEAPS should ping rarely ("borderline... or none"). Design issue:
+Telegram CSPs currently come from the strict execution pipeline (score-gated),
+which is separate from the dashboard pipeline that computes BUY/WAIT actions —
+wiring conviction into the Telegram gate needs the two pipelines reconciled.
+Collect a few more "I'd act on this / noise" examples first.
+
 ### C8 — "Is today a trading day?" notification gate (P10)
 John only wants pings on days when conditions exist: at least one watchlist
 name moving ≥5% (or an open-position BIG MOVE). Quiet market → no Telegram at
@@ -486,3 +509,9 @@ rich-but-quiet opportunity (high IVP, no big move today) deserve a ping or not?
   in results.json. Dashboard unchanged — every action still visible there.
   Constants: `TG_POS_MIN_PROFIT` (60), `TG_POS_NEAR_STRIKE` (15). Validated
   9/9 against every logged real case. Built 2026-07-21.
+- **A10 — CC/PIO card text shortened (P18); convexity Grades A+B → Telegram.**
+  Removed zone-%-of-band and cost-basis lines from CC and PIO card reasoning;
+  lead line is now sale price vs John's sell target (✅/⚠ BELOW), then IVP
+  only when signal-worthy, then annualized + $/day. Convexity Telegram filter
+  widened from Grade A only to A+B (strict mode already keeps these rare;
+  cleared the "Grade B convexity → Telegram" backlog item). Built 2026-07-22.
