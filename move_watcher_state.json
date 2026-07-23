@@ -3,7 +3,8 @@
   "alerted": {
     "GOOGL:down": 5,
     "MSTR:down": 5,
-    "TSLA:down": 10
+    "TSLA:down": 10,
+    "KNX:down": 5
   },
   "dispatched": {
     "13:47": true
