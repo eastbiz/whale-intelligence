@@ -8,5 +8,9 @@
   },
   "dispatched": {
     "13:47": true
-  }
+  },
+  "scan_triggered": {
+    "TSLA:down": true
+  },
+  "scan_trigger_count": 0
 }
