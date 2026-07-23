@@ -3,11 +3,12 @@
   "alerted": {
     "GOOGL:down": 5,
     "MSTR:down": 5,
-    "TSLA:down": 10,
+    "TSLA:down": 15,
     "KNX:down": 5
   },
   "dispatched": {
-    "13:47": true
+    "13:47": true,
+    "18:47": true
   },
   "scan_triggered": {
     "TSLA:down": true
