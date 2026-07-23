@@ -183,6 +183,15 @@ to stabilize (that was the old LEAPS-engine philosophy, explicitly removed).
   LEAP cheap. Constants `LEAPS_DIP_1D_PCT` / `LEAPS_DIP_5D_PCT` /
   `LEAPS_DIP_MAX_IVP` at top of file.
 
+- **A12 — Move-triggered full scan.** The 15-min Move Watcher now dispatches a
+  FULL scan (not just a price ping) when a name moves ≥8% on the day, so the
+  actual trade candidate — LEAPS BUY_DIP, refreshed P&L, CSP/CC cards — lands
+  within ~15 min instead of waiting for the next 3×/day slot. Closes the gap
+  John flagged: awareness was fast (A7) but the candidate still waited.
+  IBKR-budget guards: one trigger per ticker/direction/day, hard daily cap (3),
+  skip if a scan ran within 25 min. Validated 7/7 (dispatch, dedup, cap,
+  fresh-skip, failure-safe). Built 2026-07-23.
+
 ### P13 — Past trades on the same name are entry context (the "personal premium book")
 When repeating an action (CSP/CC on a name I've traded before), I look at my
 history: what premium did I get last time, at what delta, at what stock price.
