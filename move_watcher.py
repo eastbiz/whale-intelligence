@@ -44,6 +44,18 @@ SCANNER_WORKFLOW   = "scanner.yml"
 GITHUB_TOKEN       = os.environ.get("GITHUB_TOKEN", "")
 GITHUB_REPOSITORY  = os.environ.get("GITHUB_REPOSITORY", "eastbiz/whale-intelligence")
 
+# ── Move-triggered full scan (A12) ───────────────────────────────────────
+# A ≥5% move only pings the price (above). A BIG move (≥8%) means John wants a
+# FRESH trade candidate now — LEAPS BUY_DIP, refreshed P&L — not at the next
+# 3x/day slot. So the watcher dispatches a FULL scan on a big mover. Guards to
+# protect the ~10/day IBKR Flex budget: (1) one trigger per ticker/direction
+# per day, (2) a hard daily cap, (3) skip if a scan already ran very recently
+# (data still fresh). The 3 scheduled scans + up to 3 watchdog rescues + this
+# cap stay within budget; the scanner's own IBKR cache absorbs the rest.
+MOVE_SCAN_PCT         = 8.0   # |day move| that warrants a fresh full scan
+MOVE_SCAN_MAX_PER_DAY = 3     # hard cap on move-triggered scans (IBKR budget)
+MOVE_SCAN_FRESH_MIN   = 25    # skip if a full scan completed within this many min
+
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID   = os.environ.get("TELEGRAM_CHAT_ID", "")
 
@@ -218,6 +230,45 @@ def run_watchdog(state: dict) -> bool:
     return changed
 
 
+def run_move_trigger(state: dict, big_movers: list) -> bool:
+    """Dispatch ONE full scan when a big mover (>=MOVE_SCAN_PCT) appears, so a
+    fresh trade candidate (LEAPS BUY_DIP, P&L) lands within ~15 min instead of
+    waiting for the next 3x/day slot. Budget-guarded. Returns True if state
+    changed. big_movers: list of (ticker, chg, key) already past MOVE_SCAN_PCT."""
+    if not big_movers:
+        return False
+    triggered = state.setdefault("scan_triggered", {})     # key -> True (per day)
+    count = state.setdefault("scan_trigger_count", 0)
+    # Only names not already used to trigger a scan today
+    fresh = [(tk, chg, key) for tk, chg, key in big_movers if key not in triggered]
+    if not fresh:
+        return False
+    if count >= MOVE_SCAN_MAX_PER_DAY:
+        print(f"move-trigger: {len(fresh)} big mover(s) but daily cap "
+              f"({MOVE_SCAN_MAX_PER_DAY}) reached — IBKR budget guard")
+        # still record them so we don't log this every 15 min
+        for tk, chg, key in fresh:
+            triggered[key] = True
+        return True
+    last = last_scan_utc()
+    if last is not None:
+        age = (datetime.now(timezone.utc) - last).total_seconds() / 60
+        if age < MOVE_SCAN_FRESH_MIN:
+            print(f"move-trigger: big mover(s) but a scan ran {age:.0f} min ago "
+                  f"(<{MOVE_SCAN_FRESH_MIN}) — data still fresh, not dispatching")
+            for tk, chg, key in fresh:
+                triggered[key] = True     # this scan already covers them
+            return True
+    names = ", ".join(f"{tk} {chg:+.1f}%" for tk, chg, key in fresh)
+    print(f"move-trigger: big mover(s) [{names}] — dispatching full scan")
+    if dispatch_scanner(f"big move: {names}"):
+        for tk, chg, key in fresh:
+            triggered[key] = True
+        state["scan_trigger_count"] = count + 1
+        return True
+    return False
+
+
 def main():
     dt = now_et()
     if not market_hours(dt):
@@ -240,6 +291,7 @@ def main():
         state = {"date": today, "alerted": {}}
 
     lines = []
+    big_movers = []          # (ticker, chg, key) for names past MOVE_SCAN_PCT
     changed = False
     for tk in watch:
         price, chg = yahoo_quote(tk)
@@ -247,8 +299,10 @@ def main():
             continue
         if abs(chg) < MOVE_ALERT_PCT:
             continue
-        bucket = int(abs(chg) // 5) * 5          # 5, 10, 15, ...
         key = f"{tk}:{'up' if chg > 0 else 'down'}"
+        if abs(chg) >= MOVE_SCAN_PCT:
+            big_movers.append((tk, chg, key))
+        bucket = int(abs(chg) // 5) * 5          # 5, 10, 15, ...
         if state["alerted"].get(key, 0) >= bucket:
             continue                              # already alerted this bucket
         state["alerted"][key] = bucket
@@ -263,6 +317,9 @@ def main():
         print(f"alerted {len(lines)} mover(s)")
     else:
         print("no new movers")
+
+    # Move-triggered full scan: a big mover gets a fresh candidate now
+    changed = run_move_trigger(state, big_movers) or changed
 
     # Watchdog: rescue late/dropped scheduled scans
     changed = run_watchdog(state) or changed
