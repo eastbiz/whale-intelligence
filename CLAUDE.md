@@ -84,7 +84,11 @@ independently.**
 - **CSP / CC engine** (`csp_engine`, `find_best_cc`) — bucket-aware premium
   selling. Buckets A–D with annualized-return minimums 12/18/28/40%.
 - **Deep-ITM LEAPS** (`find_best_leaps`) — stock-replacement, delta ≥0.75, three
-  bands (Conservative / Sweet spot / More leverage).
+  bands (Conservative / Sweet spot / More leverage). **BUY THE DIP (P12/EX-8):**
+  `leaps_trend_action` returns `BUY_DIP` on a ≥8% 1-day or ≥12% 5-day drop when
+  IVP ≤50 — the drop day IS the entry, no "wait for stabilization" (that gate
+  was removed 2026-07). BUY_DIP reaches Telegram regardless of routine score.
+  Constants: `LEAPS_DIP_1D_PCT` (−8), `LEAPS_DIP_5D_PCT` (−12), `LEAPS_DIP_MAX_IVP` (50).
 - **Cheap Convexity LEAPS** (`scan_convexity`) — far-OTM long-dated calls,
   STRICT MODE. Only Grade A/B passers shown, one best row per ticker, near-misses
   discarded. Distinct from deep-ITM LEAPS. Grades A+B → Telegram.
