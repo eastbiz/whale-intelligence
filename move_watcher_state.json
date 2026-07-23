@@ -1,13 +1,11 @@
 {
-  "date": "2026-07-22",
+  "date": "2026-07-23",
   "alerted": {
-    "PATH:down": 10,
-    "NOW:down": 5,
-    "PLTR:down": 5,
-    "SPCX:down": 5
+    "GOOGL:down": 5,
+    "MSTR:down": 5,
+    "TSLA:down": 10
   },
   "dispatched": {
-    "13:47": true,
-    "18:47": true
+    "13:47": true
   }
 }
