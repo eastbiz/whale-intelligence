@@ -47,6 +47,13 @@ independently.**
   Dedup: one alert per ticker/direction/day, re-alerts only when the move
   crosses the next 5% bucket (state in `move_watcher_state.json`, committed
   only when an alert fired). NO Schwab/IBKR calls — never burns tokens.
+- **Move-triggered full scan** (A12, inside the Move Watcher): a ≥5% move
+  only pings the price, but a **≥8% move** (`MOVE_SCAN_PCT`) dispatches a FULL
+  scan so a fresh candidate (LEAPS BUY_DIP, refreshed P&L) lands within ~15 min
+  instead of waiting for the next 3×/day slot. IBKR-budget guards: one trigger
+  per ticker/direction/day, a hard daily cap (`MOVE_SCAN_MAX_PER_DAY` = 3), and
+  skip if a scan ran within `MOVE_SCAN_FRESH_MIN` (25) min. State keys
+  `scan_triggered` / `scan_trigger_count` in `move_watcher_state.json`.
 - **Watchdog self-heal** (inside the Move Watcher): GitHub's cron delivered
   every scheduled scan 60-105 min late in Jul 2026 and occasionally dropped
   runs. The watcher checks each expected slot (13:47/16:41/18:47 UTC — keep
