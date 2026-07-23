@@ -74,6 +74,15 @@ PNLSWING_FLIP_TO       = 0.0    # ...and is now at/above breakeven
 # pre-earnings at 32% → wanted; NBIS 52% profit 36% OTM → noise (2026-07-21).
 TG_POS_MIN_PROFIT      = 60.0   # profit% that alone justifies a close ping
 TG_POS_NEAR_STRIKE     = 15.0   # dist-to-strike% that makes any move relevant
+# ── LEAPS "buy the dip" (P12 + P7, EX-8) ─────────────────────────────────
+# John rejects "wait for the falling knife to stop" for LEAPS: a big drop on
+# CHEAP IV is a buy-cheap-optionality entry NOW, and he takes the follow-on
+# risk. Calibrated on TSLA -14% / IVP 28 → he bought $180 + $240 LEAPS on the
+# drop (2026-07-23). Gated on low IVP because a LEAP bought at high IV is
+# expensive. r1/r5 are stored as PERCENT in the trend dict.
+LEAPS_DIP_1D_PCT       = -8.0   # >=8% single-day drop = capitulation entry
+LEAPS_DIP_5D_PCT       = -12.0  # or >=12% washout over 5 days
+LEAPS_DIP_MAX_IVP      = 50.0   # only when IVP is low enough that the LEAP is cheap
 
 # ── Schwab account number → label mapping ────────────────────
 # Format: last 4 digits or full number (dashes optional)
@@ -3285,9 +3294,24 @@ def leaps_trend_action(trend: dict, ivp: float, price: float, week52_high: float
     state   = trend.get("state", "STILL_FALLING")
     r1      = trend.get("r1", 0)
     r3      = trend.get("r3", 0)
+    r5      = trend.get("r5", 0)
     off_low = trend.get("off_low_5d", 0)
 
     off_high = trend.get("off_high_5d", 0)
+
+    # ── BUY THE DIP (P7 + P12, EX-8) — checked BEFORE the "wait for
+    # stabilization" states. A big drop on cheap IV is a LEAPS entry NOW;
+    # John takes the risk if it drops further. Removes the old falling-knife
+    # gate for LEAPS. r1/r5 are percentages; low-IVP gate keeps the LEAP cheap.
+    if ivp <= LEAPS_DIP_MAX_IVP and (r1 <= LEAPS_DIP_1D_PCT or r5 <= LEAPS_DIP_5D_PCT):
+        _mv = (f"down {abs(r1):.1f}% today" if r1 <= LEAPS_DIP_1D_PCT
+               else f"down {abs(r5):.1f}% over 5 days")
+        return {
+            "action":    "BUY_DIP",
+            "label":     "BUY THE DIP",
+            "signal":    f"{_mv}, IVP {ivp:.0f}% (LEAP is cheap) — stock-replacement entry on the drop",
+            "recommend": True,
+        }
 
     # AT HIGHS — stock near 5d high on strong uptrend
     if state == "AT_HIGHS":
@@ -5013,11 +5037,16 @@ def run_scanner():
         thr = math.ceil(TELEGRAM_MIN_SCORE_PCT * mx)
         result = []
         for o in opps:
-            if o.get("score", 0) < thr: continue
-            # Only send when trend recommends buying (BUY action, not WATCH/WAIT)
             trend_action = o.get("trend_action", "WATCH")
             if isinstance(trend_action, dict):
                 trend_action = trend_action.get("action", "WATCH")
+            # BUY_DIP (P7+P12, EX-8) is event-driven — a big drop on cheap IV.
+            # Send it regardless of routine score (it's rare by construction),
+            # same as the time-sensitive spike/drop alerts.
+            if trend_action == "BUY_DIP":
+                result.append(o); continue
+            # Normal BUY (stabilized bounce) still requires a strong score.
+            if o.get("score", 0) < thr: continue
             if trend_action != "BUY": continue
             result.append(o)
         return result

@@ -167,14 +167,21 @@ Two firm sub-decisions (2026-07-22):
   handful more "good day / bad day" verdicts across DIFFERENT-vol names to
   confirm the ~1.2× multiple and the WAIT vs SKIP line before coding.
 
-### P12 — LEAPS: low IVP + recent price drop
+### P12 — LEAPS: low IVP + recent price drop (buy the dip, don't wait for the bounce)
 LEAPS candidates come from the opposite screen as premium selling: stocks with
 LOW IVP that dropped recently — buy cheap optionality on quality names after
-the fall, sell expensive premium elsewhere.
-- Evidence: stated workflow 2026-07-21; sheet shows 99 LEAP entries (MSFT
-  after drops, LULU, NVDA...).
-- System status: aligned — strategy_allowed blocks LEAPS at elevated/extreme
-  IVR and in upper price zones.
+the fall, sell expensive premium elsewhere. **And the drop day itself is the
+entry — P7 applies to LEAPS too.** A big drop on cheap IV is a buy signal NOW;
+I take the risk if it drops again tomorrow. Do NOT wait for the falling knife
+to stabilize (that was the old LEAPS-engine philosophy, explicitly removed).
+- Evidence: stated workflow 2026-07-21; EX-8 (TSLA −14%, IVP 28 → bought $180
+  + $240 LEAPS on the drop, 2026-07-23); sheet shows 99 LEAP entries.
+- System status: **Actioned — A11.** `leaps_trend_action` now returns a
+  BUY_DIP action (≥8% 1-day or ≥12% 5-day drop AND IVP ≤50), checked before
+  the old "wait for stabilization" states; it reaches Telegram regardless of
+  routine score (event-driven, like spike/drop alerts). Low-IVP gate keeps the
+  LEAP cheap. Constants `LEAPS_DIP_1D_PCT` / `LEAPS_DIP_5D_PCT` /
+  `LEAPS_DIP_MAX_IVP` at top of file.
 
 ### P13 — Past trades on the same name are entry context (the "personal premium book")
 When repeating an action (CSP/CC on a name I've traded before), I look at my
@@ -319,6 +326,25 @@ positions only.
   stayed over 5%. Distilled into P17; gate calibrated so that every alert he
   acted on (PATH, CLS ×2, NBIS $180 swing) passes and both NBIS noise alerts
   fail (9/9 test cases).
+
+### EX-8 — TSLA −14% dip: LEAPS bought on the drop (2026-07-23)
+- TSLA $321.04, **−14.16% today** (−52.98), IVP ~28%. 52wk range $297.82–
+  $498.83, so ~36% off the high.
+- John: "Remove the waiting for falling-knife stop. I take the risk if TSLA
+  drops again tomorrow. The dip is 14%+ — strong signal to look into LEAPS."
+  **Executed:** bought LEAPS at **$180** and a few at **$240** strike
+  (deep-ITM stock replacement — $180 is ~44% ITM, $240 ~25% ITM).
+- Engine gap it exposed: LEAPS Telegram only fired on trend_action == "BUY",
+  and `leaps_trend_action` returned WAIT ("wait for stabilization") for
+  STILL_FALLING / AT_LOWS — the exact philosophy P7 rejects. So the biggest,
+  cheapest dip of the week produced no LEAPS alert.
+- Fix (A11): BUY_DIP action on big-drop + low-IVP, ahead of the wait states;
+  validated TSLA −14%/IVP28 → BUY_DIP, high-IVP version stays quiet, mild
+  drops unaffected, existing states unchanged (6/6).
+- Challenge on record: a long LEAP on a still-falling stock has no premium
+  cushion (unlike a CSP) — if TSLA keeps dropping the call bleeds directly.
+  John accepts this explicitly; the low-IVP gate is the risk control (cheap
+  entry), not a stabilization wait.
 
 ### EX-7 — NBIS post-rally: attractive premium, wrong day to write (2026-07-22)
 - NBIS $225.64, **+4.02% today, +31.36% over 5 days**. Dashboard showed CSP
