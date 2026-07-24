@@ -411,6 +411,32 @@ positions only.
   acted on (PATH, CLS ×2, NBIS $180 swing) passes and both NBIS noise alerts
   fail (9/9 test cases).
 
+### EX-14 — The round-trip problem: a 1-day move alone is misleading (2026-07-24)
+- John: "If AAPL drops 7% today but rose 7% yesterday, I consider it neutral —
+  overreaction to news that corrected itself, no action warranted. But you
+  might say 'write CSP.' In this situation the hard buy-below target works
+  better." Key insight: notability can't key off the 1-DAY move — a move that
+  reverses a recent opposite move is noise.
+- Design consequence: gate notability on the NET multi-day move (5d), which
+  mathematically cancels a round-trip (today is inside the 5d window, so
+  −7%/+7% nets ~0 in 5d while a real crash or slide shows up), PLUS price
+  at/below the buy target as a second confirmation (a round-trip doesn't leave
+  the price at the target). The 1-day % is shown for urgency, not the trigger.
+- Reconciles EX-13: bucket-scaled = "big for this stock"; net-move + target =
+  "real, not a round-trip." Hard targets are NOT abandoned — they're the
+  confirmation that catches exactly this case.
+
+### EX-13 — Telegram notification philosophy (2026-07-24)
+- John: "I want a system where really notable moves will NOT slip from my
+  attention, but there won't be many other notifications or noise — so I don't
+  stop paying attention to Telegram. I don't want to be constantly checking
+  CSP/CC/LEAPS in my sheet. And the hard price targets are short-term and
+  high-maintenance — I have to update them often — so the system shouldn't lean
+  entirely on them."
+- Correction on record: A16 over-tightened — it gated notable moves BEHIND the
+  hard targets (IN_ZONE only), the exact fragile dependency John objects to,
+  and dropped genuinely notable moves (CRDO −10%). To be revised per C11.
+
 ### EX-12 — "NOTABLE MOVES" too noisy; wants earnings reminder (2026-07-24)
 - Scan Telegram "NOTABLE MOVES" listed CRDO −10% (6.5% from buy), MU −7.8%,
   TSLA −2.3%/−18%5d (4.1% from buy), NOW +7.1% (9.4% from buy) — each with
@@ -670,6 +696,22 @@ Flag text names the reason in John's terms ("+31%/5d ≈ 2.4× normal"). Same
 machinery could later flag the CC side symmetrically (drop that's already
 overextended) and inform C5. BUILD ONLY after enough cross-vol verdicts
 validate the multiple — see P19(b).
+
+### C11 — Bucket-scaled, net-move notability for Telegram (EX-13/EX-14) *(proposed)*
+Redefine what earns a Telegram "notable move," to make Telegram high-signal
+without leaning on hand-maintained price targets:
+- **Notable = big for THIS stock** — threshold scales by bucket (A–D), which is
+  stable (rarely edited) unlike buy/sell targets. Draft: 1d A5/B6/C9/D12%.
+- **Trigger on the NET multi-day move, not 1-day** — gate on 5d (bucket-scaled),
+  which cancels round-trips (EX-14). 1-day % shown for urgency only.
+- **Hard target as the SECOND confirmation** — price at/below buy (drop) or
+  at/above sell (rise) is an independent trigger AND the round-trip catch.
+  Notable = (sustained 5d move, bucket-scaled) OR (price in the target zone).
+- **Telegram shrinks to 3 things:** notable moves (clean, + earnings, target as
+  context not nudge), position alerts (P17), rare real opportunities (BUY_DIP /
+  CC-at-target / convexity A/B). Remove "consider CSP/LEAPS/CC" and "X% away".
+- Revises A16 (which over-gated on IN_ZONE only). Awaiting John's sign-off on
+  the bucket thresholds + the net-move-vs-1-day trigger.
 
 ### C8 — "Is today a trading day?" notification gate (P10)
 John only wants pings on days when conditions exist: at least one watchlist
