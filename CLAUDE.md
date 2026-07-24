@@ -86,8 +86,10 @@ independently.**
   in losses. Applied uniformly — no exceptions for cc_only tickers. **CC
   Telegram alerts go further (A14/P20):** they fire only when the stock is
   AT/ABOVE `sell_above` (not just the midpoint), so no premature CC pings that
-  cap upside below the sell target. cc_only names (MSTR/OWL) exempt. Dashboard
-  still shows midpoint-passing CCs.
+  cap upside below the sell target, AND earnings is not inside the option's
+  expiry (A15/P21 — don't alert a CC you'd hold through earnings). Both gates
+  apply to spike CCs too. cc_only names (MSTR/OWL) exempt. Dashboard still
+  shows midpoint-passing CCs.
 - **Strict filters surface rare value.** Zero results is an acceptable, expected
   outcome (especially convexity). Do NOT loosen filters to fill the page.
 - **Volatile names (NBIS, CRDO, CLS) are the whole point** of the move-based
@@ -112,7 +114,8 @@ independently.**
   discarded. Distinct from deep-ITM LEAPS. Grades A+B → Telegram.
 - **Spike CC** (`find_spike_cc`) — sell calls into an 8%+ up-spike on ANY held
   100+ share position. Overrides `spreads_only` (a CC on owned shares isn't
-  naked). Goes to Telegram.
+  naked). Goes to Telegram — but through the SAME CC gates as routine CCs
+  (A15/P21): at/above `sell_above` AND earnings not inside the option expiry.
 - **Post-Drop CSP** — sell puts into a drop. Over-gated historically; TRADING
   tier excluded. Known limited.
 - **Position management engine** (`position_management_engine`) — per-position

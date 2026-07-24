@@ -205,6 +205,12 @@ to stabilize (that was the old LEAPS-engine philosophy, explicitly removed).
   zone-first midpoint). Stops premature CC alerts that cap upside below the
   sell target (NVDA at $209.69 vs $225 — EX-10). cc_only exit-waiting names
   (MSTR/OWL) exempt. Dashboard unchanged. Validated 8/8. Built 2026-07-24.
+- **A15 — CC gates extended to the spike-CC path + earnings-inside-expiry.**
+  `_cc_telegram_ok` (shared by regular CC and spike CC) now suppresses a CC
+  ping when the stock is below sell_above OR earnings falls on/before the
+  option expiry. Closes the spike-CC bypass of A14 and adds the earnings rule
+  (P21). cc_only exempt; only fires on known earnings dates. Validated 8/8.
+  Built 2026-07-24.
 
 ### P13 — Past trades on the same name are entry context (the "personal premium book")
 When repeating an action (CSP/CC on a name I've traded before), I look at my
@@ -285,6 +291,18 @@ called away.
   "should not fire unless above the sell target").
 - System status: **Actioned — A14.** Telegram-only gate; dashboard unchanged.
 
+### P21 — Don't alert a CC I'd have to hold through earnings
+Even on a spike, near earnings is a bad time to write a covered call: the
+post-earnings pop can take the stock through the strike and I get called away,
+capping upside (the same NVDA/AAPL missed-upside trap). So a CC ping is
+suppressed when earnings falls inside the option's life (earnings on/before
+expiry) — the CC analog of P9. Applies to spike CCs too, not just routine CCs.
+cc_only exit-waiting names (MSTR/OWL) exempt — a call-away is the goal there.
+- Evidence: EX-11 (AAPL spike CC pinged at $332.67 with earnings days away,
+  20 DTE — John: "earnings is a few days away, bad time, even with a spike").
+- System status: **Actioned — A15.** Telegram-only; only fires when the
+  earnings date is actually known (unfetched date can't be gated — flagged).
+
 ### P16 — LEAPS are long-term investments, exempt from event-day logic
 The deep-ITM LEAPS (e.g. 10× CLS Jan'28 $180) are stock replacement held for
 years. Earnings calls don't factor into them — no trimming logic, no P15
@@ -360,6 +378,23 @@ positions only.
   stayed over 5%. Distilled into P17; gate calibrated so that every alert he
   acted on (PATH, CLS ×2, NBIS $180 swing) passes and both NBIS noise alerts
   fail (9/9 test cases).
+
+### EX-11 — AAPL spike CC below target + near earnings (2026-07-24)
+- SPIKE CC alert: AAPL @ $332.67, +8.6% above 50MA, IVP 98%, sell call $340
+  (20 DTE / Aug 14), 35.3% annualized. John: (1) "same as NVDA — only notify
+  if above the sell-above target" (AAPL sell_above = $360, so $332.67 is 7.6%
+  below); (2) "earnings is a few days away, bad time even with the spike."
+- Two gaps: the spike-CC path (find_spike_cc → tg_spikes) bypassed the A14
+  sell-target gate entirely (different code path), and its earnings gate
+  (`days_to_earnings > 7`) either just cleared (~8d) or the earnings date
+  wasn't fetched.
+- Fix (A15): unified `_cc_telegram_ok` now gates BOTH regular and spike CC on
+  (a) price ≥ sell_above and (b) earnings not inside the option's expiry.
+  AAPL suppressed on the sell-target rule regardless of earnings-data state;
+  additionally on earnings when the date is known. Validated 8/8.
+- Caveat logged: if AAPL's alert fired because get_earnings_date returned
+  nothing, the earnings gate can't help (missing data) — the sell-target gate
+  still covers this case. Worth a separate check on get_earnings_date coverage.
 
 ### EX-10 — NVDA CC ping below the sell target (2026-07-24)
 - Telegram fired a CC for NVDA at stock $209.685, sell call $235, IVP 51%,
