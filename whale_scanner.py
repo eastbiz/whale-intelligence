@@ -78,6 +78,11 @@ TG_POS_NEAR_STRIKE     = 15.0   # dist-to-strike% that makes any move relevant
 # not just clear the expiry. Blocks CCs held through earnings AND CCs that
 # expire right up against it (rich earnings-IV premium, assignment-before-pop).
 CC_EARNINGS_BUFFER_DAYS = 5
+# Notable-move thresholds by bucket (C11/EX-13/EX-14). A move is "notable" when
+# the NET 5-day move clears the bar for that stock's volatility class — scaled
+# by bucket (stable) not by hand-maintained price targets, and on the 5-day net
+# (not 1-day) so a round-trip cancels out. Values are |5d %|.
+NOTABLE_5D_BY_BUCKET  = {"A": 8.0, "B": 10.0, "C": 13.0, "D": 18.0}
 # ── LEAPS "buy the dip" (P12 + P7, EX-8) ─────────────────────────────────
 # John rejects "wait for the falling knife to stop" for LEAPS: a big drop on
 # CHEAP IV is a buy-cheap-optionality entry NOW, and he takes the follow-on
@@ -4575,58 +4580,51 @@ def run_scanner():
         _c5  = _md.get("change_5d_pct",  0) * 100
         _c30 = _md.get("change_30d_pct", 0) * 100
 
-        # Phase 1.5: Tighter thresholds for Telegram — reduce noise.
-        # Was: 1d ≥ 5%  OR  5d ≥ 10%
-        # Now: 1d ≥ 7%  OR  5d ≥ 15%
-        _trigger_drop = _c1 <= -7.0 or _c5 <= -15.0
-        _trigger_rise = _c1 >=  7.0 or _c5 >=  15.0
-
-        # REMOVE tickers: skip drop alerts (no new entries), keep rise alerts (may want to write CCs)
-        if _tk in SPECULATIVE_TICKERS and _trigger_drop and not _trigger_rise:
+        # ── Notability (C11, EX-13/EX-14) ─────────────────────────────
+        # Trigger on the NET 5-day move (a -7% day undoing a +7% day nets ~0
+        # over 5d → round-trips cancel, EX-14), scaled by the stock's BUCKET
+        # (stable, low-maintenance) — OR the price actually landing in the
+        # target zone (the round-trip catch; a bounce-back isn't at target).
+        # The 1-day % is shown for urgency but never triggers on its own.
+        _thr5   = NOTABLE_5D_BY_BUCKET.get(get_bucket(_tk, BUCKETS), 13.0)
+        _csp_in = bool(_pw.get("csp_status") == "IN_ZONE" and _bu)
+        _cc_in  = bool(_pw.get("cc_status")  == "IN_ZONE" and _sa)
+        _drop   = (_c5 <= -_thr5) or _csp_in
+        _rise   = (_c5 >=  _thr5) or _cc_in
+        if not (_drop or _rise):
             continue
-        if not (_trigger_drop or _trigger_rise):
-            continue
 
-        # "today" label: use actual weekday name if running on weekend (stale Friday data)
-        _now_dow = now_et().weekday()  # 0=Mon … 6=Sun
-        _is_weekend = _now_dow >= 5
-        if _is_weekend:
-            # Last trading day was Friday
-            _day_lbl = "Fri"
-        else:
-            _day_lbl = "today"
+        _now_dow = now_et().weekday()
+        _day_lbl = "Fri" if _now_dow >= 5 else "today"
 
-        # Build move line: show all timeframes that are non-trivial
+        # Move string: 1d (urgency) · 5d (the trigger) · 30d (context)
         _parts = []
         if abs(_c1) >= 1.0:  _parts.append(f"{_c1:+.1f}% {_day_lbl}")
         if abs(_c5) >= 2.0:  _parts.append(f"{_c5:+.1f}% (5d)")
         if abs(_c30) >= 5.0: _parts.append(f"{_c30:+.1f}% (30d)")
         _move_str = " · ".join(_parts) if _parts else f"{_c1:+.1f}% {_day_lbl}"
 
-        # ── GO-signal gate (P22) ──────────────────────────────────────
-        # Telegram = "go sit at the computer and trade," not "here are 7 names
-        # to check." A move only makes this list when it lands the stock IN an
-        # ACTIONABLE zone — below the buy target (CSP) on a drop, or at/above
-        # the sell target (CC) on a rise. No "X% away / consider" nudges.
-        # (A serious LEAPS dip still pings separately via the BUY_DIP alert.)
-        _csp_go = _trigger_drop and _pw.get("csp_status") == "IN_ZONE" and _bu
-        _cc_go  = _trigger_rise and _pw.get("cc_status")  == "IN_ZONE" and _sa
-        if not (_csp_go or _cc_go):
-            continue
-
-        _icon = "📉" if _trigger_drop else "📈"
-        _go   = (f"BELOW your ${_bu:g} buy → GO: check CSP" if _csp_go
-                 else f"ABOVE your ${_sa:g} sell → GO: check CC")
+        # Drop takes priority if both somehow set (can't really co-occur).
+        _is_drop = _drop and not (_rise and not _drop)
+        _icon = "📉" if _is_drop else "📈"
+        # Target shown as a clear GO only when the price is actually in the
+        # zone — never a "consider" nudge or an "X% away" line.
+        if _is_drop and _csp_in:
+            _ctx = f" — BELOW your ${_bu:g} buy → CSP"
+        elif (not _is_drop) and _cc_in:
+            _ctx = f" — AT/ABOVE your ${_sa:g} sell → CC"
+        else:
+            _ctx = ""
         _etag = _earnings_tag(_tk)
-        _line = f"{_icon} *{_tk}* {_move_str} — {_go}"
+        _line = f"{_icon} *{_tk}* {_move_str}{_ctx}"
         if _etag:
             _line += f"\n  {_etag.strip()}"
-        _move_alerts.append((_c1, _trigger_drop, _line))
+        _move_alerts.append((_c1, _is_drop, _line))
 
     if _move_alerts:
         # Sort: big drops first, then big rises
         _move_alerts.sort(key=lambda x: (0 if x[1] else 1, x[0]))
-        briefing += "\n━━━ GO SIGNALS — in your zone ━━━\n"
+        briefing += "\n━━━ NOTABLE MOVES ━━━\n"
         for _, _, _line in _move_alerts:
             briefing += f"{_line}\n"
 
