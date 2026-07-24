@@ -44,9 +44,16 @@ independently.**
   during market hours, Yahoo-quotes-only check of the watchlist + names with
   open short options (from last `results.json`). Any ≥5% day move → one
   compact Telegram message with buy/sell-target and held-position context.
-  Dedup: one alert per ticker/direction/day, re-alerts only when the move
-  crosses the next 5% bucket (state in `move_watcher_state.json`, committed
-  only when an alert fired). NO Schwab/IBKR calls — never burns tokens.
+  **Proximity gate (A13):** a ≥5% move only PINGS when it lands near something
+  actionable — within `MOVE_NEAR_TARGET_PCT` (10%) of buy_under/sell_above, or
+  `MOVE_NEAR_STRIKE_PCT` (12%) of a held short strike. A big drop that leaves
+  the price far above the buy target (e.g. MU −6.7% at 105% above buy) is
+  silenced. Dedup: one alert per ticker/direction/day, re-alerts only when the
+  move crosses the next 5% bucket (state in `move_watcher_state.json`,
+  committed only when an alert fired). NO Schwab/IBKR calls — never burns
+  tokens. NOTE: the ≥8% move still triggers a full scan regardless of
+  proximity (that path surfaces LEAPS BUY_DIP etc.), so big movers aren't lost
+  — only the raw ping is gated.
 - **Move-triggered full scan** (A12, inside the Move Watcher): a ≥5% move
   only pings the price, but a **≥8% move** (`MOVE_SCAN_PCT`) dispatches a FULL
   scan so a fresh candidate (LEAPS BUY_DIP, refreshed P&L) lands within ~15 min

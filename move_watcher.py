@@ -56,6 +56,17 @@ MOVE_SCAN_PCT         = 8.0   # |day move| that warrants a fresh full scan
 MOVE_SCAN_MAX_PER_DAY = 3     # hard cap on move-triggered scans (IBKR budget)
 MOVE_SCAN_FRESH_MIN   = 25    # skip if a full scan completed within this many min
 
+# ── Proximity gate for the Telegram ping (A13) ───────────────────────────
+# A >=5% move alone is NOT enough to ping — John doesn't care that MU dropped
+# 6.7% when it's still 105% above his buy target. A name earns a ping only when
+# the move brings the price CLOSE to something actionable: within
+# NEAR_TARGET_PCT of his buy-under (on a drop) or sell-above (on a rise), or
+# within NEAR_STRIKE_PCT of a strike he actually holds. Everything else is
+# suppressed. (The >=8% move still triggers a FULL scan regardless — that path
+# surfaces LEAPS BUY_DIP etc. independent of these targets.)
+MOVE_NEAR_TARGET_PCT  = 10.0  # price within 10% of buy_under / sell_above
+MOVE_NEAR_STRIKE_PCT  = 12.0  # price within 12% of a held short strike
+
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID   = os.environ.get("TELEGRAM_CHAT_ID", "")
 
@@ -140,6 +151,26 @@ def load_universe():
         print(f"no positions from {RESULTS_FILE} ({e})")
 
     return targets, short_pos
+
+
+def near_actionable(tk, price, chg, targets, short_pos):
+    """A13 proximity gate: does this move bring the price close enough to
+    something John cares about to be worth a ping? Returns (bool, reasons)."""
+    reasons = []
+    tgt = targets.get(tk, {})
+    bu, sa = tgt.get("buy_under", 0), tgt.get("sell_above", 0)
+    # Drop toward the buy-under target (a CSP could get actionable)
+    if chg < 0 and bu > 0 and price <= bu * (1 + MOVE_NEAR_TARGET_PCT / 100):
+        reasons.append("near buy-under")
+    # Rise toward the sell-above target (a CC could get actionable)
+    if chg > 0 and sa > 0 and price >= sa * (1 - MOVE_NEAR_TARGET_PCT / 100):
+        reasons.append("near sell-above")
+    # Near a strike John actually holds (getting tested, either direction)
+    for p in short_pos.get(tk, []):
+        strike = p.get("strike", 0) or 0
+        if strike > 0 and abs(price - strike) / strike <= MOVE_NEAR_STRIKE_PCT / 100:
+            reasons.append(f"near {p.get('type','')} ${strike:g}")
+    return (bool(reasons), reasons)
 
 
 def build_line(tk, price, chg, targets, short_pos):
@@ -300,8 +331,16 @@ def main():
         if abs(chg) < MOVE_ALERT_PCT:
             continue
         key = f"{tk}:{'up' if chg > 0 else 'down'}"
+        # Big moves still trigger a full scan regardless of proximity — that
+        # path surfaces LEAPS BUY_DIP etc. independent of these targets.
         if abs(chg) >= MOVE_SCAN_PCT:
             big_movers.append((tk, chg, key))
+        # A13 proximity gate: only PING when the move lands near something
+        # actionable (buy-under / sell-above / a held strike). Applied before
+        # the dedup mark so a name that later moves INTO range still alerts.
+        worthy, why = near_actionable(tk, price, chg, targets, short_pos)
+        if not worthy:
+            continue
         bucket = int(abs(chg) // 5) * 5          # 5, 10, 15, ...
         if state["alerted"].get(key, 0) >= bucket:
             continue                              # already alerted this bucket

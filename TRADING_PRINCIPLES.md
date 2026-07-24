@@ -191,6 +191,15 @@ to stabilize (that was the old LEAPS-engine philosophy, explicitly removed).
   IBKR-budget guards: one trigger per ticker/direction/day, hard daily cap (3),
   skip if a scan ran within 25 min. Validated 7/7 (dispatch, dedup, cap,
   fresh-skip, failure-safe). Built 2026-07-23.
+- **A13 — Move Watcher proximity gate.** The 15-min ping now fires only when a
+  ≥5% move lands NEAR something actionable — within 10% of buy_under /
+  sell_above, or 12% of a held short strike — instead of on every ≥5% mover.
+  Calibrated on EX-9 (John: MU −6.7% at 105% above his buy target = noise;
+  CRDO −8.8% at 7.8% above buy + on his $200 strike = the one that mattered).
+  Validated on the real screenshot: 5 movers → 2 pings (CRDO, POWL kept; MU,
+  CLS, NBIS silenced). The ≥8% full-scan trigger is unchanged, so big movers
+  still refresh candidates. Constants `MOVE_NEAR_TARGET_PCT` (10),
+  `MOVE_NEAR_STRIKE_PCT` (12). Built 2026-07-23.
 
 ### P13 — Past trades on the same name are entry context (the "personal premium book")
 When repeating an action (CSP/CC on a name I've traded before), I look at my
@@ -335,6 +344,19 @@ positions only.
   stayed over 5%. Distilled into P17; gate calibrated so that every alert he
   acted on (PATH, CLS ×2, NBIS $180 swing) passes and both NBIS noise alerts
   fail (9/9 test cases).
+
+### EX-9 — Move Watcher noise: too many pings far from targets (2026-07-23)
+- 10:56 ET ping listed CLS, CRDO, MU, NBIS, POWL (5 names). John: "a little
+  less messages." Pointed at MU −6.7% ($923.86): buy-under $450 → 105% above,
+  short CSP $700 → 32% away. "I don't even want to be notified unless it's
+  getting close." Same for the far short CSP ($700 vs $900).
+- Distilled: gate the ping on PROXIMITY to an actionable price, not the size
+  of the move (A13). Only CRDO (7.8% from buy, on the $200 strike) and POWL
+  (9.4% from buy) survive the gate — exactly the actionable ones.
+- Note: NBIS −10.5% is silenced from the ping but STILL triggers a full scan
+  (≥8%), so its real candidate (BUY_DIP LEAP if IVP low, updated cards) is
+  delivered by the scan — the noisy price ping is replaced by the actual
+  actionable alert, not lost.
 
 ### EX-8 — TSLA −14% dip: LEAPS bought on the drop (2026-07-23)
 - TSLA $321.04, **−14.16% today** (−52.98), IVP ~28%. 52wk range $297.82–
