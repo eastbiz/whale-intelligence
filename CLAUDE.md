@@ -83,7 +83,11 @@ independently.**
 - **Profit-taking target: 80–90% of max premium** for routine closes.
 - **Zone-first (CCs):** never recommend a CC when the stock is below the
   midpoint of the buy_under/sell_above band. Writing CCs below cost basis locks
-  in losses. Applied uniformly — no exceptions for cc_only tickers.
+  in losses. Applied uniformly — no exceptions for cc_only tickers. **CC
+  Telegram alerts go further (A14/P20):** they fire only when the stock is
+  AT/ABOVE `sell_above` (not just the midpoint), so no premature CC pings that
+  cap upside below the sell target. cc_only names (MSTR/OWL) exempt. Dashboard
+  still shows midpoint-passing CCs.
 - **Strict filters surface rare value.** Zero results is an acceptable, expected
   outcome (especially convexity). Do NOT loosen filters to fill the page.
 - **Volatile names (NBIS, CRDO, CLS) are the whole point** of the move-based

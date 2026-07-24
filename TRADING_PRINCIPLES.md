@@ -200,6 +200,11 @@ to stabilize (that was the old LEAPS-engine philosophy, explicitly removed).
   CLS, NBIS silenced). The ≥8% full-scan trigger is unchanged, so big movers
   still refresh candidates. Constants `MOVE_NEAR_TARGET_PCT` (10),
   `MOVE_NEAR_STRIKE_PCT` (12). Built 2026-07-23.
+- **A14 — CC Telegram gate: at/above sell target.** A covered-call alert now
+  reaches Telegram only when the underlying is ≥ the ticker's sell_above (was:
+  zone-first midpoint). Stops premature CC alerts that cap upside below the
+  sell target (NVDA at $209.69 vs $225 — EX-10). cc_only exit-waiting names
+  (MSTR/OWL) exempt. Dashboard unchanged. Validated 8/8. Built 2026-07-24.
 
 ### P13 — Past trades on the same name are entry context (the "personal premium book")
 When repeating an action (CSP/CC on a name I've traded before), I look at my
@@ -268,6 +273,17 @@ line (annualized + $/day).
   genuinely exceptional ("CLS borderline... or none") → Candidate C9.
 - System status: **Actioned** (A10) for CC/PIO card text; convexity → 
   Telegram now includes Grade B (A10). C9 pending design.
+
+### P20 — A CC only pings when the stock is AT/ABOVE my sell target
+Don't alert me to write a covered call while the stock is below my sell-above
+target — writing a CC there caps upside below where I'd actually let the shares
+go (the exact NVDA missed-upside trap in CLAUDE.md). The zone-first midpoint
+gate is fine for the dashboard, but a Telegram CC ping needs the full sell
+target met. Exit-waiting cc_only names (MSTR/OWL) are exempt — they WANT to be
+called away.
+- Evidence: EX-10 (NVDA CC pinged at $209.69 with a $225 sell target — John:
+  "should not fire unless above the sell target").
+- System status: **Actioned — A14.** Telegram-only gate; dashboard unchanged.
 
 ### P16 — LEAPS are long-term investments, exempt from event-day logic
 The deep-ITM LEAPS (e.g. 10× CLS Jan'28 $180) are stock replacement held for
@@ -344,6 +360,17 @@ positions only.
   stayed over 5%. Distilled into P17; gate calibrated so that every alert he
   acted on (PATH, CLS ×2, NBIS $180 swing) passes and both NBIS noise alerts
   fail (9/9 test cases).
+
+### EX-10 — NVDA CC ping below the sell target (2026-07-24)
+- Telegram fired a CC for NVDA at stock $209.685, sell call $235, IVP 51%,
+  15.6% annualized. John: "should not fire if it is not above the sell target.
+  If NVDA was above $225 I would like to be notified." NVDA sell_above = $225.
+- Cause: the CC fired on the zone-first MIDPOINT gate ($202.50 for NVDA's
+  $180–$225 band), which $209.69 clears. John wants the alert gated at the
+  full sell target, not the midpoint.
+- Fix (A14): CC Telegram gate requires underlying ≥ sell_above (cc_only names
+  exempt). Validated 8/8 (NVDA suppressed at $209.69, pings at $225+; MSFT
+  below $500 suppressed; TSM above $450 pings; MSTR/OWL always ping).
 
 ### EX-9 — Move Watcher noise: too many pings far from targets (2026-07-23)
 - 10:56 ET ping listed CLS, CRDO, MU, NBIS, POWL (5 names). John: "a little
