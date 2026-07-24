@@ -5029,6 +5029,26 @@ def run_scanner():
 
     tg_csps   = _tg_green(top_csps,  "CSP")
     tg_ccs    = _tg_green(top_ccs,   "CC")
+
+    # ── CC Telegram gate (P20, EX-10): only ping when the stock is AT/ABOVE
+    # the sell-above target. Writing a CC below target caps upside — the zone-
+    # first midpoint gate is too loose for alerts (NVDA fired at $209.69 with a
+    # $225 sell target). cc_only exit-waiting names (MSTR/OWL) are exempt: they
+    # WANT to be called away, so alert regardless. Dashboard still shows all.
+    def _cc_at_sell_target(opps: list) -> list:
+        kept = []
+        for o in opps:
+            _tk = o.get("ticker", "")
+            if is_cc_only(_tk, BUCKETS):
+                kept.append(o); continue
+            _sa = SYMBOL_SETTINGS.get(_tk, {}).get("sell_above", 0) or 0
+            _px = o.get("price", 0) or 0
+            if _sa > 0 and _px < _sa:
+                print(f"   🔕 CC {_tk} dashboard-only: ${_px:.2f} < sell target ${_sa:g}")
+                continue
+            kept.append(o)
+        return kept
+    tg_ccs = _cc_at_sell_target(tg_ccs)
     # LEAPS Telegram filter: only BUY trend + high score
     # trend_action is stored as string at top level of opp dict
     # Prevents every scan from flooding Telegram with routine LEAPS
