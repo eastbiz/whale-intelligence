@@ -211,6 +211,14 @@ to stabilize (that was the old LEAPS-engine philosophy, explicitly removed).
   option expiry. Closes the spike-CC bypass of A14 and adds the earnings rule
   (P21). cc_only exempt; only fires on known earnings dates. Validated 8/8.
   Built 2026-07-24.
+- **A16 — "GO SIGNALS" replace "NOTABLE MOVES" (P22).** The scan's move block
+  now fires only when a move lands the stock IN an actionable zone (below buy /
+  at-or-above sell); removed "consider CSP/LEAPS/CC" and "X% away" nudges.
+  Clear GO language + earnings tag. Built 2026-07-24.
+- **A17 — CC earnings buffer (P23).** CC gate extended from "earnings inside
+  expiry" to "earnings within DTE + 5 days" — a CC must clear earnings by a
+  buffer. Plus `_earnings_tag` reminder line on CSP/CC/spike Telegram alerts.
+  Validated 4/4. Built 2026-07-24.
 
 ### P13 — Past trades on the same name are entry context (the "personal premium book")
 When repeating an action (CSP/CC on a name I've traded before), I look at my
@@ -303,6 +311,30 @@ cc_only exit-waiting names (MSTR/OWL) exempt — a call-away is the goal there.
 - System status: **Actioned — A15.** Telegram-only; only fires when the
   earnings date is actually known (unfetched date can't be gated — flagged).
 
+### P22 — Telegram = "go sit at the computer," not "check these 7 names"
+I already spend too much time checking/trading. A Telegram signal must be a
+clear GO: the stock is actually below my buy target (write CSP) or at/above my
+sell target (write CC), or a genuinely serious LEAPS dip. NOT "X% away →
+consider CSP/LEAPS" nudges across seven names. Zero signals on a quiet day is
+the correct, wanted outcome.
+- Evidence: EX-12 (NOTABLE MOVES block listing CRDO/MU/TSLA/NOW as "consider,"
+  all still 4–9% ABOVE buy — John: "I do not want to check seven stocks").
+- System status: **Actioned — A16.** NOTABLE MOVES → "GO SIGNALS" fires only
+  on IN_ZONE (below buy on a drop / at-or-above sell on a rise); "consider" and
+  "X% away" removed. Serious LEAPS dips still ping via the separate BUY_DIP
+  alert (A11).
+
+### P23 — A CC must clear earnings by a buffer, not just avoid holding through it
+Extends P21. Even a CC that expires a few days BEFORE earnings is risky — the
+premium is pumped by pre-earnings IV and a run-up can call me away right before
+the pop. So a CC ping requires the option to expire at least a buffer (5 days)
+before earnings — else earnings is "too close." Post-earnings CCs (event
+passed) flow freely.
+- Evidence: 2026-07-24 discussion ("risky to write CC with DTE very close to
+  earnings"); John agreed to the buffer approach, 5 days.
+- System status: **Actioned — A17.** `_cc_telegram_ok` suppresses when
+  `days_to_earnings ≤ DTE + CC_EARNINGS_BUFFER_DAYS` (5). cc_only exempt.
+
 ### P16 — LEAPS are long-term investments, exempt from event-day logic
 The deep-ITM LEAPS (e.g. 10× CLS Jan'28 $180) are stock replacement held for
 years. Earnings calls don't factor into them — no trimming logic, no P15
@@ -378,6 +410,20 @@ positions only.
   stayed over 5%. Distilled into P17; gate calibrated so that every alert he
   acted on (PATH, CLS ×2, NBIS $180 swing) passes and both NBIS noise alerts
   fail (9/9 test cases).
+
+### EX-12 — "NOTABLE MOVES" too noisy; wants earnings reminder (2026-07-24)
+- Scan Telegram "NOTABLE MOVES" listed CRDO −10% (6.5% from buy), MU −7.8%,
+  TSLA −2.3%/−18%5d (4.1% from buy), NOW +7.1% (9.4% from buy) — each with
+  "→ consider CSP/LEAPS" or "consider CC". John: "nice to see notable moves,
+  but I don't like the 'consider'. Minimize signals unless the stock is really
+  below buy or a really serious LEAPS. I don't want to check seven stocks. Make
+  Telegram a clear signal to go sit at the computer — e.g. 'TSLA is below your
+  buy and dropped X% today'."
+- Also asked: show the earnings date on whatever fires ("Earnings 7/31") as a
+  reminder he might otherwise miss.
+- Fixes: A16 (GO-only gate → P22) + earnings tag on CSP/CC/spike alerts and GO
+  lines. Validated: all four screenshot names suppressed; only IN_ZONE GO
+  signals fire (6/6).
 
 ### EX-11 — AAPL spike CC below target + near earnings (2026-07-24)
 - SPIKE CC alert: AAPL @ $332.67, +8.6% above 50MA, IVP 98%, sell call $340

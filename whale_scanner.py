@@ -74,6 +74,10 @@ PNLSWING_FLIP_TO       = 0.0    # ...and is now at/above breakeven
 # pre-earnings at 32% → wanted; NBIS 52% profit 36% OTM → noise (2026-07-21).
 TG_POS_MIN_PROFIT      = 60.0   # profit% that alone justifies a close ping
 TG_POS_NEAR_STRIKE     = 15.0   # dist-to-strike% that makes any move relevant
+# A CC alert must expire at least this many days BEFORE earnings (P21/P23) —
+# not just clear the expiry. Blocks CCs held through earnings AND CCs that
+# expire right up against it (rich earnings-IV premium, assignment-before-pop).
+CC_EARNINGS_BUFFER_DAYS = 5
 # ── LEAPS "buy the dip" (P12 + P7, EX-8) ─────────────────────────────────
 # John rejects "wait for the falling knife to stop" for LEAPS: a big drop on
 # CHEAP IV is a buy-cheap-optionality entry NOW, and he takes the follow-on
@@ -3982,6 +3986,21 @@ def fmt_quality(q) -> str:
     return " | ".join(lines) if lines else f"✅ Quality {score}/6 | {pullback:.1f}% off highs"
 
 
+def _earnings_tag(ticker: str, within_days: int = 21) -> str:
+    """'📅 Earnings M/D (Nd)' line when earnings is known and within_days out,
+    else ''. A reminder on the signal itself so John doesn't miss it."""
+    try:
+        ed = get_earnings_date(ticker)
+        if not ed:
+            return ""
+        days = (ed - datetime.now()).days
+        if 0 <= days <= within_days:
+            return f"  📅 Earnings {ed.month}/{ed.day} ({days}d)"
+    except Exception:
+        pass
+    return ""
+
+
 def fmt_csp(opp) -> str:
     t = opp["csp"]["timing"]; s = opp["sizing"]; q = opp["quality"]
     d = f" | δ{opp['csp']['delta']}" if opp['csp'].get('delta') else ""
@@ -4003,6 +4022,7 @@ def fmt_csp(opp) -> str:
            if opp.get("oi_signal") else []),
         *([f"  📍 Max Pain: ${opp['expiry_breakdown']['max_pain_strike']} | P/C ratio: {opp['expiry_breakdown']['put_call_ratio']}"]
            if opp.get("expiry_breakdown") and opp["expiry_breakdown"].get("max_pain_strike") else []),
+        *([_earnings_tag(opp['ticker'])] if _earnings_tag(opp['ticker']) else []),
         f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
     ])
 
@@ -4019,6 +4039,7 @@ def fmt_cc(opp) -> str:
         f"  Bid ${cc['bid']} / Ask ${cc['ask']} | Mid ${cc['premium']}",
         f"  δ{cc['delta']} | {cc['otm_pct']}% OTM | IVP {cc['ivp']:.0f}% ({ivp_label})",
         f"  ${ppd}/day | Annualized: {cc['annualized_return']}%",
+        *([_earnings_tag(opp['ticker'])] if _earnings_tag(opp['ticker']) else []),
         f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
     ])
 
@@ -4167,6 +4188,7 @@ def fmt_spike_cc(opp) -> str:
         f"  δ{sc['delta']} | Annualized: {sc['annualized_return']}% | ${sc['premium']/sc['dte']:.2f}/day",
         f"  Protection: {sc['protection_pct']}% downside buffer",
         f"  Breakeven: ${sc.get('avg_cost','—')} | Max {sc['max_contracts']} contracts",
+        *([_earnings_tag(opp['ticker'])] if _earnings_tag(opp['ticker']) else []),
         "",
         f"  ⚠️ _Exit when 50-70% of premium captured_",
         f"  ⚠️ _Close early if stock reverses sharply_",
@@ -4581,44 +4603,30 @@ def run_scanner():
         if abs(_c30) >= 5.0: _parts.append(f"{_c30:+.1f}% (30d)")
         _move_str = " · ".join(_parts) if _parts else f"{_c1:+.1f}% {_day_lbl}"
 
-        # Zone context — only mention what's actionable
-        _zone_parts = []
-        _pct_buy = _pw.get("pct_from_buy", 999) or 999
-        if _pw["csp_status"] == "IN_ZONE":
-            _zone_parts.append(f"IN CSP ZONE at ${_bu} — check options now")
-        elif _pw["csp_status"] == "APPROACHING" and _bu:
-            _zone_parts.append(f"CSP zone ${_bu} ({_pct_buy:.1f}% away)")
-        elif _pw["csp_status"] == "WATCHLIST" and _bu and _pct_buy <= 20:
-            _zone_parts.append(f"CSP zone ${_bu} ({_pct_buy:.1f}% away)")
-
-        if _pw.get("cc_status") == "IN_ZONE" and _sa:
-            _zone_parts.append(f"above CC target ${_sa} — write calls")
-        elif _pw.get("cc_status") == "APPROACHING" and _sa:
-            _pct_s = _pw.get("pct_from_sell", 0)
-            if 0 < _pct_s <= 20:
-                _zone_parts.append(f"CC target ${_sa} ({_pct_s:.1f}% away)")
-
-        # Action suggestion — only on trading days (markets open)
-        _action = ""
-        if not _is_weekend:
-            if _trigger_drop:
-                _action = "→ consider CSP/LEAPS"
-            elif _trigger_rise:
-                _action = "→ consider CC"
+        # ── GO-signal gate (P22) ──────────────────────────────────────
+        # Telegram = "go sit at the computer and trade," not "here are 7 names
+        # to check." A move only makes this list when it lands the stock IN an
+        # ACTIONABLE zone — below the buy target (CSP) on a drop, or at/above
+        # the sell target (CC) on a rise. No "X% away / consider" nudges.
+        # (A serious LEAPS dip still pings separately via the BUY_DIP alert.)
+        _csp_go = _trigger_drop and _pw.get("csp_status") == "IN_ZONE" and _bu
+        _cc_go  = _trigger_rise and _pw.get("cc_status")  == "IN_ZONE" and _sa
+        if not (_csp_go or _cc_go):
+            continue
 
         _icon = "📉" if _trigger_drop else "📈"
-        _zone_txt = " · ".join(_zone_parts)
-        _line = f"{_icon} *{_tk}* {_move_str}"
-        if _zone_txt:
-            _line += f"\n   {_zone_txt}"
-        if _action:
-            _line += f" {_action}"
+        _go   = (f"BELOW your ${_bu:g} buy → GO: check CSP" if _csp_go
+                 else f"ABOVE your ${_sa:g} sell → GO: check CC")
+        _etag = _earnings_tag(_tk)
+        _line = f"{_icon} *{_tk}* {_move_str} — {_go}"
+        if _etag:
+            _line += f"\n  {_etag.strip()}"
         _move_alerts.append((_c1, _trigger_drop, _line))
 
     if _move_alerts:
         # Sort: big drops first, then big rises
         _move_alerts.sort(key=lambda x: (0 if x[1] else 1, x[0]))
-        briefing += "\n━━━ NOTABLE MOVES ━━━\n"
+        briefing += "\n━━━ GO SIGNALS — in your zone ━━━\n"
         for _, _, _line in _move_alerts:
             briefing += f"{_line}\n"
 
@@ -5052,8 +5060,9 @@ def run_scanner():
         _cc  = o.get(cc_key, {}) or {}
         _dte = _cc.get("dte", 0) or 0
         _d2e = o.get("quality", {}).get("days_to_earnings", 999)
-        if _d2e is not None and _d2e < 900 and _dte > 0 and _d2e <= _dte:
-            print(f"   🔕 CC {_tk} dashboard-only: earnings in {_d2e}d inside {_dte}d expiry")
+        if _d2e is not None and _d2e < 900 and _dte > 0 and _d2e <= _dte + CC_EARNINGS_BUFFER_DAYS:
+            print(f"   🔕 CC {_tk} dashboard-only: earnings in {_d2e}d vs {_dte}d expiry "
+                  f"(need ≥{CC_EARNINGS_BUFFER_DAYS}d clearance)")
             return False
         return True
     tg_ccs = [o for o in tg_ccs if _cc_telegram_ok(o, "cc")]
