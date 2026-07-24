@@ -219,6 +219,16 @@ to stabilize (that was the old LEAPS-engine philosophy, explicitly removed).
   expiry" to "earnings within DTE + 5 days" — a CC must clear earnings by a
   buffer. Plus `_earnings_tag` reminder line on CSP/CC/spike Telegram alerts.
   Validated 4/4. Built 2026-07-24.
+- **A18 — Notable-move redefine: net-5d + bucket + target-OR (C11).** Replaces
+  A16's too-strict IN_ZONE gate. A move is notable when the NET 5-day move
+  clears a BUCKET-scaled bar (A −8 / B −10 / C −13 / D −18%, stable, not the
+  hand-maintained targets) OR the price is actually in the buy/sell target
+  zone. Triggering on 5d (not 1d) cancels round-trips (a −7% day undoing a +7%
+  day nets ~0). 1-day % shown for urgency only; target shown as a clear GO
+  only when in-zone (never "consider"/"X% away"); earnings tag included.
+  Removed the stale SPECULATIVE_TICKERS drop-skip (bucket thresholds now do
+  that job correctly). `NOTABLE_5D_BY_BUCKET` constant. Validated 10/10
+  incl. John's round-trip case. Built 2026-07-24.
 
 ### P13 — Past trades on the same name are entry context (the "personal premium book")
 When repeating an action (CSP/CC on a name I've traded before), I look at my
@@ -697,7 +707,8 @@ machinery could later flag the CC side symmetrically (drop that's already
 overextended) and inform C5. BUILD ONLY after enough cross-vol verdicts
 validate the multiple — see P19(b).
 
-### C11 — Bucket-scaled, net-move notability for Telegram (EX-13/EX-14) *(proposed)*
+### ~~C11~~ — GRADUATED → A18 (built 2026-07-24)
+### C11 (original) — Bucket-scaled, net-move notability for Telegram (EX-13/EX-14)
 Redefine what earns a Telegram "notable move," to make Telegram high-signal
 without leaning on hand-maintained price targets:
 - **Notable = big for THIS stock** — threshold scales by bucket (A–D), which is
