@@ -1,17 +1,16 @@
 {
-  "date": "2026-07-23",
+  "date": "2026-07-24",
   "alerted": {
-    "GOOGL:down": 5,
-    "MSTR:down": 5,
-    "TSLA:down": 15,
-    "KNX:down": 5
-  },
-  "dispatched": {
-    "13:47": true,
-    "18:47": true
+    "CLS:down": 5,
+    "CRDO:down": 5,
+    "MU:down": 5,
+    "NBIS:down": 10,
+    "POWL:down": 5
   },
   "scan_triggered": {
-    "TSLA:down": true
+    "CRDO:down": true,
+    "NBIS:down": true
   },
-  "scan_trigger_count": 0
+  "scan_trigger_count": 1,
+  "dispatched": {}
 }
