@@ -5030,25 +5030,33 @@ def run_scanner():
     tg_csps   = _tg_green(top_csps,  "CSP")
     tg_ccs    = _tg_green(top_ccs,   "CC")
 
-    # ── CC Telegram gate (P20, EX-10): only ping when the stock is AT/ABOVE
-    # the sell-above target. Writing a CC below target caps upside — the zone-
-    # first midpoint gate is too loose for alerts (NVDA fired at $209.69 with a
-    # $225 sell target). cc_only exit-waiting names (MSTR/OWL) are exempt: they
-    # WANT to be called away, so alert regardless. Dashboard still shows all.
-    def _cc_at_sell_target(opps: list) -> list:
-        kept = []
-        for o in opps:
-            _tk = o.get("ticker", "")
-            if is_cc_only(_tk, BUCKETS):
-                kept.append(o); continue
-            _sa = SYMBOL_SETTINGS.get(_tk, {}).get("sell_above", 0) or 0
-            _px = o.get("price", 0) or 0
-            if _sa > 0 and _px < _sa:
-                print(f"   🔕 CC {_tk} dashboard-only: ${_px:.2f} < sell target ${_sa:g}")
-                continue
-            kept.append(o)
-        return kept
-    tg_ccs = _cc_at_sell_target(tg_ccs)
+    # ── CC Telegram gates — shared by regular CC (A14/P20) AND spike CC
+    # (A15/P21). A CC ping reaches Telegram only when BOTH hold:
+    #   (1) stock AT/ABOVE sell_above — writing a CC below target caps upside
+    #       (NVDA fired at $209.69 vs $225 target — EX-10). Zone-first midpoint
+    #       is too loose for alerts.
+    #   (2) earnings NOT inside the option's life — don't nudge a CC that would
+    #       be held THROUGH earnings (called-away-on-a-pop risk; the CC analog
+    #       of P9). AAPL spike CC fired with earnings days away (EX-11).
+    # cc_only exit-waiting names (MSTR/OWL) exempt from both — they WANT the
+    # call-away. Dashboard still shows every CC; these gate Telegram only.
+    def _cc_telegram_ok(o: dict, cc_key: str) -> bool:
+        _tk = o.get("ticker", "")
+        if is_cc_only(_tk, BUCKETS):
+            return True
+        _px = o.get("price", 0) or 0
+        _sa = SYMBOL_SETTINGS.get(_tk, {}).get("sell_above", 0) or 0
+        if _sa > 0 and _px < _sa:
+            print(f"   🔕 CC {_tk} dashboard-only: ${_px:.2f} < sell target ${_sa:g}")
+            return False
+        _cc  = o.get(cc_key, {}) or {}
+        _dte = _cc.get("dte", 0) or 0
+        _d2e = o.get("quality", {}).get("days_to_earnings", 999)
+        if _d2e is not None and _d2e < 900 and _dte > 0 and _d2e <= _dte:
+            print(f"   🔕 CC {_tk} dashboard-only: earnings in {_d2e}d inside {_dte}d expiry")
+            return False
+        return True
+    tg_ccs = [o for o in tg_ccs if _cc_telegram_ok(o, "cc")]
     # LEAPS Telegram filter: only BUY trend + high score
     # trend_action is stored as string at top level of opp dict
     # Prevents every scan from flooding Telegram with routine LEAPS
@@ -5071,7 +5079,9 @@ def run_scanner():
             result.append(o)
         return result
     tg_leaps  = _tg_leaps_filter(top_leaps)
-    tg_spikes = top_spikes   # time-sensitive — no score gate
+    # Spike CCs skip the score gate (time-sensitive) but STILL honor the CC
+    # gates: at/above sell target + earnings not inside expiry (A15/P21).
+    tg_spikes = [o for o in top_spikes if _cc_telegram_ok(o, "spike_cc")]
     tg_drops  = top_drops    # time-sensitive — no score gate
 
     # ── Phase 1.6: STRICT_ZONE_TELEGRAM filter ─────────────────
