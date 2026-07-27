@@ -112,8 +112,19 @@ def push_secret(session: requests.Session, repo: str, key_id: str,
     )
     if r.status_code in (201, 204):
         print(f"   ✅ {name} updated")
+    elif r.status_code == 403:
+        sys.exit(
+            f"❌ Failed to update {name} on {repo}: 403 — the PAT can read secrets "
+            f"but not write them.\n"
+            f"   Fix: GitHub → Settings → Developer settings → Fine-grained tokens →\n"
+            f"   your token → Permissions → Repository permissions → Secrets →\n"
+            f"   set to \"Read and write\" (not \"Read-only\"), then Update token.\n"
+            f"   Also confirm {repo} is listed under the token's Repository access.\n"
+            f"   Editing permissions does NOT change the token value, so your\n"
+            f"   GITHUB_TOKEN environment variable stays as-is."
+        )
     else:
-        sys.exit(f"❌ Failed to update {name}: {r.status_code} {r.text}")
+        sys.exit(f"❌ Failed to update {name} on {repo}: {r.status_code} {r.text}")
 
 
 def main() -> None:
