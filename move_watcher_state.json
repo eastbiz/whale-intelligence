@@ -5,5 +5,11 @@
     "NVDA:down": 5,
     "POWL:down": 5
   },
-  "dispatched": {}
+  "dispatched": {
+    "16:41": true
+  },
+  "scan_triggered": {
+    "NOW:up": true
+  },
+  "scan_trigger_count": 1
 }
