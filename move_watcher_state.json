@@ -6,7 +6,8 @@
     "POWL:down": 5
   },
   "dispatched": {
-    "16:41": true
+    "16:41": true,
+    "13:47": true
   },
   "scan_triggered": {
     "NOW:up": true
