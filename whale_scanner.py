@@ -968,11 +968,41 @@ def _parse_ibkr_xml(root: "ET.Element") -> dict:
 
 IBKR_XML_FALLBACK = "ibkr_positions.xml"   # commit this file to repo when Flex API is down
 
+# Refuse to trade off an XML snapshot older than this. Position alerts run almost
+# entirely on IBKR data (every short put lives there), so quietly scanning a
+# months-old statement is worse than scanning nothing: it invents P&L for
+# positions that may already be closed and hides ones that were opened since.
+IBKR_XML_MAX_AGE_DAYS = 5
+
+# Set by get_ibkr_positions() / the fallback path so run_scanner() can report how
+# trustworthy the IBKR position data is (and alert when it is degraded).
+IBKR_DATA_STATUS = {"source": "none", "degraded": True, "detail": "not loaded yet"}
+
+
+def _set_ibkr_status(source: str, degraded: bool, detail: str) -> None:
+    IBKR_DATA_STATUS.clear()
+    IBKR_DATA_STATUS.update({"source": source, "degraded": degraded, "detail": detail})
+
+
+def _parse_when_generated(when: str) -> Optional[datetime]:
+    """Parse a Flex 'whenGenerated' stamp ('20260505;210912') into a datetime."""
+    if not when:
+        return None
+    txt = re.sub(r"[^0-9]", "", when)
+    for width, fmt in ((14, "%Y%m%d%H%M%S"), (8, "%Y%m%d")):
+        if len(txt) >= width:
+            try:
+                return datetime.strptime(txt[:width], fmt)
+            except ValueError:
+                continue
+    return None
+
 
 def get_ibkr_positions() -> dict:
     positions = {}
     if not IBKR_FLEX_TOKEN or not IBKR_FLEX_QUERY_ID:
         print("   ⚠️ IBKR_FLEX_TOKEN or IBKR_FLEX_QUERY_ID not set")
+        _set_ibkr_status("none", True, "IBKR_FLEX_TOKEN / IBKR_FLEX_QUERY_ID not set")
         return positions
     try:
         r = requests.get(
@@ -1017,6 +1047,10 @@ def get_ibkr_positions() -> dict:
     except Exception as e:
         print(f"   IBKR error: {e}")
         return _ibkr_xml_file_fallback()
+    if not positions:
+        print("   ⚠️ IBKR Flex returned no positions — trying XML fallback")
+        return _ibkr_xml_file_fallback()
+    _set_ibkr_status("flex", False, "live Flex statement")
     return positions
 
 
@@ -1035,14 +1069,39 @@ def _ibkr_xml_file_fallback() -> dict:
         root = ET.fromstring(xml_text)
         # Accept both FlexQueryResponse (manual download) and FlexStatementResponse wrappers
         positions = _parse_ibkr_xml(root)
-        if positions:
-            # Show file date so it's clear this is not live data
-            _stmt = root.find(".//FlexStatement")
-            _when = _stmt.get("whenGenerated","?") if _stmt is not None else "?"
-            print(f"   ⚠️  Using XML fallback data — statement generated {_when} (NOT live)")
+        if not positions:
+            _set_ibkr_status("xml", True, f"{IBKR_XML_FALLBACK} parsed but held no positions")
+            return {}
+
+        # Show file date so it's clear this is not live data
+        _stmt = root.find(".//FlexStatement")
+        _when = _stmt.get("whenGenerated", "") if _stmt is not None else ""
+        _gen  = _parse_when_generated(_when)
+        if _gen is None:
+            print(f"   ⛔ {IBKR_XML_FALLBACK} has no readable whenGenerated stamp "
+                  f"({_when!r}) — refusing to use it (cannot verify age)")
+            _set_ibkr_status("none", True,
+                             f"{IBKR_XML_FALLBACK} rejected: unreadable date stamp {_when!r}")
+            return {}
+
+        age_days = (datetime.now() - _gen).days
+        if age_days > IBKR_XML_MAX_AGE_DAYS:
+            print(f"   ⛔ {IBKR_XML_FALLBACK} is {age_days} days old "
+                  f"(generated {_gen:%Y-%m-%d}, limit {IBKR_XML_MAX_AGE_DAYS}d) — REFUSING to use it. "
+                  f"IBKR positions unavailable this scan.")
+            _set_ibkr_status("none", True,
+                             f"XML fallback rejected: {age_days}d old "
+                             f"(generated {_gen:%Y-%m-%d}, limit {IBKR_XML_MAX_AGE_DAYS}d)")
+            return {}
+
+        print(f"   ⚠️  Using XML fallback data — statement generated {_gen:%Y-%m-%d} "
+              f"({age_days}d old, NOT live)")
+        _set_ibkr_status("xml", True,
+                         f"XML fallback, {age_days}d old (generated {_gen:%Y-%m-%d})")
         return positions
     except Exception as e:
         print(f"   ⚠️ Failed to parse {IBKR_XML_FALLBACK}: {e}")
+        _set_ibkr_status("none", True, f"{IBKR_XML_FALLBACK} parse error: {e}")
         return {}
 
 
@@ -4309,12 +4368,28 @@ def run_scanner():
                   f"(fresh: {_ibkr_fresh_stk}stk/{_ibkr_fresh_opts}opt vs "
                   f"cache: {_cache_stk}stk/{_cache_opts}opt) — USING CACHE")
             ibkr = _ibkr_cache
+            _set_ibkr_status("cache", True,
+                             f"Flex looked incomplete ({_ibkr_fresh_stk}stk/{_ibkr_fresh_opts}opt "
+                             f"vs cache {_cache_stk}stk/{_cache_opts}opt) — using cached positions")
         else:
             print(f"   ✅ IBKR Flex fresh data looks complete — using it")
     except FileNotFoundError:
         print("   ℹ️  No IBKR positions cache found (first run or cache cleared)")
     except Exception as _ce:
         print(f"   ⚠️ Could not load IBKR positions cache: {_ce}")
+
+    # Fail LOUD, not silent. Every short put lives at IBKR, so degraded position
+    # data means the exit engine is partly or wholly blind — John needs to know
+    # that from Telegram, not from a buried Actions log line.
+    if IBKR_DATA_STATUS.get("degraded"):
+        _n_opt = sum(1 for v in ibkr.values() if v.get("asset_class") == "OPT")
+        print(f"   ⚠️⚠️  IBKR DATA DEGRADED: {IBKR_DATA_STATUS.get('detail')}")
+        send_telegram(
+            "⚠️ *IBKR position data degraded*\n"
+            f"{IBKR_DATA_STATUS.get('detail')}\n"
+            f"Source: `{IBKR_DATA_STATUS.get('source')}` — {_n_opt} IBKR options loaded.\n"
+            "Position exit alerts (BIG MOVE / TAKE PROFIT) may be incomplete this scan."
+        )
     # ─────────────────────────────────────────────────────────────────────────
 
     stk_hold = {k:v for k,v in ibkr.items() if v.get("asset_class")=="STK"}
@@ -6707,6 +6782,7 @@ def run_scanner():
         "scan_date":           now_pt().strftime("%Y-%m-%d"),
         "schwab_live":         len(schwab_quotes) > 0,
         "schwab_last_success": now_pt().strftime(SCAN_TS_FMT) if len(schwab_quotes) > 0 else None,
+        "ibkr_data_status":    dict(IBKR_DATA_STATUS),
         "execution_candidates": execution_candidates,   # strict — Telegram quality
         "review_candidates":    review_candidates,      # relaxed — dashboard review
         "dashboard_opportunities": review_candidates,   # alias for dashboard compat

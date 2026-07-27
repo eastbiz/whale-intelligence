@@ -77,6 +77,11 @@ jobs:
           git config user.email "scanner@whale-intelligence"
           if [ -f results.json ]; then
             git add -f results.json
+            # The runner is destroyed after each job, so the IBKR stale-Flex
+            # guard only works if its cache is committed alongside results.json.
+            if [ -f ibkr_positions_cache.json ]; then
+              git add -f ibkr_positions_cache.json
+            fi
             if git diff --staged --quiet; then
               echo "No changes to commit"
             else
