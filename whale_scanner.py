@@ -30,9 +30,13 @@ from bucket_config import (
 # Pacific Time helper (your local timezone)
 PT = ZoneInfo("America/Los_Angeles")
 
-def now_et():
+def now_pt():
     """Current time in Pacific Time (handles DST automatically)."""
     return datetime.now(tz.utc).astimezone(PT)
+
+# Display timestamps are Pacific. They were previously stamped "ET" while
+# holding Pacific values, putting any consumer outside Pacific 3 hours off.
+SCAN_TS_FMT = "%Y-%m-%d %H:%M PT"
 
 UNUSUAL_WHALES_API_KEY = ""  # Removed — no longer used
 TELEGRAM_BOT_TOKEN     = os.environ.get("TELEGRAM_BOT_TOKEN", "")
@@ -3840,7 +3844,7 @@ def fmt_opp_cc(opp: dict) -> str:
         f"  δ{cc['delta']} | Annualized: {cc['annualized_return']}% | {cc['max_contracts']} contracts",
         f"  Protection: {cc['protection_pct']}% downside buffer",
         f"  IVP: {opp['ivp']:.0f}% | Exit at 50-70% profit",
-        f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
+        f"_Scanned {now_pt().strftime('%b %d %H:%M')} PT_"
     ]
     return "\n".join(lines)
 
@@ -4028,7 +4032,7 @@ def fmt_csp(opp) -> str:
         *([f"  📍 Max Pain: ${opp['expiry_breakdown']['max_pain_strike']} | P/C ratio: {opp['expiry_breakdown']['put_call_ratio']}"]
            if opp.get("expiry_breakdown") and opp["expiry_breakdown"].get("max_pain_strike") else []),
         *([_earnings_tag(opp['ticker'])] if _earnings_tag(opp['ticker']) else []),
-        f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
+        f"_Scanned {now_pt().strftime('%b %d %H:%M')} PT_"
     ])
 
 
@@ -4045,7 +4049,7 @@ def fmt_cc(opp) -> str:
         f"  δ{cc['delta']} | {cc['otm_pct']}% OTM | IVP {cc['ivp']:.0f}% ({ivp_label})",
         f"  ${ppd}/day | Annualized: {cc['annualized_return']}%",
         *([_earnings_tag(opp['ticker'])] if _earnings_tag(opp['ticker']) else []),
-        f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
+        f"_Scanned {now_pt().strftime('%b %d %H:%M')} PT_"
     ])
 
 
@@ -4080,7 +4084,7 @@ def fmt_leaps(opp) -> str:
         f"  {itm}{d}",
         f"  Intrinsic: ${l['intrinsic']} | Extrinsic: ${l['extrinsic']} ({ext_pct:.1f}%)",
         f"  Leverage: {l['leverage']}x | Tier: {s['tier']} | Room: ${s['room_usd']:,.0f}",
-        f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
+        f"_Scanned {now_pt().strftime('%b %d %H:%M')} PT_"
     ])
 
 
@@ -4099,7 +4103,7 @@ def fmt_convex(o) -> str:
         f"  Coverage — 20%: {_c(cov20)} | 25%: {_c(cov25)} | 30%: {_c(cov30)}",
         f"  OI {o['open_interest']} | Spread {o['spread_pct']}% | Max loss = premium",
         f"_Use limit near mid; do not pay ask blindly_" if o.get("spread_pct", 0) > 8 else "",
-        f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
+        f"_Scanned {now_pt().strftime('%b %d %H:%M')} PT_"
     ]).replace("\n\n_Scanned", "\n_Scanned")
 
 
@@ -4117,7 +4121,7 @@ def fmt_pmcc(opp) -> str:
         f"  Bid ${p['bid']} / Ask ${p['ask']}",
         f"  {p['otm_pct']}% OTM | IVP {p['ivp']:.0f}%{d}",
         f"  Annualized: {p['annualized_return']}% | Months to recover LEAPS: {p['months_to_recover']}",
-        f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
+        f"_Scanned {now_pt().strftime('%b %d %H:%M')} PT_"
     ])
 
 
@@ -4133,7 +4137,7 @@ def fmt_pio_cc(opp) -> str:
         f"  Bid ${p['bid']} / Ask ${p['ask']} | Mid ${p['premium']}",
         f"  δ{p['delta']} | IVP {opp['ivp']:.0f}% ({ivp_label})",
         f"  ${ppd}/day | Annualized: {p['annualized_return']}%",
-        f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
+        f"_Scanned {now_pt().strftime('%b %d %H:%M')} PT_"
     ]
     return "\n".join([l for l in lines if l is not None])
 
@@ -4166,7 +4170,7 @@ def fmt_drop_csp(opp) -> str:
         "",
         f"  ✅ _Favorable if: market selloff, sector rotation, profit taking_",
         f"  ❌ _Avoid if: earnings miss, guidance cut, broken trend_",
-        f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
+        f"_Scanned {now_pt().strftime('%b %d %H:%M')} PT_"
     ]
     return "\n".join([l for l in lines if l is not None])
 
@@ -4197,7 +4201,7 @@ def fmt_spike_cc(opp) -> str:
         "",
         f"  ⚠️ _Exit when 50-70% of premium captured_",
         f"  ⚠️ _Close early if stock reverses sharply_",
-        f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
+        f"_Scanned {now_pt().strftime('%b %d %H:%M')} PT_"
     ]
     return "\n".join([l for l in lines if l is not None])
 
@@ -4241,15 +4245,23 @@ def skip_redundant_scheduled_run(max_age_min: int = 100) -> bool:
     always execute. 100 min is safely below the tightest slot spacing
     (16:41→18:47 UTC = 126 min), so legitimate slots are never skipped —
     and if one ever were, the watchdog would rescue it anyway.
-    NOTE: scan_time strings say "ET" but now_et() actually returns Pacific —
-    parse with PT (see now_et()).
+    Timestamps are Pacific. Prefers scan_time_iso (carries a real offset);
+    falls back to scan_time, accepting the legacy "ET" suffix that older
+    results.json files carry even though the value was always Pacific.
     """
     if os.environ.get("GITHUB_EVENT_NAME") != "schedule":
         return False
     try:
         with open("results.json") as f:
-            st = json.load(f).get("scan_time", "")
-        last = datetime.strptime(st, "%Y-%m-%d %H:%M ET").replace(tzinfo=PT)
+            prev = json.load(f)
+        iso = prev.get("scan_time_iso", "")
+        if iso:
+            last = datetime.fromisoformat(iso)
+            if last.tzinfo is None:
+                last = last.replace(tzinfo=PT)
+        else:
+            st = prev.get("scan_time", "").replace(" ET", "").replace(" PT", "")
+            last = datetime.strptime(st, "%Y-%m-%d %H:%M").replace(tzinfo=PT)
         age_min = (datetime.now(tz.utc).astimezone(PT) - last).total_seconds() / 60
         return 0 <= age_min < max_age_min
     except Exception:
@@ -4262,7 +4274,7 @@ def run_scanner():
               "100 min (watchdog or earlier slot). Skipping duplicate.")
         return
     print(f"\n{'='*60}")
-    print(f"🐋 WHALE INTELLIGENCE v5 — {now_et().strftime('%Y-%m-%d %H:%M')} ET")
+    print(f"🐋 WHALE INTELLIGENCE v5 — {now_pt().strftime('%Y-%m-%d %H:%M')} PT")
     print(f"   Framework: Quality → Pullback → Option Yield")
     print(f"{'='*60}\n")
 
@@ -4554,7 +4566,7 @@ def run_scanner():
         # Phase 1.5: APPROACHING CC alerts removed (dashboard only)
 
     briefing = (
-        f"📡 *MARKET BRIEFING — {now_et().strftime('%b %d, %Y %H:%M')} ET*\n"
+        f"📡 *MARKET BRIEFING — {now_pt().strftime('%b %d, %Y %H:%M')} PT*\n"
         f"\n"
         f"*VIX: {vix}*  {vix_data['label']}\n"
     )
@@ -4594,7 +4606,7 @@ def run_scanner():
         if not (_drop or _rise):
             continue
 
-        _now_dow = now_et().weekday()
+        _now_dow = now_pt().weekday()
         _day_lbl = "Fri" if _now_dow >= 5 else "today"
 
         # Move string: 1d (urgency) · 5d (the trigger) · 30d (context)
@@ -6645,7 +6657,7 @@ def run_scanner():
     # Event-driven: a big favorable move on a name you hold a short option.
     # P17 gate: only decision-pressure alerts reach Telegram, once per
     # position per day (the dashboard shows every action regardless).
-    _today_str = now_et().strftime("%Y-%m-%d")
+    _today_str = now_pt().strftime("%Y-%m-%d")
     # Carry forward keys already pinged today (results.json survives scans)
     _tg_alert_log = {k: d for k, d in _prev_tg_alerts.items() if d == _today_str}
     _tg_bigmove = []
@@ -6681,17 +6693,20 @@ def run_scanner():
                 f"  {p['reason']}",
                 f"  Underlying ${p['underlying']} | strike ${p['strike']:g} | {p['dte']}d left",
                 _price_line,
-                f"_Scanned {now_et().strftime('%b %d %H:%M')} PT_"
+                f"_Scanned {now_pt().strftime('%b %d %H:%M')} PT_"
             ])
             send_telegram(_msg); time.sleep(2)
     else:
         print(f"   🚨 No BIG MOVE reviews this scan")
 
     results = {
-        "scan_time":           now_et().strftime("%Y-%m-%d %H:%M ET"),
-        "scan_date":           now_et().strftime("%Y-%m-%d"),
+        "scan_time":           now_pt().strftime(SCAN_TS_FMT),
+        # Explicit UTC offset — consumers should do date math on this rather
+        # than parsing scan_time, which carries no machine-readable zone.
+        "scan_time_iso":       now_pt().isoformat(timespec="seconds"),
+        "scan_date":           now_pt().strftime("%Y-%m-%d"),
         "schwab_live":         len(schwab_quotes) > 0,
-        "schwab_last_success": now_et().strftime("%Y-%m-%d %H:%M ET") if len(schwab_quotes) > 0 else None,
+        "schwab_last_success": now_pt().strftime(SCAN_TS_FMT) if len(schwab_quotes) > 0 else None,
         "execution_candidates": execution_candidates,   # strict — Telegram quality
         "review_candidates":    review_candidates,      # relaxed — dashboard review
         "dashboard_opportunities": review_candidates,   # alias for dashboard compat
