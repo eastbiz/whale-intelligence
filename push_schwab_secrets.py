@@ -13,17 +13,74 @@ Requires:
     Read and write).
 
 Usage:
-    python push_schwab_secrets.py [--token-path schwab_token.json]
-                                   [--repos eastbiz/whale-intelligence,eastbiz/reports]
+    python push_schwab_secrets.py
+        Finds the token file automatically (current folder, this script's
+        folder, your home folder, or ~/scanner).
+
+    python push_schwab_secrets.py --token-path C:\\Users\\John\\schwab_token.json
+        Point at the file explicitly.
+
+    python push_schwab_secrets.py --access-token <AT> --refresh-token <RT>
+        Paste the values straight from refresh_token.py's output — no file
+        needed.
+
+    Add --repos eastbiz/reports to target a single repo.
 """
 import argparse
 import base64
+import glob
 import json
 import os
 import sys
 
 import requests
 from nacl import encoding, public
+
+
+def find_token_file(explicit_path: str | None) -> str:
+    """Locate the token file. refresh_token.py writes it relative to whatever
+    directory it was run from, which is not always the scanner folder."""
+    if explicit_path:
+        if not os.path.exists(explicit_path):
+            sys.exit(f"❌ No such file: {explicit_path}")
+        return explicit_path
+
+    home = os.path.expanduser("~")
+    candidates = [
+        "schwab_token.json",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "schwab_token.json"),
+        os.path.join(home, "schwab_token.json"),
+        os.path.join(home, "scanner", "schwab_token.json"),
+    ]
+    # Also accept any *token*.json sitting in the scanner folder or home dir.
+    for d in (os.getcwd(), os.path.join(home, "scanner"), home):
+        candidates.extend(sorted(glob.glob(os.path.join(d, "*token*.json"))))
+
+    seen = set()
+    for path in candidates:
+        real = os.path.abspath(path)
+        if real in seen or not os.path.exists(real):
+            continue
+        seen.add(real)
+        try:
+            with open(real) as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            continue
+        token = data.get("token", data)
+        if token.get("access_token") and token.get("refresh_token"):
+            print(f"   Using token file: {real}")
+            return real
+
+    sys.exit(
+        "❌ Couldn't find a Schwab token file containing access_token + refresh_token.\n"
+        "   Looked in: current folder, this script's folder, your home folder,\n"
+        "   and the scanner folder.\n"
+        "   Fix: pass the path explicitly, e.g.\n"
+        "     python push_schwab_secrets.py --token-path C:\\Users\\John\\schwab_token.json\n"
+        "   Or paste the values directly:\n"
+        "     python push_schwab_secrets.py --access-token <AT> --refresh-token <RT>"
+    )
 
 
 def load_tokens(token_path: str) -> tuple[str, str]:
@@ -61,7 +118,9 @@ def push_secret(session: requests.Session, repo: str, key_id: str,
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--token-path", default=os.environ.get("SCHWAB_TOKEN_PATH", "schwab_token.json"))
+    ap.add_argument("--token-path", default=os.environ.get("SCHWAB_TOKEN_PATH"))
+    ap.add_argument("--access-token", help="Paste the ACCESS value directly instead of reading a file")
+    ap.add_argument("--refresh-token", help="Paste the REFRESH value directly instead of reading a file")
     ap.add_argument("--repos", default="eastbiz/whale-intelligence,eastbiz/reports")
     args = ap.parse_args()
     repos = [r.strip() for r in args.repos.split(",") if r.strip()]
@@ -75,7 +134,12 @@ def main() -> None:
             "then set it as a permanent GITHUB_TOKEN environment variable."
         )
 
-    access_token, refresh_token = load_tokens(args.token_path)
+    if args.access_token and args.refresh_token:
+        access_token, refresh_token = args.access_token, args.refresh_token
+    elif args.access_token or args.refresh_token:
+        sys.exit("❌ Pass BOTH --access-token and --refresh-token, or neither.")
+    else:
+        access_token, refresh_token = load_tokens(find_token_file(args.token_path))
 
     session = requests.Session()
     session.headers.update({
