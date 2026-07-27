@@ -14,7 +14,7 @@ Requires:
 
 Usage:
     python push_schwab_secrets.py [--token-path schwab_token.json]
-                                   [--repo eastbiz/whale-intelligence]
+                                   [--repos eastbiz/whale-intelligence,eastbiz/reports]
 """
 import argparse
 import base64
@@ -62,14 +62,15 @@ def push_secret(session: requests.Session, repo: str, key_id: str,
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--token-path", default=os.environ.get("SCHWAB_TOKEN_PATH", "schwab_token.json"))
-    ap.add_argument("--repo", default="eastbiz/whale-intelligence")
+    ap.add_argument("--repos", default="eastbiz/whale-intelligence,eastbiz/reports")
     args = ap.parse_args()
+    repos = [r.strip() for r in args.repos.split(",") if r.strip()]
 
     gh_token = os.environ.get("GITHUB_TOKEN")
     if not gh_token:
         sys.exit(
             "❌ GITHUB_TOKEN env var not set.\n"
-            "   Create a fine-grained PAT scoped to this repo with the "
+            "   Create a fine-grained PAT scoped to these repos with the "
             "\"Secrets\" repository permission set to Read and write, "
             "then set it as a permanent GITHUB_TOKEN environment variable."
         )
@@ -83,15 +84,16 @@ def main() -> None:
         "X-GitHub-Api-Version": "2022-11-28",
     })
 
-    r = session.get(f"https://api.github.com/repos/{args.repo}/actions/secrets/public-key", timeout=10)
-    if r.status_code != 200:
-        sys.exit(f"❌ Couldn't fetch repo public key: {r.status_code} {r.text}")
-    key_data = r.json()
+    for repo in repos:
+        r = session.get(f"https://api.github.com/repos/{repo}/actions/secrets/public-key", timeout=10)
+        if r.status_code != 200:
+            sys.exit(f"❌ Couldn't fetch public key for {repo}: {r.status_code} {r.text}")
+        key_data = r.json()
 
-    print(f"   Pushing tokens to {args.repo} secrets...")
-    push_secret(session, args.repo, key_data["key_id"], key_data["key"], "SCHWAB_ACCESS_TOKEN", access_token)
-    push_secret(session, args.repo, key_data["key_id"], key_data["key"], "SCHWAB_REFRESH_TOKEN", refresh_token)
-    print("✅ Done — GitHub Secrets updated.")
+        print(f"   Pushing tokens to {repo} secrets...")
+        push_secret(session, repo, key_data["key_id"], key_data["key"], "SCHWAB_ACCESS_TOKEN", access_token)
+        push_secret(session, repo, key_data["key_id"], key_data["key"], "SCHWAB_REFRESH_TOKEN", refresh_token)
+    print("✅ Done — GitHub Secrets updated on all repos.")
 
 
 if __name__ == "__main__":
