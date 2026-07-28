@@ -4088,6 +4088,27 @@ def fmt_leaps(opp) -> str:
     ])
 
 
+def _convex_earnings_note(ticker: str) -> str:
+    """Earnings warning for convexity alerts (P24). Earnings does NOT threaten a
+    2+ year far-OTM thesis, but entering just before it means paying elevated
+    pre-earnings IV on a vega-heavy option. Warning only — never a gate."""
+    try:
+        ed = get_earnings_date(ticker)
+        if not ed:
+            return ""
+        days = (ed - datetime.now()).days
+        if days == 0:
+            return "  ⚠️ *Earnings TODAY* — you'd pay pre-earnings IV; consider waiting a day"
+        if 1 <= days <= 3:
+            return (f"  ⚠️ *Earnings in {days}d* ({ed.month}/{ed.day}) — entering now pays "
+                    f"elevated IV; thesis is 2+ yrs, so waiting costs little")
+        if 4 <= days <= 21:
+            return f"  📅 Earnings {ed.month}/{ed.day} ({days}d)"
+    except Exception:
+        pass
+    return ""
+
+
 def fmt_convex(o) -> str:
     """Format a Cheap Convexity LEAP alert (Grade A only). Flat field schema."""
     grade = "💎 EXCELLENT (A)" if o.get("classification") == "A" else "✅ GOOD (B)"
@@ -4102,6 +4123,10 @@ def fmt_convex(o) -> str:
         f"  Strike {o['strike_pct']}% of spot | Burden {o['ann_burden_pct']}%/yr",
         f"  Coverage — 20%: {_c(cov20)} | 25%: {_c(cov25)} | 30%: {_c(cov30)}",
         f"  OI {o['open_interest']} | Spread {o['spread_pct']}% | Max loss = premium",
+        # Earnings is NOT a thesis risk for an 800+ DTE far-OTM call (many more
+        # earnings before expiry) — but buying the day before means paying
+        # elevated pre-earnings IV. Warn, never gate (P24).
+        _convex_earnings_note(o['ticker']),
         f"_Use limit near mid; do not pay ask blindly_" if o.get("spread_pct", 0) > 8 else "",
         f"_Scanned {now_pt().strftime('%b %d %H:%M')} PT_"
     ]).replace("\n\n_Scanned", "\n_Scanned")

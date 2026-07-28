@@ -229,6 +229,12 @@ to stabilize (that was the old LEAPS-engine philosophy, explicitly removed).
   Removed the stale SPECULATIVE_TICKERS drop-skip (bucket thresholds now do
   that job correctly). `NOTABLE_5D_BY_BUCKET` constant. Validated 10/10
   incl. John's round-trip case. Built 2026-07-24.
+- **A19 — Earnings warning on convexity alerts (P24).** `_convex_earnings_note`
+  adds "⚠️ Earnings TODAY — you'd pay pre-earnings IV; consider waiting a day"
+  (0d), a similar note with the date (1-3d), or a plain "📅 Earnings M/D (Nd)"
+  (4-21d) to CHEAP CONVEXITY Telegram alerts. Deliberately a warning, NOT a
+  gate — earnings doesn't threaten an 800+ DTE far-OTM thesis, it only affects
+  entry price. Validated across all branches. Built 2026-07-28.
 
 ### P13 — Past trades on the same name are entry context (the "personal premium book")
 When repeating an action (CSP/CC on a name I've traded before), I look at my
@@ -345,6 +351,21 @@ passed) flow freely.
 - System status: **Actioned — A17.** `_cc_telegram_ok` suppresses when
   `days_to_earnings ≤ DTE + CC_EARNINGS_BUFFER_DAYS` (5). cc_only exempt.
 
+### P24 — Earnings is a WARNING for convexity, not a gate
+Earnings matters very differently by instrument. For a short CSP/CC (20-40 DTE)
+it's a real risk — one gap can blow through the strike, force assignment, or cap
+upside — so it GATES the alert (A15/A17). For a far-OTM convexity LEAP (800+
+DTE) it does NOT threaten the thesis: there are ~10 more earnings before expiry
+and no single one decides it. Gap risk is even two-sided for a buyer (a
+down-gap = cheaper entry later; an up-gap = the call gains). What earnings
+actually costs is ENTRY PRICE — buying the day before means paying elevated
+pre-earnings IV on a vega-heavy option. So: warn, never suppress. Suppressing a
+rare Grade A/B convexity find over an event that doesn't threaten a 2.4-year
+bet would throw away signal.
+- Evidence: EX-15 (PYPL convexity alert on its earnings day, 2026-07-28).
+- System status: **Actioned — A19.** `_convex_earnings_note` adds a warning
+  line to convexity alerts (⚠ for 0-3 days, 📅 date for 4-21 days). No gating.
+
 ### P16 — LEAPS are long-term investments, exempt from event-day logic
 The deep-ITM LEAPS (e.g. 10× CLS Jan'28 $180) are stock replacement held for
 years. Earnings calls don't factor into them — no trimming logic, no P15
@@ -420,6 +441,24 @@ positions only.
   stayed over 5%. Distilled into P17; gate calibrated so that every alert he
   acted on (PATH, CLS ×2, NBIS $180 swing) passes and both NBIS noise alerts
   fail (9/9 test cases).
+
+### EX-15 — PYPL convexity alert on earnings day (2026-07-28)
+- Telegram: CHEAP CONVEXITY PYPL @ $58.58, Grade B, buy $90 call Dec-2028
+  (870 DTE), mid $1.73 / ask $1.85, breakeven $91.85 (needs 20.8%/yr), spread
+  14.5%. PYPL reported earnings the same day. John asked (a) why it wasn't on
+  the dashboard, (b) whether earnings makes it bad timing.
+- (a) Not a bug: the PYPL row WAS in the committed results.json (with an AAPL
+  $510 Grade B); John was viewing a cached copy — confirmed visible after
+  refresh. Worth remembering when a Telegram/dashboard mismatch is reported.
+- (b) Claude's read: structure fine (max loss = premium, 48.6x convexity, 1.3%
+  /yr burden) but entering on earnings day is poor — you pay pre-earnings IV on
+  a vega-heavy long-dated option, the 14.5% spread is wide, and a 20.8%/yr
+  hurdle makes entry price most of the edge. Recommended waiting a day.
+- Also flagged: PYPL buy_under is $35 vs $58.58 spot — a convexity LEAP isn't
+  stock ownership (no assignment), so not a contradiction, but worth being
+  deliberate about funding a +57% bet on a name he won't buy for 40% lower.
+- Gap found: scan_convexity had NO earnings awareness at all. Fixed as A19
+  (warning, not gate — P24).
 
 ### EX-14 — The round-trip problem: a 1-day move alone is misleading (2026-07-24)
 - John: "If AAPL drops 7% today but rose 7% yesterday, I consider it neutral —
