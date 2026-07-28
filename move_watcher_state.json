@@ -8,11 +8,13 @@
   "scan_triggered": {
     "MU:down": true,
     "NBIS:down": true,
-    "POWL:down": true
+    "POWL:down": true,
+    "CLS:up": true
   },
-  "scan_trigger_count": 2,
+  "scan_trigger_count": 3,
   "dispatched": {
     "13:47": true,
-    "16:41": true
+    "16:41": true,
+    "18:47": true
   }
 }
