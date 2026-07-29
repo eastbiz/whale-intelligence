@@ -5,7 +5,8 @@
     "POWL:down": 5,
     "CRDO:down": 5,
     "FIX:down": 5,
-    "MU:down": 5
+    "MU:down": 5,
+    "NOW:up": 5
   },
   "scan_triggered": {
     "NBIS:down": true,
@@ -14,6 +15,7 @@
   "scan_trigger_count": 2,
   "dispatched": {
     "13:47": true,
-    "16:41": true
+    "16:41": true,
+    "18:47": true
   }
 }
