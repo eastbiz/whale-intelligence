@@ -1,21 +1,20 @@
 {
-  "date": "2026-07-29",
+  "date": "2026-07-30",
   "alerted": {
-    "NBIS:down": 10,
-    "POWL:down": 5,
-    "CRDO:down": 5,
-    "FIX:down": 5,
-    "MU:down": 5,
-    "NOW:up": 5
+    "CRDO:up": 10,
+    "NBIS:up": 25,
+    "POWL:up": 5
   },
   "scan_triggered": {
-    "NBIS:down": true,
-    "CLS:down": true
+    "CRDO:up": true,
+    "FIX:up": true,
+    "MSFT:up": true,
+    "MU:up": true,
+    "NBIS:up": true,
+    "POWL:up": true
   },
-  "scan_trigger_count": 2,
+  "scan_trigger_count": 1,
   "dispatched": {
-    "13:47": true,
-    "16:41": true,
-    "18:47": true
+    "13:47": true
   }
 }
