@@ -28,9 +28,9 @@ before it reverses**. Volatility that made the position scary is the same
 volatility that hands me the exit.
 - Evidence: EX-1 (NBIS $180 put swung from deep underwater to ~breakeven on a
   +16% day), EX-2 (NBIS $140 put at +36% after one +16% day).
-- System status: **partially built** — this is the existing BIG MOVE alert.
-  Gap identified (see C1): the stale-mark guard hides the real P&L on exactly
-  these high-vol names. Pending sign-off.
+- System status: **Actioned** — BIG MOVE (A6) + P&L SWING (A6) + real P&L on
+  volatile names (A5). Validated end-to-end by EX-16 (CRDO 46% loss → 10%
+  profit alert → closed at $10, +$900 realized).
 
 ### P2 — Deep-OTM options on extreme-vol names retain REAL value
 A put 30%+ OTM on NBIS is still worth ~$10 because the stock can move 16% in a
@@ -441,6 +441,29 @@ positions only.
   stayed over 5%. Distilled into P17; gate calibrated so that every alert he
   acted on (PATH, CLS ×2, NBIS $180 swing) passes and both NBIS noise alerts
   fail (9/9 test cases).
+
+### EX-16 — CRDO $200 put: P&L SWING alert → closed at $10 (2026-07-30) ✅
+**The feature working exactly as specified, with a real fill.**
+- Alert (06:45 PT): "CRDO rose 7.5% today — your CSP $200 is ITM, now at 10%
+  profit ($3,660 to close, 0d left). Big move — review whether to close before
+  it reverses. **Swing since last scan: 46% loss → 10% profit.**"
+- John: "That is exactly the right notification as I wanted. The put which was
+  under water yesterday got profitable today, a day before expiration."
+- **Closed at $10.00 fill** (3 contracts): premium in $13 → $3,900 received,
+  $3,000 paid to close, **realized +$900 = 23% of premium**, 1.5% on $60,000
+  collateral. Better than the $12.20 mark shown at scan time (CRDO kept rising
+  during the day, so the put decayed further in his favour).
+- Decision quality: at the alert's $190.78 spot, intrinsic was $9.22 and the
+  effective basis on assignment would have been $187. He had just lowered
+  CRDO buy_under to $175 — so he did NOT want the shares at $187, and paying a
+  small amount of time value to avoid assignment is coherent with that target
+  (P9/P8: only accept assignment at strikes you want to own).
+- Validates: A6 (P&L SWING + stacked swing context), A5 (real P&L shown on a
+  volatile name — the old stale-mark guard would have hidden this), P17 (the
+  alert passed the Telegram gate on near-strike/ITM, not on profit %).
+- Fourth completed alert→action→fill cycle after PATH (EX-6), CLS ×2 (EX-5),
+  NBIS $180 (EX-3). The 0-DTE timing also shows the value of the swing line:
+  the position was only worth acting on because of WHERE it came from.
 
 ### EX-15 — PYPL convexity alert on earnings day (2026-07-28)
 - Telegram: CHEAP CONVEXITY PYPL @ $58.58, Grade B, buy $90 call Dec-2028
