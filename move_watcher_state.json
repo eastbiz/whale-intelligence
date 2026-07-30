@@ -3,7 +3,8 @@
   "alerted": {
     "CRDO:up": 10,
     "NBIS:up": 25,
-    "POWL:up": 5
+    "POWL:up": 5,
+    "MSFT:up": 15
   },
   "scan_triggered": {
     "CRDO:up": true,
