@@ -426,7 +426,7 @@ SYMBOL_SETTINGS = {
     # ── CORE ─────────────────────────────────────────────────────────────────
     # Updated 2026-07-19 per user table — current price targets reflecting recent run-up.
     # buy_under=0 means NO BUY (price way above target, only CC monitoring).
-    "AAPL": {"buy_under":    0, "sell_above":  360, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "AAPL": {"buy_under":    0, "sell_above":  350, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "AMZN": {"buy_under":  220, "sell_above":  330, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "GOOGL":{"buy_under":  300, "sell_above":  450, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "IBKR": {"buy_under":   70, "sell_above":  110, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
