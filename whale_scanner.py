@@ -659,9 +659,16 @@ def schwab_get_quotes(tickers: list) -> dict:
             # ivPercentile is in the quote object for equities
             _ivp_raw = (q.get("volatility", 0) or
                         q.get("impliedYield", 0) or 0)
-            # Print raw fundamental keys on first ticker to debug
+            # Print raw keys on the first ticker. The fundamental list is
+            # printed in FULL (it used to truncate at 10) so the next scan
+            # settles whether Schwab carries an earnings date — the Yahoo
+            # earnings feed is dead and this call already fetches fundamentals,
+            # so a field here would cost no extra request.
             if not result:
-                print(f"   Schwab quote keys for {ticker}: q={list(q.keys())[:10]} f={list(f.keys())[:10]}")
+                print(f"   Schwab quote keys for {ticker}: q={list(q.keys())[:10]}")
+                print(f"   Schwab fundamental keys ({len(f)}): {sorted(f.keys())}")
+                _earnish = [k for k in f.keys() if "earn" in k.lower() or "eps" in k.lower()]
+                print(f"   → earnings-ish fundamental fields: {_earnish or 'NONE'}")
             result[ticker] = {
                 "price":       float(q.get("lastPrice",  q.get("mark", 0)) or 0),
                 "week52_high": float(q.get("52WeekHigh", 0) or 0),
