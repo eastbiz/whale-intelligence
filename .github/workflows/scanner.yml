@@ -77,6 +77,7 @@ jobs:
           git config user.email "scanner@whale-intelligence"
           if [ -f results.json ]; then
             git add -f results.json
+            [ -f iv_history.json ] && git add -f iv_history.json
             if git diff --staged --quiet; then
               echo "No changes to commit"
             else

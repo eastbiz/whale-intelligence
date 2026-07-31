@@ -250,6 +250,14 @@ to stabilize (that was the old LEAPS-engine philosophy, explicitly removed).
   30/60 (sweet spot 35-50); the inline dashboard CC scanner was independently
   using 20-60 (the source of John's 20-DTE AMZN card) and now uses the shared
   constants; spike CC `OPP_CC_DTE_MIN/MAX` 14-30 → 30-60. All CC paths aligned. Built 2026-07-31.
+- **A23 — honest IV labels + real-IV-percentile groundwork (P26).** All cards
+  and Telegram alerts now show `ATM IV x%` via `atm_iv_from_ivp()` instead of
+  the fake "IVP". Each scan banks that ticker's ATM IV to `iv_history.json`
+  (committed by the workflow, one sample/ticker/day, ~1.5yr retained). Once a
+  ticker has ≥60 samples, `real_iv_percentile()` activates automatically and
+  labels become "IV 22% (IVP 33% of 1yr)" — no further change needed. Scoring
+  still consumes the legacy `ivp` field unchanged (deliberate: relabel first,
+  re-tune scoring only after real percentiles exist). Built 2026-07-31.
 
 ### P13 — Past trades on the same name are entry context (the "personal premium book")
 When repeating an action (CSP/CC on a name I've traded before), I look at my
@@ -392,6 +400,19 @@ the constant management. Minimum 30 DTE, range 30-60, with 35-50 the preferred w
   source of the 20-DTE card) now uses the same constants. Spike CCs too
   (`OPP_CC_DTE_MIN/MAX` was 14-30 → 30-60).
 
+### P26 — "IVP" was never a real IV percentile — show honest IV
+The `ivp` field is a fixed transform of current ATM IV
+(`100*(1-exp(-atm_iv/0.25))`), with NO historical comparison. "IVP 58%" only
+ever meant "ATM IV ≈ 22%". That reads as premium-rich when it may be the
+opposite, and it misled a live decision. I want a REAL IV percentile (IV today
+vs this ticker's own past year) — that's the number I'm used to and trade on.
+- Evidence: EX-19 — AMZN card showed "✅ IVP 58%" while John's broker showed a
+  true IV percentile of 29%: post-earnings IV crush, thin premium. He was right
+  ("premium will not be so exciting"); the scanner label said the opposite.
+- System status: **Actioned — A23.** Displays are now honest ("ATM IV 22%"),
+  and daily ATM IV is banked per ticker so a TRUE percentile switches on
+  automatically at 60 samples/ticker: "IV 22% (IVP 33% of 1yr)".
+
 ### P16 — LEAPS are long-term investments, exempt from event-day logic
 The deep-ITM LEAPS (e.g. 10× CLS Jan'28 $180) are stock replacement held for
 years. Earnings calls don't factor into them — no trimming logic, no P15
@@ -467,6 +488,22 @@ positions only.
   stayed over 5%. Distilled into P17; gate calibrated so that every alert he
   acted on (PATH, CLS ×2, NBIS $180 swing) passes and both NBIS noise alerts
   fail (9/9 test cases).
+
+### EX-19 — "IVP 58%" vs the broker's 29%: the label was fake (2026-07-31)
+- John on the AMZN CC card: "I actually see IVP at 29% for AMZN so I think
+  premium will not be so exciting." Scanner card read "✅ IVP 58% — Good".
+- Investigation: the scanner's `ivp` is `100*(1-exp(-atm_iv/0.25))` — a pure
+  function of current ATM IV, no history. Inverting it: "IVP 58" = **ATM IV
+  21.7%**, which is ordinary-to-low for AMZN. John's 29% was a TRUE percentile
+  (post-earnings IV crush). **John's read was correct and the scanner's label
+  was actively misleading** — it implied rich premium on a 21.8%-annualized CC.
+- CLAUDE.md already warned "IVP ≠ IV Rank", but every card, alert and score
+  still printed it as if it were a percentile, so the warning never reached the
+  decision. Naming an approximation after the real metric is worse than not
+  having it.
+- Fix A23: honest labels now; real percentile auto-enables once history banks.
+- Note: the technical limitation was genuine — Schwab exposes current IV only,
+  no history — so a real percentile cannot be backfilled, only accumulated.
 
 ### EX-18 — AMZN post-earnings CC: the C12 bug's live scenario (2026-07-31)
 - Follow-up to EX-17. John: "It had earnings yesterday. Therefore the increase

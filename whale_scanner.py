@@ -27,6 +27,79 @@ from bucket_config import (
 )
 
 # ── API Keys ────────────────────────────────────────────────
+# ── IV labelling (A23) ───────────────────────────────────────────────────
+# The historical `ivp` field is NOT an IV percentile — it is a fixed transform
+# of current ATM IV: ivp = 100*(1-exp(-atm_iv/0.25)). It carries no historical
+# context, so "IVP 58%" really just meant "ATM IV ~22%", which misled a real
+# decision (AMZN post-earnings, EX-19). Until enough IV history is banked for a
+# TRUE percentile, display ATM IV; switch automatically once history suffices.
+IV_HISTORY_FILE   = "iv_history.json"
+IV_HISTORY_MIN_N  = 60    # samples needed before a real percentile is credible
+IV_HISTORY_KEEP   = 400   # ~1.5 trading years per ticker
+_IV_HISTORY = {}
+
+
+def atm_iv_from_ivp(ivp: float) -> float:
+    """Invert the pseudo-IVP transform back to ATM IV (as a percentage)."""
+    try:
+        p = min(94.9, max(0.1, float(ivp)))
+        return -0.25 * math.log(1 - p / 100.0) * 100.0
+    except Exception:
+        return 0.0
+
+
+def load_iv_history() -> dict:
+    try:
+        with open(IV_HISTORY_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def real_iv_percentile(ticker: str, atm_iv_pct: float):
+    """TRUE IV percentile: where today's ATM IV sits within this ticker's own
+    stored history. Returns None until IV_HISTORY_MIN_N samples exist."""
+    try:
+        vals = [h["iv"] for h in _IV_HISTORY.get(ticker.upper(), [])
+                if isinstance(h, dict) and "iv" in h]
+        if len(vals) < IV_HISTORY_MIN_N:
+            return None
+        return round(100.0 * sum(1 for v in vals if v <= atm_iv_pct) / len(vals), 1)
+    except Exception:
+        return None
+
+
+def iv_label(ivp: float, ticker: str = "") -> str:
+    """Honest IV label. Uses a REAL percentile once enough history exists,
+    otherwise plain ATM IV — never the misleading pseudo-'IVP'."""
+    iv = atm_iv_from_ivp(ivp)
+    real = real_iv_percentile(ticker, iv) if ticker else None
+    if real is not None:
+        return f"IV {iv:.0f}% (IVP {real:.0f}% of 1yr)"
+    return f"ATM IV {iv:.0f}%"
+
+
+def save_iv_history(mkt_ivps: dict) -> None:
+    """Append today's ATM IV per ticker (one sample per ticker per day)."""
+    try:
+        hist = load_iv_history()
+        today = now_pt().strftime("%Y-%m-%d")
+        for tk, ivp in (mkt_ivps or {}).items():
+            iv = atm_iv_from_ivp(ivp)
+            if iv <= 0:
+                continue
+            rows = [r for r in hist.get(tk, []) if r.get("d") != today]
+            rows.append({"d": today, "iv": round(iv, 2)})
+            hist[tk] = rows[-IV_HISTORY_KEEP:]
+        with open(IV_HISTORY_FILE, "w") as f:
+            json.dump(hist, f, separators=(",", ":"))
+        _n = sum(len(v) for v in hist.values())
+        print(f"   📈 IV history: {len(hist)} tickers, {_n} samples "
+              f"(real IVP at {IV_HISTORY_MIN_N}/ticker)")
+    except Exception as e:
+        print(f"   ⚠️ IV history save failed: {e}")
+
+
 # Pacific Time helper (your local timezone)
 PT = ZoneInfo("America/Los_Angeles")
 
@@ -2835,7 +2908,7 @@ def find_drop_csp(ticker, price, contracts, ivdata, pir, quality,
         return None, {}
 
     best = max(candidates, key=lambda x: x["score"])
-    return best, {"signal": f"✅ Post-Drop CSP | {drop_info['today_change']:+.1f}% | IVP {ivdata['ivp']:.0f}%"}
+    return best, {"signal": f"✅ Post-Drop CSP | {drop_info['today_change']:+.1f}% | {iv_label(ivdata['ivp'], ticker)}"}
 
 
 def detect_price_spike(ticker: str, md: dict) -> dict:
@@ -2934,7 +3007,7 @@ def find_spike_cc(ticker, price, qty, avg_cost, contracts, ivdata, spike_info) -
         return None, {}
 
     best = max(candidates, key=lambda x: x["score"])
-    return best, {"signal": f"✅ Spike CC | {spike_info['today_change']:+.1f}% move | IVP {ivdata['ivp']:.0f}%"}
+    return best, {"signal": f"✅ Spike CC | {spike_info['today_change']:+.1f}% move | {iv_label(ivdata['ivp'], ticker)}"}
 
 
 def timing_score(strategy, pir, ivp, is_spec=False, ivp_override=None) -> dict:
@@ -2956,16 +3029,16 @@ def timing_score(strategy, pir, ivp, is_spec=False, ivp_override=None) -> dict:
     if strategy == "CSP":
         if high_ivp and near_low:
             return {"score":95,"recommend":True,
-                    "signal":f"🔥 EXCELLENT — IVP {ivp:.0f}% + near 52w low{spec}"}
+                    "signal":f"🔥 EXCELLENT — ATM IV {atm_iv_from_ivp(ivp):.0f}% + near 52w low{spec}"}
         elif high_ivp and not near_high:
             return {"score":80,"recommend":True,
-                    "signal":f"✅ GOOD — IVP {ivp:.0f}%, healthy price level{spec}"}
+                    "signal":f"✅ GOOD — ATM IV {atm_iv_from_ivp(ivp):.0f}%, healthy price level{spec}"}
         elif high_ivp and near_high:
             return {"score":55,"recommend":True,
-                    "signal":f"⚠️ CAUTION — IVP {ivp:.0f}% but near 52w high{spec}"}
+                    "signal":f"⚠️ CAUTION — ATM IV {atm_iv_from_ivp(ivp):.0f}% but near 52w high{spec}"}
         else:
             return {"score":20,"recommend":False,
-                    "signal":f"❌ SKIP — IVP {ivp:.0f}% too low for premium selling"}
+                    "signal":f"❌ SKIP — ATM IV {atm_iv_from_ivp(ivp):.0f}% too low for premium selling"}
 
     elif strategy == "CC":
         if near_low:
@@ -2973,16 +3046,16 @@ def timing_score(strategy, pir, ivp, is_spec=False, ivp_override=None) -> dict:
                     "signal":"❌ AVOID — Never sell CC near 52w low (limits upside in recovery)"}
         elif near_high and high_ivp:
             return {"score":90,"recommend":True,
-                    "signal":f"🔥 EXCELLENT — Near highs + IVP {ivp:.0f}%"}
+                    "signal":f"🔥 EXCELLENT — Near highs + ATM IV {atm_iv_from_ivp(ivp):.0f}%"}
         elif near_high:
             return {"score":75,"recommend":True,
                     "signal":f"✅ GOOD — Stock near highs, income opportunity"}
         elif high_ivp:
             return {"score":65,"recommend":True,
-                    "signal":f"✅ OK — IVP {ivp:.0f}% boosts CC premium"}
+                    "signal":f"✅ OK — ATM IV {atm_iv_from_ivp(ivp):.0f}% boosts CC premium"}
         else:
             return {"score":30,"recommend":False,
-                    "signal":f"⚠️ WEAK — IVP {ivp:.0f}% too low for CC"}
+                    "signal":f"⚠️ WEAK — ATM IV {atm_iv_from_ivp(ivp):.0f}% too low for CC"}
 
     elif strategy == "LEAPS":
         very_cheap = ivp < 30
@@ -4031,7 +4104,7 @@ def fmt_csp(opp) -> str:
         f"  [{opp['tier']}] {s['tier']} tier | Max: {s['max_pct']}% (${PORTFOLIO_SIZE*s['max_pct']/100:,.0f})",
         f"  Sell Put ${opp['csp']['strike']} | {opp['csp']['expiry']} | {opp['csp']['dte']} DTE",
         f"  Bid ${opp['csp']['bid']} / Ask ${opp['csp']['ask']}",
-        f"  {opp['csp']['otm_pct']}% OTM | IV {opp['csp']['iv']}% | IVP {opp['csp']['ivp']:.0f}%{d}",
+        f"  {opp['csp']['otm_pct']}% OTM | {iv_label(opp['csp']['ivp'], opp['ticker'])}{d}",
         f"  Annualized: {opp['csp']['annualized_return']}% | ${opp['csp']['premium']/opp['csp']['dte']:.2f}/day | {opp['csp']['max_contracts']} contracts",
         *([f"  ⚠️ Below 20% minimum — consider skipping or check wider strike"]
            if opp['csp'].get('below_min') else []),
@@ -4055,7 +4128,7 @@ def fmt_cc(opp) -> str:
         f"  [{opp['tier']}] | Breakeven: ${cc.get('avg_cost','—')}",
         f"  Sell Call ${cc['strike']} | {cc['expiry']} | {cc['dte']} DTE",
         f"  Bid ${cc['bid']} / Ask ${cc['ask']} | Mid ${cc['premium']}",
-        f"  δ{cc['delta']} | {cc['otm_pct']}% OTM | IVP {cc['ivp']:.0f}% ({ivp_label})",
+        f"  δ{cc['delta']} | {cc['otm_pct']}% OTM | {iv_label(cc['ivp'], opp['ticker'])}",
         f"  ${ppd}/day | Annualized: {cc['annualized_return']}%",
         *([_earnings_tag(opp['ticker'])] if _earnings_tag(opp['ticker']) else []),
         f"_Scanned {now_pt().strftime('%b %d %H:%M')} PT_"
@@ -4225,7 +4298,7 @@ def fmt_spike_cc(opp) -> str:
         f"_{trigger} — IV spiked, sell calls before vol contracts_",
         "",
         *([f"  {dp['label']}"] if dp.get("show") else []),
-        f"  IVP: {opp['ivp']:.0f}% | {opp['pullback_pct']}% off highs",
+        f"  {iv_label(opp['ivp'], opp['ticker'])} | {opp['pullback_pct']}% off highs",
         f"  Sell Call ${sc['strike']} | {sc['expiry']} | {sc['dte']} DTE",
         f"  Bid ${sc['bid']} / Ask ${sc['ask']} | Mid ${sc['premium']}",
         f"  δ{sc['delta']} | Annualized: {sc['annualized_return']}% | ${sc['premium']/sc['dte']:.2f}/day",
@@ -4303,6 +4376,8 @@ def skip_redundant_scheduled_run(max_age_min: int = 100) -> bool:
 
 
 def run_scanner():
+    global _IV_HISTORY
+    _IV_HISTORY = load_iv_history()
     if skip_redundant_scheduled_run():
         print("⏭  Late-arriving scheduled run — a scan already completed within "
               "100 min (watchdog or earlier slot). Skipping duplicate.")
@@ -5719,10 +5794,11 @@ def run_scanner():
                     else:
                         _reasoning_parts.append(
                             f"⚠️ Sale ${_eff_sale:.2f} BELOW your sell target ${_sell_above:.0f}")
+                _ivtxt = iv_label(ivp_d, ticker)
                 if ivp_d >= 50:
-                    _reasoning_parts.append(f"✅ IVP {ivp_d:.0f}%")
+                    _reasoning_parts.append(f"✅ {_ivtxt}")
                 elif ivp_d < 30:
-                    _reasoning_parts.append(f"⚠️ IVP {ivp_d:.0f}% — light premium")
+                    _reasoning_parts.append(f"⚠️ {_ivtxt} — light premium")
                 _reasoning_parts.append(
                     f"📊 {best_cc['annualized_return']:.0f}% annualized = ${ppd_cc}/day per contract"
                 )
@@ -5831,10 +5907,11 @@ def run_scanner():
                         else:
                             _pio_reasoning_parts.append(
                                 f"⚠️ Sale ${_eff_pio:.2f} BELOW your sell target ${_sell_above:.0f}")
+                    _pio_ivtxt = iv_label(ivp_d, ticker)
                     if ivp_d >= 50:
-                        _pio_reasoning_parts.append(f"✅ IVP {ivp_d:.0f}%")
+                        _pio_reasoning_parts.append(f"✅ {_pio_ivtxt}")
                     elif ivp_d < 30:
-                        _pio_reasoning_parts.append(f"⚠️ IVP {ivp_d:.0f}% — light premium")
+                        _pio_reasoning_parts.append(f"⚠️ {_pio_ivtxt} — light premium")
                     _pio_reasoning_parts.append(
                         f"📊 {best_pio['annualized_return']:.0f}% annualized = ${_ppd_pio}/day per contract"
                     )
@@ -6774,6 +6851,10 @@ def run_scanner():
     print(f"   LEAPS in review_candidates: {len(_leaps_rc)}")
     for _lo in _leaps_rc[:5]:
         print(f"     {_lo['ticker']}: trend_label={_lo.get('trend_label')!r} trend_action={_lo.get('trend_action')!r}")
+
+    # Bank today's ATM IV per ticker so a REAL IV percentile becomes available
+    # once ~60 samples/ticker accumulate (A23).
+    save_iv_history(schwab_ivp_cache)
 
     with open("results.json","w") as f:
         json.dump(results, f, indent=2)
