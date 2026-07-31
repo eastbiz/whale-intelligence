@@ -1,23 +1,15 @@
 {
-  "date": "2026-07-30",
+  "date": "2026-07-31",
   "alerted": {
-    "CRDO:up": 10,
-    "NBIS:up": 25,
-    "POWL:up": 10,
-    "MSFT:up": 15
+    "AMZN:up": 10
   },
   "scan_triggered": {
-    "CRDO:up": true,
-    "FIX:up": true,
-    "MSFT:up": true,
-    "MU:up": true,
-    "NBIS:up": true,
-    "POWL:up": true
+    "AAPL:down": true,
+    "AMZN:up": true,
+    "NVO:down": true
   },
   "scan_trigger_count": 1,
   "dispatched": {
-    "13:47": true,
-    "16:41": true,
-    "18:47": true
+    "13:47": true
   }
 }
