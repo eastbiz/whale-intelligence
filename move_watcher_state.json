@@ -1,7 +1,7 @@
 {
   "date": "2026-07-31",
   "alerted": {
-    "AMZN:up": 10
+    "AMZN:up": 15
   },
   "scan_triggered": {
     "AAPL:down": true,
@@ -10,6 +10,7 @@
   },
   "scan_trigger_count": 1,
   "dispatched": {
-    "13:47": true
+    "13:47": true,
+    "16:41": true
   }
 }
