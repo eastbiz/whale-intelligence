@@ -171,8 +171,9 @@ CSP_DTE_MIN           = 30;   CSP_DTE_MAX     = 45
 CSP_MIN_DTE           = 30;   CSP_MAX_DTE     = 45   # aliases
 CSP_DELTA_PLTR_MIN    = 0.20; CSP_DELTA_PLTR_MAX = 0.25  # PLTR stricter
 CSP_DELTA_HIGH_IVP_MAX= 0.35  # allowed when IVP > 50
-CC_DTE_MIN            = 30;   CC_DTE_MAX      = 50  # P25: never write a CC
-                                                    # under 30 DTE; sweet spot 35-50
+CC_DTE_MIN            = 30;   CC_DTE_MAX      = 60  # P25: never write a CC
+                                                    # under 30 DTE; range 30-60,
+                                                    # sweet spot 35-50
 LEAPS_DTE_MIN         = 500   # 2+ years
 # CSP: default delta 0.25-0.30, up to 0.35 only when IVP > 50
 CSP_DELTA_MIN         = 0.25; CSP_DELTA_MAX   = 0.35  # target 0.25-0.30, hard max 0.35
@@ -238,7 +239,7 @@ GAP_RISK_PCT_OPP      = 0.20  # Opportunistic mode: allow up to 20% move
 OPP_SPIKE_MIN         = 0.08  # minimum upward spike to trigger
 OPP_SPIKE_DAYS        = 3
 OPP_CC_DTE_MIN        = 30   # P25: no CC under 30 DTE, spike CCs included
-OPP_CC_DTE_MAX        = 50   # P25 sweet spot ceiling
+OPP_CC_DTE_MAX        = 60   # P25 range ceiling (sweet spot 35-50)
 OPP_CC_DELTA_MIN      = 0.25  # post-spike: slightly aggressive ok
 OPP_CC_DELTA_MAX      = 0.40  # post-spike hard max per doc
 OPP_IVP_MIN           = 40

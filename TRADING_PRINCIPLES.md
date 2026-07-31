@@ -247,9 +247,9 @@ to stabilize (that was the old LEAPS-engine philosophy, explicitly removed).
   date yields 999 (no upcoming earnings); delta == 0 still suppresses. C12
   graduated. Built 2026-07-31.
 - **A22 — CC DTE floor of 30, window 30-50 (P25).** `CC_DTE_MIN/MAX` 30/45 →
-  30/50; the inline dashboard CC scanner was independently using 20-60 (the
-  source of John's 20-DTE AMZN card) and now uses the shared constants; spike
-  CC `OPP_CC_DTE_MIN/MAX` 14-30 → 30-50. All CC paths aligned. Built 2026-07-31.
+  30/60 (sweet spot 35-50); the inline dashboard CC scanner was independently
+  using 20-60 (the source of John's 20-DTE AMZN card) and now uses the shared
+  constants; spike CC `OPP_CC_DTE_MIN/MAX` 14-30 → 30-60. All CC paths aligned. Built 2026-07-31.
 
 ### P13 — Past trades on the same name are entry context (the "personal premium book")
 When repeating an action (CSP/CC on a name I've traded before), I look at my
@@ -383,14 +383,14 @@ bet would throw away signal.
 
 ### P25 — Never write a CC under 30 DTE; sweet spot 35-50
 Short-dated CCs aren't worth it: too little premium for the assignment risk and
-the constant management. Minimum 30 DTE, with 35-50 the preferred window.
+the constant management. Minimum 30 DTE, range 30-60, with 35-50 the preferred window.
 - Evidence: 2026-07-31 — the AMZN CC surfaced at 20 DTE. John: "I only see this
   CC with 20 days DTE. I do not think I should write any CC less than 30 days.
   Sweet spot seems 35-50 days."
-- System status: **Actioned — A22.** `CC_DTE_MIN/MAX` = 30/50 and the inline
+- System status: **Actioned — A22.** `CC_DTE_MIN/MAX` = 30/60 (sweet spot 35-50) and the inline
   dashboard CC scanner (which was independently using a 20-60 window — the
   source of the 20-DTE card) now uses the same constants. Spike CCs too
-  (`OPP_CC_DTE_MIN/MAX` was 14-30 → 30-50).
+  (`OPP_CC_DTE_MIN/MAX` was 14-30 → 30-60).
 
 ### P16 — LEAPS are long-term investments, exempt from event-day logic
 The deep-ITM LEAPS (e.g. 10× CLS Jan'28 $180) are stock replacement held for
