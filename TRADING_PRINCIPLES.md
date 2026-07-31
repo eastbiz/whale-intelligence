@@ -235,6 +235,12 @@ to stabilize (that was the old LEAPS-engine philosophy, explicitly removed).
   (4-21d) to CHEAP CONVEXITY Telegram alerts. Deliberately a warning, NOT a
   gate — earnings doesn't threaten an 800+ DTE far-OTM thesis, it only affects
   entry price. Validated across all branches. Built 2026-07-28.
+- **A20 — Telegram CC used an IBKR-only share count (EX-17).** The CC block fed
+  `find_best_cc` from `stk_hold` (IBKR positions only), so Schwab-held stock
+  (the AMZN IRA position) read as 0 shares and never produced a Telegram CC
+  even when the dashboard showed a perfect-score one. Now uses the same
+  `position_check` qty/avg the dashboard uses, `stk_hold` as fallback.
+  Built 2026-07-31.
 
 ### P13 — Past trades on the same name are entry context (the "personal premium book")
 When repeating an action (CSP/CC on a name I've traded before), I look at my
@@ -441,6 +447,24 @@ positions only.
   stayed over 5%. Distilled into P17; gate calibrated so that every alert he
   acted on (PATH, CLS ×2, NBIS $180 swing) passes and both NBIS noise alerts
   fail (9/9 test cases).
+
+### EX-17 — AMZN CC missing from Telegram: IBKR-only share lookup (2026-07-31)
+- AMZN +~15% to $271.32, ABOVE John's $270 sell target. He expected a CC
+  trigger; the dashboard HAD one (CC $285, score 13/13 — perfect — IVP 58,
+  δ0.27, 21.8% ann, plus a SPIKE_CC $280) but no Telegram alert fired.
+- Ruled out one by one: score gate (13 ≥ threshold 10 ✓), A14 sell-target gate
+  ($271.32 ≥ $270 ✓), A17 earnings gate (AMZN earnings = None ✓), John's own
+  IVP hypothesis (IVP 58 — not low), market regime (`sell_premium` hardcoded
+  True).
+- **Root cause:** the two CC pipelines used different share-count sources. The
+  dashboard uses `position_check()` → `qty_cache` (all accounts). The Telegram
+  path used `stk_hold`, built IBKR-only (`asset_class=="STK"` over the ibkr
+  dict). AMZN is a **Schwab IRA** holding ($1.37M), so qty read as 0 and the
+  entire CC block was skipped → AMZN could never enter `cc_opps`.
+- Fix (A20): CC block now uses the same `position_check` qty/avg as the
+  dashboard, `stk_hold` only as fallback.
+- Lesson: this is the C9 pipeline split biting for real. Any "dashboard shows
+  it, Telegram doesn't" report should compare the two data sources first.
 
 ### EX-16 — CRDO $200 put: P&L SWING alert → closed at $10 (2026-07-30) ✅
 **The feature working exactly as specified, with a real fill.**
@@ -785,6 +809,14 @@ without leaning on hand-maintained price targets:
   CC-at-target / convexity A/B). Remove "consider CSP/LEAPS/CC" and "X% away".
 - Revises A16 (which over-gated on IN_ZONE only). Awaiting John's sign-off on
   the bucket thresholds + the net-move-vs-1-day trigger.
+
+### C12 — days_to_earnings clamps past dates to 0 (latent A17 bug)
+`quality["days_to_earnings"]` = `max(0, (earnings - now).days)`. A PAST earnings
+date becomes 0, which the A17 CC gate reads as "earnings imminent" and
+suppresses — backwards, since just-passed earnings is the BEST time to write a
+CC (event resolved, IV still elevated). Fix: use the signed delta and treat
+negative as "no upcoming earnings." Not yet hit in production (AMZN's date was
+None, not past) but it will bite. Found 2026-07-31.
 
 ### C8 — "Is today a trading day?" notification gate (P10)
 John only wants pings on days when conditions exist: at least one watchlist
