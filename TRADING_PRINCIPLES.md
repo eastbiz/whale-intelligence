@@ -241,6 +241,15 @@ to stabilize (that was the old LEAPS-engine philosophy, explicitly removed).
   even when the dashboard showed a perfect-score one. Now uses the same
   `position_check` qty/avg the dashboard uses, `stk_hold` as fallback.
   Built 2026-07-31.
+- **A21 — past earnings dates no longer read as "earnings today" (C12).**
+  `days_to_earnings` was `max(0, delta)`, clamping a past date to 0 so the A17
+  CC gate suppressed post-earnings CCs — the single best CC window. Now a past
+  date yields 999 (no upcoming earnings); delta == 0 still suppresses. C12
+  graduated. Built 2026-07-31.
+- **A22 — CC DTE floor of 30, window 30-50 (P25).** `CC_DTE_MIN/MAX` 30/45 →
+  30/50; the inline dashboard CC scanner was independently using 20-60 (the
+  source of John's 20-DTE AMZN card) and now uses the shared constants; spike
+  CC `OPP_CC_DTE_MIN/MAX` 14-30 → 30-50. All CC paths aligned. Built 2026-07-31.
 
 ### P13 — Past trades on the same name are entry context (the "personal premium book")
 When repeating an action (CSP/CC on a name I've traded before), I look at my
@@ -372,6 +381,17 @@ bet would throw away signal.
 - System status: **Actioned — A19.** `_convex_earnings_note` adds a warning
   line to convexity alerts (⚠ for 0-3 days, 📅 date for 4-21 days). No gating.
 
+### P25 — Never write a CC under 30 DTE; sweet spot 35-50
+Short-dated CCs aren't worth it: too little premium for the assignment risk and
+the constant management. Minimum 30 DTE, with 35-50 the preferred window.
+- Evidence: 2026-07-31 — the AMZN CC surfaced at 20 DTE. John: "I only see this
+  CC with 20 days DTE. I do not think I should write any CC less than 30 days.
+  Sweet spot seems 35-50 days."
+- System status: **Actioned — A22.** `CC_DTE_MIN/MAX` = 30/50 and the inline
+  dashboard CC scanner (which was independently using a 20-60 window — the
+  source of the 20-DTE card) now uses the same constants. Spike CCs too
+  (`OPP_CC_DTE_MIN/MAX` was 14-30 → 30-50).
+
 ### P16 — LEAPS are long-term investments, exempt from event-day logic
 The deep-ITM LEAPS (e.g. 10× CLS Jan'28 $180) are stock replacement held for
 years. Earnings calls don't factor into them — no trimming logic, no P15
@@ -447,6 +467,23 @@ positions only.
   stayed over 5%. Distilled into P17; gate calibrated so that every alert he
   acted on (PATH, CLS ×2, NBIS $180 swing) passes and both NBIS noise alerts
   fail (9/9 test cases).
+
+### EX-18 — AMZN post-earnings CC: the C12 bug's live scenario (2026-07-31)
+- Follow-up to EX-17. John: "It had earnings yesterday. Therefore the increase
+  in stock price." AMZN reported 2026-07-30 → ~15% pop to $271.32, IVP still 58.
+- This is the textbook CC window: **event resolved, IV not yet crushed, stock
+  above the $270 sell target, no earnings inside a 30-50 day expiry.** Card:
+  CC $285 / 20 DTE / δ0.27 / $3.40 premium / 21.8% ann, effective sale $288.40.
+- **Confirms C12 was live, not theoretical:** `days_to_earnings` used
+  `max(0, delta)`, so a just-passed earnings date reads as 0 = "earnings today"
+  and the A17 CC gate would have SUPPRESSED exactly this best-case CC. It only
+  escaped because `get_earnings_date("AMZN")` returned None entirely.
+- Fixed as A21: a PAST earnings date now yields 999 ("no upcoming earnings"),
+  while delta == 0 (earnings actually today) still suppresses.
+- Second issue raised in the same card: 20 DTE — too short (P25 → A22).
+- Open concern: `get_earnings_date` returned None for AMZN, a mega-cap. The
+  earnings feed has real coverage gaps, which quietly weakens every earnings
+  gate (A15/A17/A19). Worth a dedicated look — see C13.
 
 ### EX-17 — AMZN CC missing from Telegram: IBKR-only share lookup (2026-07-31)
 - AMZN +~15% to $271.32, ABOVE John's $270 sell target. He expected a CC
@@ -810,7 +847,16 @@ without leaning on hand-maintained price targets:
 - Revises A16 (which over-gated on IN_ZONE only). Awaiting John's sign-off on
   the bucket thresholds + the net-move-vs-1-day trigger.
 
-### C12 — days_to_earnings clamps past dates to 0 (latent A17 bug)
+### C13 — get_earnings_date coverage gaps
+`get_earnings_date("AMZN")` returned None for a mega-cap with a known earnings
+date (it reported 2026-07-30). Every earnings gate built so far (A15 CC gate,
+A17 buffer, A19 convexity warning, the earnings tag) silently no-ops when the
+date is missing — failing OPEN, so alerts fire unwarned rather than being
+wrongly suppressed. Needs an audit of the source and a fallback. Found
+2026-07-31.
+
+### ~~C12~~ — GRADUATED → A21 (fixed 2026-07-31)
+### C12 (original) — days_to_earnings clamps past dates to 0 (latent A17 bug)
 `quality["days_to_earnings"]` = `max(0, (earnings - now).days)`. A PAST earnings
 date becomes 0, which the A17 CC gate reads as "earnings imminent" and
 suppresses — backwards, since just-passed earnings is the BEST time to write a

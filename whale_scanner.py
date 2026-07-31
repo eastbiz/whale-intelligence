@@ -171,7 +171,8 @@ CSP_DTE_MIN           = 30;   CSP_DTE_MAX     = 45
 CSP_MIN_DTE           = 30;   CSP_MAX_DTE     = 45   # aliases
 CSP_DELTA_PLTR_MIN    = 0.20; CSP_DELTA_PLTR_MAX = 0.25  # PLTR stricter
 CSP_DELTA_HIGH_IVP_MAX= 0.35  # allowed when IVP > 50
-CC_DTE_MIN            = 30;   CC_DTE_MAX      = 45
+CC_DTE_MIN            = 30;   CC_DTE_MAX      = 50  # P25: never write a CC
+                                                    # under 30 DTE; sweet spot 35-50
 LEAPS_DTE_MIN         = 500   # 2+ years
 # CSP: default delta 0.25-0.30, up to 0.35 only when IVP > 50
 CSP_DELTA_MIN         = 0.25; CSP_DELTA_MAX   = 0.35  # target 0.25-0.30, hard max 0.35
@@ -236,8 +237,8 @@ GAP_RISK_PCT_OPP      = 0.20  # Opportunistic mode: allow up to 20% move
 # Mode 2: Post-Spike CC — triggered BY upward gaps
 OPP_SPIKE_MIN         = 0.08  # minimum upward spike to trigger
 OPP_SPIKE_DAYS        = 3
-OPP_CC_DTE_MIN        = 14
-OPP_CC_DTE_MAX        = 30
+OPP_CC_DTE_MIN        = 30   # P25: no CC under 30 DTE, spike CCs included
+OPP_CC_DTE_MAX        = 50   # P25 sweet spot ceiling
 OPP_CC_DELTA_MIN      = 0.25  # post-spike: slightly aggressive ok
 OPP_CC_DELTA_MAX      = 0.40  # post-spike hard max per doc
 OPP_IVP_MIN           = 40
@@ -2489,7 +2490,14 @@ def stock_quality_check(ticker: str, md: dict, earn_date) -> dict:
     if earn_date:
         try:
             delta = (earn_date - datetime.now()).days
-            days_to_earnings = max(0, delta)
+            # A PAST earnings date means the event is already resolved (the feed
+            # just hasn't rolled to next quarter yet) → treat as "no upcoming
+            # earnings", NOT as "earnings today". The old max(0, delta) clamped
+            # past dates to 0, which made the CC earnings gate suppress exactly
+            # the best CC window: just after the print, IV still elevated
+            # (AMZN 2026-07-31, EX-18). delta == 0 (today) stays 0 — you really
+            # don't want to write a CC hours before a print.
+            days_to_earnings = 999 if delta < 0 else delta
         except:
             pass
 
@@ -5643,7 +5651,7 @@ def run_scanner():
                 pass  # no uncovered shares — skip CC (still show PIO below)
             calls_30_60 = [c for c in contracts_d
                            if c.get("option_type") == "C"
-                           and 20 <= (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days <= 60
+                           and CC_DTE_MIN <= (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days <= CC_DTE_MAX
                            and float(c.get("strike",0) or 0) > price*0.99]
             best_cc = None; best_cc_score = 0
             # Phase 1.5: zone-blocked tickers skip the loop entirely
