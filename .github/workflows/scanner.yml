@@ -78,6 +78,7 @@ jobs:
           if [ -f results.json ]; then
             git add -f results.json
             [ -f iv_history.json ] && git add -f iv_history.json
+            [ -f exposure_history.json ] && git add -f exposure_history.json
             if git diff --staged --quiet; then
               echo "No changes to commit"
             else

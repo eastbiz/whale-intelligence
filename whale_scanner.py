@@ -33,6 +33,19 @@ from bucket_config import (
 # context, so "IVP 58%" really just meant "ATM IV ~22%", which misled a real
 # decision (AMZN post-earnings, EX-19). Until enough IV history is banked for a
 # TRUE percentile, display ATM IV; switch automatically once history suffices.
+# ── Earnings dates ───────────────────────────────────────────────────────
+# Manual override, consulted BEFORE Yahoo. Yahoo's calendarEvents feed went
+# silent (see get_earnings_date), and a missing date reads as "SAFE" on every
+# position — so held names get their dates pinned here.
+# UPKEEP: dates go stale each quarter. A date in the past is ignored and
+# reported at the end of the scan, so a forgotten entry fails loudly rather
+# than silencing a real warning. Format: "YYYY-MM-DD".
+EARNINGS_OVERRIDE = {
+    "SPCX": "2026-08-04",
+}
+_EARN_STATS = {"ok": set(), "empty": set(), "error": set(),
+               "stale_override": set(), "bad_override": set(), "last_error": ""}
+
 IV_HISTORY_FILE   = "iv_history.json"
 IV_HISTORY_MIN_N  = 60    # samples needed before a real percentile is credible
 IV_HISTORY_KEEP   = 400   # ~1.5 trading years per ticker
@@ -46,6 +59,76 @@ def atm_iv_from_ivp(ivp: float) -> float:
         return -0.25 * math.log(1 - p / 100.0) * 100.0
     except Exception:
         return 0.0
+
+
+EXPOSURE_HISTORY_FILE = "exposure_history.json"
+EXPOSURE_HISTORY_KEEP = 260   # ~1 trading year of daily snapshots
+
+
+def load_exposure_history() -> dict:
+    try:
+        with open(EXPOSURE_HISTORY_FILE) as f:
+            h = json.load(f)
+            return h if isinstance(h, dict) else {}
+    except Exception:
+        return {}
+
+
+def exposure_day_change(total_cso: float, total_collected: float) -> dict:
+    """Compare today's book against the last scan of a PREVIOUS day.
+
+    Scans run 3x/day, so the prior scan is usually the same day and would show
+    ~0 change. Only dates strictly before today count, which makes the number
+    answer "did I add or close positions since yesterday?".
+
+    Returns the previous values plus percent changes, or empty dict on the
+    first run / when no earlier day exists. Percent change is omitted (None)
+    when the previous value was 0 — there is no meaningful percentage from a
+    zero base, and printing "+100%" there would be misleading.
+    """
+    hist  = load_exposure_history()
+    today = now_pt().strftime("%Y-%m-%d")
+    prior = sorted(d for d in hist if d < today)
+    if not prior:
+        return {}
+    pd   = prior[-1]
+    prev = hist.get(pd) or {}
+    p_cso = prev.get("csp_obligation")
+    p_col = prev.get("premium_collected")
+
+    def _pct(now_v, prev_v):
+        if prev_v in (None, 0):
+            return None
+        return round((now_v - prev_v) / abs(prev_v) * 100, 1)
+
+    out = {"prev_day_date": pd}
+    if p_cso is not None:
+        out["prev_day_csp_obligation"] = round(p_cso, 0)
+        out["csp_obligation_change_pct"] = _pct(total_cso, p_cso)
+    if p_col is not None:
+        out["prev_day_premium_collected"] = round(p_col, 0)
+        out["premium_collected_change_pct"] = _pct(total_collected, p_col)
+    return out
+
+
+def save_exposure_history(total_cso: float, total_collected: float,
+                          n_csp: int, n_cc: int) -> None:
+    """Record today's book snapshot (last scan of the day wins)."""
+    try:
+        hist  = load_exposure_history()
+        today = now_pt().strftime("%Y-%m-%d")
+        hist[today] = {
+            "csp_obligation":    round(total_cso, 0),
+            "premium_collected": round(total_collected, 0),
+            "csp_count":         n_csp,
+            "cc_count":          n_cc,
+        }
+        for d in sorted(hist)[:-EXPOSURE_HISTORY_KEEP]:
+            hist.pop(d, None)
+        with open(EXPOSURE_HISTORY_FILE, "w") as f:
+            json.dump(hist, f, separators=(",", ":"), sort_keys=True)
+    except Exception as e:
+        print(f"   ⚠️ Exposure history save failed: {e}")
 
 
 def load_iv_history() -> dict:
@@ -949,7 +1032,27 @@ def get_market_data(tickers: list) -> dict:
 
 
 def get_earnings_date(ticker: str) -> Optional[datetime]:
-    """Fetch next earnings date from Yahoo Finance."""
+    """Next earnings date. Manual override first, then Yahoo.
+
+    The Yahoo path returned nothing for every ticker across every scan on
+    2026-07-30/31 — days_to_earnings was the 999 sentinel for all 17 open
+    positions, so EARNINGS WARNING could never fire and the CC earnings gate
+    (A15/P21) passed everything through as "no earnings known". The old bare
+    `except: pass` hid that completely. Failures are now counted and reported
+    at the end of the scan, and EARNINGS_OVERRIDE gives a trustworthy path
+    for held names regardless of what Yahoo does.
+    """
+    tk = ticker.upper()
+    if tk in EARNINGS_OVERRIDE:
+        try:
+            d = datetime.strptime(EARNINGS_OVERRIDE[tk], "%Y-%m-%d")
+            # Stale entries are worse than none: a date in the past would read
+            # as "earnings already passed" and silence a real warning.
+            if d.date() >= datetime.now().date():
+                return d
+            _EARN_STATS["stale_override"].add(tk)
+        except Exception:
+            _EARN_STATS["bad_override"].add(tk)
     try:
         r = requests.get(
             f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{ticker}"
@@ -959,9 +1062,31 @@ def get_earnings_date(ticker: str) -> Optional[datetime]:
         j   = r.json().get("quoteSummary",{}).get("result",[{}])[0]
         ts  = j.get("calendarEvents",{}).get("earnings",{}).get("earningsDate",[])
         if ts:
+            _EARN_STATS["ok"].add(tk)
             return datetime.fromtimestamp(ts[0].get("raw",0))
-    except: pass
+        _EARN_STATS["empty"].add(tk)
+    except Exception as e:
+        _EARN_STATS["error"].add(tk)
+        _EARN_STATS["last_error"] = f"{type(e).__name__}: {e}"
     return None
+
+
+def report_earnings_feed() -> None:
+    """Print earnings-feed health. A silently dead feed reads as 'SAFE' on
+    every position, which is the dangerous failure mode — make it loud."""
+    ok, empty, err = _EARN_STATS["ok"], _EARN_STATS["empty"], _EARN_STATS["error"]
+    ov = len(EARNINGS_OVERRIDE)
+    print(f"   📅 Earnings feed: {len(ok)} from Yahoo, {len(empty)} empty, "
+          f"{len(err)} errored | {ov} manual override{'s' if ov != 1 else ''}")
+    if err and _EARN_STATS.get("last_error"):
+        print(f"      last error: {_EARN_STATS['last_error']}")
+    if not ok and (empty or err):
+        print("      ⚠️ Yahoo returned NO earnings dates this scan — every "
+              "position without an override reads as SAFE. Check the feed.")
+    for _k, _msg in (("stale_override", "override date in the past — update it"),
+                     ("bad_override",   "override not YYYY-MM-DD")):
+        if _EARN_STATS[_k]:
+            print(f"      ⚠️ {', '.join(sorted(_EARN_STATS[_k]))}: {_msg}")
 
 
 def get_fundamentals(ticker: str) -> dict:
@@ -1307,6 +1432,20 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
             print(f"     LEAPS: {lp['ticker']} ${lp['strike']} {lp['expiry']} DTE={lp['dte']} BE={lp['breakeven']}")
     print(f"   CSP Obligation: ${total_cso:,.0f} ({csp_pct:.1f}%) | Remaining: ${remaining_csp:,.0f}")
 
+    # Premium actually collected on the open book — computed here so the
+    # day-over-day comparison and the returned field use one value.
+    _collected = sum(p.get("premium_received", 0) * 100 * p.get("contracts", 0)
+                     for p in csp_positions + cc_positions)
+    # Compare BEFORE recording today, or today's snapshot becomes the baseline.
+    _day_chg = exposure_day_change(total_cso, _collected)
+    save_exposure_history(total_cso, _collected, len(csp_positions), len(cc_positions))
+    if _day_chg:
+        _cc = _day_chg.get("csp_obligation_change_pct")
+        _pc = _day_chg.get("premium_collected_change_pct")
+        print(f"   Day change vs {_day_chg['prev_day_date']}: "
+              f"CSP obligation {('%+.1f%%' % _cc) if _cc is not None else 'n/a'} | "
+              f"premium collected {('%+.1f%%' % _pc) if _pc is not None else 'n/a'}")
+
     return {
         "portfolio_size":          round(portfolio_size, 0),
         "max_csp_allocation_pct":  int(MAX_CSP_ALLOCATION_PCT * 100),
@@ -1328,9 +1467,10 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
         # Premium actually COLLECTED on the open short book (credit received
         # when each position was opened). Distinct from the three fields above —
         # do not confuse them; the dashboard's risk summary shows this one.
-        "total_premium_collected": round(sum(
-            p.get("premium_received", 0) * 100 * p.get("contracts", 0)
-            for p in csp_positions + cc_positions), 0),
+        "total_premium_collected": round(_collected, 0),
+        # Day-over-day deltas (vs the last scan of a previous day). Keys are
+        # absent on the first run or when no earlier day has been recorded.
+        **_day_chg,
         # Risk summary (spec §4)
         "max_assignment_exposure": round(total_cso, 0),
         "max_shares_called_away":  sum(cc_shares.values()),
@@ -6867,6 +7007,7 @@ def run_scanner():
     # Bank today's ATM IV per ticker so a REAL IV percentile becomes available
     # once ~60 samples/ticker accumulate (A23).
     save_iv_history(schwab_ivp_cache)
+    report_earnings_feed()
 
     with open("results.json","w") as f:
         json.dump(results, f, indent=2)
