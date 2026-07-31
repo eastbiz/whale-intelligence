@@ -1319,9 +1319,18 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
         "cc_shares_covered":       cc_shares,
         "cc_coverage_pct":         cc_coverage_pct,
         "cc_positions":            cc_positions,
+        # Candidate premium from THIS scan's opportunities (filled in later,
+        # after the opportunity lists are built). Hypothetical — what you WOULD
+        # collect if every surfaced candidate were sold at suggested size.
         "total_premium_csp":       0,
         "total_premium_cc":        0,
         "total_premium_all":       0,
+        # Premium actually COLLECTED on the open short book (credit received
+        # when each position was opened). Distinct from the three fields above —
+        # do not confuse them; the dashboard's risk summary shows this one.
+        "total_premium_collected": round(sum(
+            p.get("premium_received", 0) * 100 * p.get("contracts", 0)
+            for p in csp_positions + cc_positions), 0),
         # Risk summary (spec §4)
         "max_assignment_exposure": round(total_cso, 0),
         "max_shares_called_away":  sum(cc_shares.values()),
@@ -2157,6 +2166,7 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
         return {
             "action":          action,
             "reason":          reason,
+            "take_profit_threshold": take_profit_threshold,
             "profit_pct":      profit_pct,
             "pnl_dollar":      pnl_dollar,
             "dte":             dte,
@@ -6694,6 +6704,7 @@ def run_scanner():
             "earn_zone":      _result["earn_zone"],
             "action":         _result["action"],
             "reason":         _result["reason"],
+            "take_profit_threshold": _result["take_profit_threshold"],
             "sort_priority":  _result["sort_priority"],
         })
 
@@ -6762,6 +6773,7 @@ def run_scanner():
             "earn_zone":      _result["earn_zone"],
             "action":         _result["action"],
             "reason":         _result["reason"],
+            "take_profit_threshold": _result["take_profit_threshold"],
             "sort_priority":  _result["sort_priority"],
         })
 
