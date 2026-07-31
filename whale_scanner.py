@@ -4901,13 +4901,19 @@ def run_scanner():
                       f"{spike_info['today_change']:+.1f}% move")
 
         # ── CC ───────────────────────────────────────────
-        holding = stk_hold.get(ticker,{})
-        qty = holding.get("quantity",0); avg = holding.get("avg_cost",0)
+        # Share count MUST come from the same source the dashboard uses
+        # (position_check → sizing, already computed above as qty/avg). The old
+        # `stk_hold` lookup was IBKR-only, so shares held at Schwab (e.g. the
+        # AMZN IRA position) read as qty=0 and the Telegram CC never fired even
+        # though the dashboard showed the CC — EX-17.
+        holding = stk_hold.get(ticker, {})
+        cc_qty = qty if qty else holding.get("quantity", 0)
+        cc_avg = avg if avg else holding.get("avg_cost", 0)
         if (gng["sell_premium"]
-                and qty >= 100
+                and cc_qty >= 100
                 and not quality["hard_stop"]
                 and ticker not in LEAPS_ONLY):
-            cc, _ = find_best_cc(ticker, price, qty, avg, contracts, ivdata, pir,
+            cc, _ = find_best_cc(ticker, price, cc_qty, cc_avg, contracts, ivdata, pir,
                                already_covered=portfolio_exposure.get("cc_shares_covered",{}).get(ticker, 0),
                                sell_above=SYMBOL_SETTINGS.get(ticker, {}).get("sell_above", 0),
                                buy_under=SYMBOL_SETTINGS.get(ticker, {}).get("buy_under", 0))
