@@ -260,6 +260,13 @@ call still marked at its pre-drop price). The engine guards against this:
 
 ## Deployment
 
+- **Push straight to `main` in BOTH repos.** John's standing instruction
+  (2026-08-01): finished work goes to `main` directly — no feature branch, no
+  pull request, no merge step for him. Some Claude Code sessions start pinned
+  to a `claude/...` branch; when that happens, still land the work on `main`
+  (fast-forward merge, then push) rather than leaving it on the branch. The
+  dashboard serves GitHub Pages from `main`, so work parked on a branch is
+  simply not deployed.
 - Push `whale_scanner.py` (+ `bucket_config.py`, `buckets.csv`) to
   `eastbiz/whale-intelligence`.
 - Push `index.html` to `eastbiz/whale-dashboard`.
