@@ -1,0 +1,72 @@
+name: Earnings Watcher
+
+# Fills the two windows the other jobs are blind to. Full scans land
+# 9:47 / 12:41 / 2:47 PM ET and the Move Watcher stops at 16:05 ET, but
+# earnings releases arrive ~4:05-4:30 PM ET and ~6:00-8:30 AM ET.
+on:
+  schedule:
+    # ── PDT (UTC-7, Mar–Nov) ─────────────────────────────────
+    # 5:15 PM ET (21:15 UTC) — after-close reporters
+    - cron: '15 21 * * 1-5'
+    # 7:30 AM ET (11:30 UTC) — before-open reporters + overnight catch-up
+    - cron: '30 11 * * 1-5'
+    # ── PST (UTC-8, Nov–Mar) — swap the blocks when the clocks change ──
+    # 5:15 PM ET (22:15 UTC)
+    # - cron: '15 22 * * 1-5'
+    # 7:30 AM ET (12:30 UTC)
+    # - cron: '30 12 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      window:
+        description: 'Which window to run (after_close / pre_open)'
+        required: false
+        default: ''
+
+concurrency:
+  group: earnings-watcher
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Python 3.11
+        uses: actions/setup-python@v5.4.0
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests anthropic
+
+      - name: Run earnings watcher
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+          ANTHROPIC_API_KEY:  ${{ secrets.ANTHROPIC_API_KEY }}
+          EARN_WINDOW:        ${{ github.event.inputs.window }}
+        run: python earnings_watcher.py
+
+      - name: Commit calendar + state
+        run: |
+          git config user.name "whale-scanner"
+          git config user.email "scanner@whale-intelligence"
+          for f in earnings_calendar.json earnings_watcher_state.json; do
+            [ -f "$f" ] && git add -f "$f"
+          done
+          if git diff --staged --quiet; then
+            echo "No calendar/state changes to commit"
+          else
+            git commit -m "earnings calendar/state $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git push origin main || (git pull --rebase origin main && git push origin main)
+            echo "calendar/state committed OK"
+          fi

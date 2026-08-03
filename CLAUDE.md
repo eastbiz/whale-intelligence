@@ -61,6 +61,43 @@ independently.**
   per ticker/direction/day, a hard daily cap (`MOVE_SCAN_MAX_PER_DAY` = 3), and
   skip if a scan ran within `MOVE_SCAN_FRESH_MIN` (25) min. State keys
   `scan_triggered` / `scan_trigger_count` in `move_watcher_state.json`.
+- **Earnings Watcher** (`earnings_watcher.py` + `earnings-watcher.yml`): twice
+  a weekday — **5:15 PM ET** (after-close reporters) and **7:30 AM ET**
+  (before-open reporters + overnight catch-up). Both windows were previously
+  blind: full scans stop at 2:47 PM ET and the Move Watcher at 16:05 ET, while
+  releases land ~4:05-4:30 PM and ~6:00-8:30 AM ET. Sends one Telegram message
+  per reporter: EPS actual vs consensus, the after-hours/pre-market gap, YOUR
+  position on that name (strike, expiry, where the gap leaves you), then 3-5
+  lines of interpretation.
+  **Division of labour (deliberate — do not blur it):** every NUMBER is
+  computed in Python from a feed (EPS from Nasdaq, price from Yahoo, position
+  P&L and strike distance from `results.json`). Claude gets those as
+  established facts and is told NOT to restate or recompute them — it supplies
+  interpretation only (guidance, segment detail, why it moved) via the
+  server-side `web_search` tool. A confident-but-wrong number is the worst
+  output this system can produce; the model is never the source of one.
+  **Scope:** names with an open short option + watchlist names within
+  `EARN_NEAR_TARGET_PCT` (15%) of buy_under/sell_above. `EARN_SCOPE_ALL = True`
+  widens to all 32. `EARN_MAX_PER_RUN` (6) caps Claude calls per run.
+  Dedup: one report per ticker per earnings date (`earnings_watcher_state.json`).
+  NO Schwab/IBKR calls. Needs `ANTHROPIC_API_KEY` (already a repo secret) and
+  `pip install anthropic` in the workflow.
+- **Earnings calendar** (`earnings_calendar.py`, cache `earnings_calendar.json`):
+  Yahoo's `calendarEvents` went silent in Jul 2026 — it now requires a
+  cookie+crumb pair. Result: `days_to_earnings` was the 999 sentinel on every
+  un-overridden ticker, which reads as SAFE, **silently disabling the CC
+  earnings gates (A15/A17, P21/P23) and EARNINGS WARNING**. Source chain, first
+  hit wins: `EARNINGS_OVERRIDE` → Nasdaq keyless day calendar (also yields
+  report time bmo/amc + consensus EPS) → Yahoo *with* crumb → committed cache.
+  The Nasdaq sweep (~35 weekday requests over a −3/+50 day window) runs at most
+  once per day; the scanner calls `ecal.refresh()` only when the cache wasn't
+  built today, so it is normally free. `get_earnings_date()` delegates here;
+  `report_health()` makes a dead calendar loud rather than silent.
+  **Broker note:** neither Schwab nor IBKR supplies this. Schwab's Trader API
+  has no earnings endpoint (its `instruments` fundamentals give dividend dates,
+  not earnings dates); IBKR's earnings calendar lives in TWS/Web API Refinitiv
+  fundamentals, not the Flex Query interface this repo uses. Neither broker
+  provides earnings *results* at all. Third-party is the only route.
 - **Watchdog self-heal** (inside the Move Watcher): GitHub's cron delivered
   every scheduled scan 60-105 min late in Jul 2026 and occasionally dropped
   runs. The watcher checks each expected slot (13:47/16:41/18:47 UTC — keep
@@ -226,6 +263,12 @@ call still marked at its pre-drop price). The engine guards against this:
   `SCHWAB_REFRESH_TOKEN`/`SCHWAB_ACCESS_TOKEN` to GitHub Actions secrets
   (no more copy-paste) — requires a `GITHUB_TOKEN` env var holding a
   fine-grained PAT scoped to this repo with "Secrets: Read and write".
+- **Earnings dates are the quiet killer.** A MISSING date is more dangerous
+  than a wrong one: it resolves to 999 → "SAFE" → the CC gates and EARNINGS
+  WARNING pass everything through with no visible symptom. Check the
+  `📅 Earnings calendar:` line in the scan log; if it says 0 tickers cached,
+  every earnings gate is off. `EARNINGS_OVERRIDE` remains the manual escape
+  hatch and is consulted before any feed.
 - **IVP ≠ IV Rank.** The scanner only has IVP (percentile), computed as
   `100 * (1 - exp(-atm_iv / 0.25))`. Never use "IV Rank" language. IVP can be
   stale on weekends.

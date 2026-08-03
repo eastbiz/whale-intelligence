@@ -26,6 +26,17 @@ from bucket_config import (
     is_watchlist_only,
 )
 
+# ── Earnings calendar (source chain + committed cache) ───────
+# Yahoo's calendarEvents feed went silent, which made every un-overridden
+# ticker read as "no earnings known" = SAFE, silently disabling the CC gates
+# and EARNINGS WARNING. This module restores the dates. Optional import so a
+# missing file degrades to the legacy Yahoo path rather than killing the scan.
+try:
+    import earnings_calendar as ecal
+except Exception as _e:
+    ecal = None
+    print(f"⚠️ earnings_calendar unavailable ({_e}) — earnings dates will be sparse")
+
 # ── API Keys ────────────────────────────────────────────────
 # ── IV labelling (A23) ───────────────────────────────────────────────────
 # The historical `ivp` field is NOT an IV percentile — it is a fixed transform
@@ -1039,15 +1050,19 @@ def get_market_data(tickers: list) -> dict:
 
 
 def get_earnings_date(ticker: str) -> Optional[datetime]:
-    """Next earnings date. Manual override first, then Yahoo.
+    """Next earnings date. Manual override first, then the calendar module.
 
     The Yahoo path returned nothing for every ticker across every scan on
     2026-07-30/31 — days_to_earnings was the 999 sentinel for all 17 open
     positions, so EARNINGS WARNING could never fire and the CC earnings gate
-    (A15/P21) passed everything through as "no earnings known". The old bare
-    `except: pass` hid that completely. Failures are now counted and reported
-    at the end of the scan, and EARNINGS_OVERRIDE gives a trustworthy path
-    for held names regardless of what Yahoo does.
+    (A15/P21) passed everything through as "no earnings known". Root cause:
+    Yahoo now requires a cookie+crumb pair on quoteSummary.
+
+    `earnings_calendar` fixes that with a real source chain — Nasdaq's keyless
+    day calendar, Yahoo *with* crumb, then a committed cache — so a single dead
+    source no longer blanks every date. The override stays FIRST and remains
+    the trustworthy manual path. Failures are still counted and reported at the
+    end of the scan; a silently empty calendar is the dangerous failure here.
     """
     tk = ticker.upper()
     if tk in EARNINGS_OVERRIDE:
@@ -1060,6 +1075,20 @@ def get_earnings_date(ticker: str) -> Optional[datetime]:
             _EARN_STATS["stale_override"].add(tk)
         except Exception:
             _EARN_STATS["bad_override"].add(tk)
+
+    if ecal is not None:
+        try:
+            d = ecal.next_earnings_date(tk)
+            if d:
+                _EARN_STATS["ok"].add(tk)
+                return d
+            _EARN_STATS["empty"].add(tk)
+            return None
+        except Exception as e:
+            _EARN_STATS["error"].add(tk)
+            _EARN_STATS["last_error"] = f"calendar {type(e).__name__}: {e}"
+
+    # Legacy fallback — only reached if earnings_calendar failed to import.
     try:
         r = requests.get(
             f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{ticker}"
@@ -1083,13 +1112,19 @@ def report_earnings_feed() -> None:
     every position, which is the dangerous failure mode — make it loud."""
     ok, empty, err = _EARN_STATS["ok"], _EARN_STATS["empty"], _EARN_STATS["error"]
     ov = len(EARNINGS_OVERRIDE)
-    print(f"   📅 Earnings feed: {len(ok)} from Yahoo, {len(empty)} empty, "
+    print(f"   📅 Earnings feed: {len(ok)} resolved, {len(empty)} unknown, "
           f"{len(err)} errored | {ov} manual override{'s' if ov != 1 else ''}")
+    if ecal is not None:
+        try:
+            ecal.report_health()
+        except Exception as e:
+            print(f"      ⚠️ calendar health check failed: {e}")
     if err and _EARN_STATS.get("last_error"):
         print(f"      last error: {_EARN_STATS['last_error']}")
     if not ok and (empty or err):
-        print("      ⚠️ Yahoo returned NO earnings dates this scan — every "
-              "position without an override reads as SAFE. Check the feed.")
+        print("      ⚠️ NO earnings dates resolved this scan — every position "
+              "without an override reads as SAFE, which silently disables the "
+              "CC earnings gates and EARNINGS WARNING. Check the sources.")
     for _k, _msg in (("stale_override", "override date in the past — update it"),
                      ("bad_override",   "override not YYYY-MM-DD")):
         if _EARN_STATS[_k]:
@@ -4566,6 +4601,17 @@ def run_scanner():
     print(f"{'='*60}\n")
 
     global PORTFOLIO_SIZE
+
+    # Earnings calendar: no-ops unless the cache wasn't built today (the
+    # pre-open earnings watcher normally builds it), so this is free on most
+    # scans and self-heals if that run failed.
+    if ecal is not None:
+        try:
+            if ecal.refresh_needed():
+                print("📅 Refreshing earnings calendar...")
+                ecal.refresh(tickers=list(SYMBOL_SETTINGS.keys()))
+        except Exception as e:
+            print(f"   ⚠️ earnings calendar refresh failed: {e}")
 
     print("📊 IBKR positions...")
     ibkr     = get_ibkr_positions()
