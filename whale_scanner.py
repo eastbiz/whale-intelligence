@@ -3269,10 +3269,18 @@ def get_max_alloc(ticker: str) -> float:
     else:                            return 0.025
 
 
-def find_best_csp(ticker, price, contracts, ivdata, pir, quality, sizing=None, market_weak=False) -> tuple:
+def find_best_csp(ticker, price, contracts, ivdata, pir, quality, sizing=None, market_weak=False,
+                  buy_under=0) -> tuple:
     """
     Find best cash-secured put opportunity.
     Returns (csp_dict, timing_dict) or (None, {})
+
+    buy_under: per-symbol max effective entry (strike - premium). 0 = no limit.
+      CRITICAL (A24/EX-20): this path feeds TELEGRAM. It previously had no
+      buy_under awareness at all — only the dashboard's csp_engine enforced it —
+      so Telegram recommended CSPs whose assignment price was well ABOVE John's
+      buy target (TSM $370 put = $358 effective vs a $320 target). Same 3%
+      grace as csp_engine so the two paths agree.
     """
     if not contracts: return None, {}
 
@@ -3299,6 +3307,11 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality, sizing=None, m
             spread_pct = (ask - bid) / ask if ask > 0 else 1.0
             mid    = bid + (ask - bid) * 0.25 if spread_pct > 0.30 else (bid + ask) / 2
             if mid < 0.10: continue
+
+            # Buy-under gate (A24) — assignment price must respect the target.
+            # Matches csp_engine's rule so dashboard and Telegram never disagree.
+            if buy_under > 0 and round(strike - mid, 2) > buy_under * 1.03:
+                continue
 
             # Use real delta from Schwab if available
             delta  = float(c.get("delta", 0) or 0)
@@ -4214,8 +4227,12 @@ def fmt_quality(q) -> str:
         lines.append(f"🚨 Earnings in {earn}d — HARD STOP")
     elif earn_status == "warning":
         lines.append(f"⚠️ Earnings in {earn}d — caution")
-    elif earn and earn > 0:
+    elif earn and 0 < earn < 900:
         lines.append(f"✅ Earnings in {earn}d — safe")
+    elif earn and earn >= 900:
+        # 999 is the "no earnings date available" sentinel (C13 coverage gap) —
+        # never print it as a real number, and don't claim "safe" when unknown.
+        lines.append("• Earnings date unknown — verify before trading")
 
     # MA50 extension
     if q.get("ma50_extended"):
@@ -4258,7 +4275,9 @@ def fmt_csp(opp) -> str:
         f"  {fmt_quality(q)}",
         *([f"  {opp['darkpool']['label']}"]
            if opp.get('darkpool',{}).get('show') else []),
-        f"  [{opp['tier']}] {s['tier']} tier | Max: {s['max_pct']}% (${PORTFOLIO_SIZE*s['max_pct']/100:,.0f})",
+        (f"  {opp['tier']} tier | Max: {s['max_pct']}% (${PORTFOLIO_SIZE*s['max_pct']/100:,.0f})"
+         if str(opp['tier']) == str(s['tier']) else
+         f"  [{opp['tier']}] {s['tier']} tier | Max: {s['max_pct']}% (${PORTFOLIO_SIZE*s['max_pct']/100:,.0f})"),
         f"  Sell Put ${opp['csp']['strike']} | {opp['csp']['expiry']} | {opp['csp']['dte']} DTE",
         f"  Bid ${opp['csp']['bid']} / Ask ${opp['csp']['ask']}",
         f"  {opp['csp']['otm_pct']}% OTM | {iv_label(opp['csp']['ivp'], opp['ticker'])}{d}",
@@ -4430,7 +4449,9 @@ def fmt_drop_csp(opp) -> str:
         f"  δ{d['delta']} | Premium: {d['prem_pct']}% of strike",
         f"  Annualized: {d['annualized_return']}% | ${d['premium']/d['dte']:.2f}/day",
         f"  Collateral: ${d['collateral']:,.0f} | {d['max_contracts']} contracts (reduced size)",
-        f"  [{opp['tier']}] {s['tier']} tier | Room: ${s['room_usd']:,.0f}",
+        (f"  {opp['tier']} tier | Room: ${s['room_usd']:,.0f}"
+         if str(opp['tier']) == str(s['tier']) else
+         f"  [{opp['tier']}] {s['tier']} tier | Room: ${s['room_usd']:,.0f}"),
         "",
         f"  ✅ _Favorable if: market selloff, sector rotation, profit taking_",
         f"  ❌ _Avoid if: earnings miss, guidance cut, broken trend_",
@@ -5054,7 +5075,8 @@ def run_scanner():
             q_adjusted = dict(quality)
             if gng.get("spy_warning"):
                 q_adjusted["quality_score"] = max(0, quality["quality_score"] - 1)
-            csp, _ = find_best_csp(ticker, price, contracts, ivdata, pir, q_adjusted, sizing=sizing, market_weak=spy_regime.get('market_weak', False))
+            csp, _ = find_best_csp(ticker, price, contracts, ivdata, pir, q_adjusted, sizing=sizing, market_weak=spy_regime.get('market_weak', False),
+                                   buy_under=SYMBOL_SETTINGS.get(ticker, {}).get('buy_under', 0))
             if csp:
                 # below_min trades still shown but scored lower
                 score_mult = 0.5 if csp.get("below_min") else 1.0

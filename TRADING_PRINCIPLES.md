@@ -258,6 +258,15 @@ to stabilize (that was the old LEAPS-engine philosophy, explicitly removed).
   labels become "IV 22% (IVP 33% of 1yr)" — no further change needed. Scoring
   still consumes the legacy `ivp` field unchanged (deliberate: relabel first,
   re-tune scoring only after real percentiles exist). Built 2026-07-31.
+- **A24 — buy_under gate on the Telegram CSP path (P27/EX-20).**
+  `find_best_csp()` had no buy_under awareness, so Telegram recommended CSPs
+  with assignment prices above John's target (TSM $358 effective vs $320
+  target). Now enforces `strike − premium ≤ buy_under × 1.03`, matching
+  csp_engine exactly so the two pipelines agree. Built 2026-08-03.
+- **A25 — alert display fixes.** The 999 "earnings unknown" sentinel no longer
+  prints as "Earnings in 999d — safe" (now "Earnings date unknown — verify
+  before trading" — honest, and doesn't claim safety it can't verify);
+  "Core Core tier" duplication removed from CSP/LEAPS alerts. Built 2026-08-03.
 
 ### P13 — Past trades on the same name are entry context (the "personal premium book")
 When repeating an action (CSP/CC on a name I've traded before), I look at my
@@ -413,6 +422,18 @@ vs this ticker's own past year) — that's the number I'm used to and trade on.
   and daily ATM IV is banked per ticker so a TRUE percentile switches on
   automatically at 60 samples/ticker: "IV 22% (IVP 33% of 1yr)".
 
+### P27 — A CSP alert is only valid if assignment respects my buy target
+The whole point of a CSP is getting paid to buy at a price I want. If the
+effective entry (strike − premium) sits above my buy_under, the trade
+contradicts its own purpose — no matter how good the annualized return looks.
+Being near 52-week highs makes it worse, not better.
+- Evidence: EX-20 — Telegram pushed a TSM $370 put (effective entry $358.45)
+  while John's TSM buy target is $320, 12% lower. John: "it's not close to buy
+  below. It is actually near the highs, as you comment yourself. Why is this a
+  good opportunity to write a CSP?"
+- System status: **Actioned — A24.** `find_best_csp` (the Telegram path) now
+  enforces the same buy_under rule csp_engine always had.
+
 ### P16 — LEAPS are long-term investments, exempt from event-day logic
 The deep-ITM LEAPS (e.g. 10× CLS Jan'28 $180) are stock replacement held for
 years. Earnings calls don't factor into them — no trimming logic, no P15
@@ -488,6 +509,30 @@ positions only.
   stayed over 5%. Distilled into P17; gate calibrated so that every alert he
   acted on (PATH, CLS ×2, NBIS $180 swing) passes and both NBIS noise alerts
   fail (9/9 test cases).
+
+### EX-20 — TSM CSP alert above the buy target: Telegram path had no gate (2026-08-03)
+- Alert: CSP TSM @ $406.86, sell $370 put, 45 DTE, 25.3% annualized, δ0.26,
+  39 contracts / $1.44M collateral. John challenged it: TSM is nowhere near his
+  $320 buy target and the alert's own text said "near 52w high."
+- He was right, and the numbers are stark: effective entry = $370 − $11.55 =
+  **$358.45**, which is **12% ABOVE** his $320 buy target. csp_engine (the
+  dashboard path) would have hard-skipped it — its limit is $320 × 1.03 =
+  $329.60.
+- **Root cause — the C9 pipeline split again, now on the CSP side.**
+  `find_best_csp()` feeds Telegram and had **no buy_under parameter at all**;
+  only the dashboard's `csp_engine()` enforced the rule. So Telegram could
+  recommend CSPs whose assignment price violated the core target, indefinitely.
+  This is the third instance of the same class (EX-17 CC shares, EX-15 dashboard
+  mismatch) — different pipelines computing different answers.
+- Fixed as A24 (buy_under gate, same 3% grace as csp_engine, so both paths now
+  agree). Verified against the real chain: the $370 and $340 puts are blocked;
+  $330 and below pass.
+- Two display bugs in the same alert, also fixed (A25): "✅ Earnings in 999d —
+  safe" — 999 is the *no earnings date known* sentinel (C13) being printed as a
+  real number AND labelled safe; and "Core Core tier" duplication.
+- Unresolved contradiction noted: the alert simultaneously said "near 52w high"
+  (timing_score) and "23.1% off highs" (quality) — two different measures
+  disagreeing in one message. Logged as C14.
 
 ### EX-19 — "IVP 58%" vs the broker's 29%: the label was fake (2026-07-31)
 - John on the AMZN CC card: "I actually see IVP at 29% for AMZN so I think
@@ -883,6 +928,12 @@ without leaning on hand-maintained price targets:
   CC-at-target / convexity A/B). Remove "consider CSP/LEAPS/CC" and "X% away".
 - Revises A16 (which over-gated on IN_ZONE only). Awaiting John's sign-off on
   the bucket thresholds + the net-move-vs-1-day trigger.
+
+### C14 — "near 52w high" vs "23.1% off highs" contradiction
+The TSM alert (EX-20) said both in one message: `timing_score` called it "near
+52w high" while `quality` reported 23.1% off the high. Two different distance
+measures with different reference points, printed side by side. At minimum they
+should agree; at best one should be removed. Found 2026-08-03.
 
 ### C13 — get_earnings_date coverage gaps
 `get_earnings_date("AMZN")` returned None for a mega-cap with a known earnings
