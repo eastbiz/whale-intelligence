@@ -76,10 +76,16 @@ independently.**
   interpretation only (guidance, segment detail, why it moved) via the
   server-side `web_search` tool. A confident-but-wrong number is the worst
   output this system can produce; the model is never the source of one.
-  **Scope:** names with an open short option + watchlist names within
-  `EARN_NEAR_TARGET_PCT` (15%) of buy_under/sell_above. `EARN_SCOPE_ALL = True`
-  widens to all 32. `EARN_MAX_PER_RUN` (6) caps Claude calls per run.
+  **Scope:** `EARN_SCOPE_ALL = True` — every watchlist name, which is what John
+  tracks by hand. Set it False to narrow to held short options + names within
+  `EARN_NEAR_TARGET_PCT` (15%) of buy_under/sell_above; that narrower gate was
+  the original default and it silently dropped PLTR on the first live run
+  (mid-band between buy 85 / sell 160), so don't re-enable it without checking
+  which names it excludes. `EARN_MAX_PER_RUN` (6) caps Claude calls per run.
   Dedup: one report per ticker per earnings date (`earnings_watcher_state.json`).
+  Out-of-scope names are deliberately NOT written to that state — recording
+  them would make a later scope change unable to surface a skipped report.
+  Runtime: ~100s per report (the web-search call dominates).
   NO Schwab/IBKR calls. Needs `ANTHROPIC_API_KEY` (already a repo secret) and
   `pip install anthropic` in the workflow.
 - **Earnings calendar** (`earnings_calendar.py`, cache `earnings_calendar.json`):
