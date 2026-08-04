@@ -50,8 +50,13 @@ import requests
 import earnings_calendar as ecal
 
 # ── tunables ─────────────────────────────────────────────────────────────
+# Scope. EARN_SCOPE_ALL covers every watchlist name, which is what John
+# actually tracks by hand — the first live run filtered PLTR out because it sat
+# mid-band between buy_under $85 and sell_above $160, and PLTR was one of the
+# two reports he asked for by name. Set this False to fall back to the narrower
+# gate: held positions + names within EARN_NEAR_TARGET_PCT of a target.
 EARN_NEAR_TARGET_PCT = 15.0   # watchlist name within this % of a target is in scope
-EARN_SCOPE_ALL       = False  # True = report on every watchlist ticker
+EARN_SCOPE_ALL       = True   # True = report on every watchlist ticker
 EARN_MAX_PER_RUN     = 6      # hard cap on Claude calls per run (cost guard)
 
 STATE_FILE   = "earnings_watcher_state.json"
@@ -520,10 +525,11 @@ def main():
         quote = yahoo_quote(tk)
         ok, reason = in_scope(tk, targets, short_pos, quote)
         if not ok:
+            # Deliberately NOT persisted: recording "out of scope" would mean a
+            # later scope change (or a price that moves into range before the
+            # next run) could never surface that report. Re-evaluating costs one
+            # Yahoo quote on a twice-daily job.
             print(f"  {tk}: reported but not in scope (no position, far from targets)")
-            # Mark it so we don't re-evaluate every run for the same report.
-            alerted[key] = "out_of_scope"
-            changed = True
             continue
 
         print(f"  {tk}: in scope ({reason}) — building report")
