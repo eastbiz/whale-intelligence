@@ -2,13 +2,17 @@
   "date": "2026-08-04",
   "alerted": {
     "CLS:up": 5,
-    "PLTR:up": 25
+    "PLTR:up": 25,
+    "SPCX:up": 5
   },
   "scan_triggered": {
-    "PLTR:up": true
+    "PLTR:up": true,
+    "CRDO:up": true,
+    "MU:up": true
   },
-  "scan_trigger_count": 1,
+  "scan_trigger_count": 2,
   "dispatched": {
-    "13:47": true
+    "13:47": true,
+    "16:41": true
   }
 }
