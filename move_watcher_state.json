@@ -3,14 +3,17 @@
   "alerted": {
     "CLS:up": 5,
     "PLTR:up": 25,
-    "SPCX:up": 5
+    "SPCX:up": 5,
+    "PATH:up": 5
   },
   "scan_triggered": {
     "PLTR:up": true,
     "CRDO:up": true,
-    "MU:up": true
+    "MU:up": true,
+    "CLS:up": true,
+    "SPCX:up": true
   },
-  "scan_trigger_count": 2,
+  "scan_trigger_count": 3,
   "dispatched": {
     "13:47": true,
     "16:41": true
