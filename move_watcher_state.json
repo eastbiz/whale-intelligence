@@ -1,16 +1,14 @@
 {
-  "date": "2026-08-03",
+  "date": "2026-08-04",
   "alerted": {
-    "AMZN:up": 5,
-    "MSFT:up": 5
+    "CLS:up": 5,
+    "PLTR:up": 25
   },
   "scan_triggered": {
-    "NBIS:up": true
+    "PLTR:up": true
   },
   "scan_trigger_count": 1,
   "dispatched": {
-    "13:47": true,
-    "16:41": true,
-    "18:47": true
+    "13:47": true
   }
 }
