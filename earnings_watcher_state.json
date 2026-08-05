@@ -1,8 +1,10 @@
 {
   "alerted": {
     "GRAB:2026-08-03": true,
+    "NVO:2026-08-05": true,
     "PLTR:2026-08-03": true,
     "POWL:2026-08-03": true,
-    "SPCX:2026-08-04": true
+    "SPCX:2026-08-04": true,
+    "UBER:2026-08-05": true
   }
 }
