@@ -253,7 +253,12 @@ CC_EARNINGS_BUFFER_DAYS = 5
 # the NET 5-day move clears the bar for that stock's volatility class — scaled
 # by bucket (stable) not by hand-maintained price targets, and on the 5-day net
 # (not 1-day) so a round-trip cancels out. Values are |5d %|.
-NOTABLE_5D_BY_BUCKET  = {"A": 8.0, "B": 10.0, "C": 13.0, "D": 18.0}
+NOTABLE_5D_BY_BUCKET  = {"A": 12.0, "B": 15.0, "C": 20.0, "D": 28.0}
+# Hard cap on the NOTABLE MOVES list. In a broad rally the bucket bars alone let
+# 13-14 names through (EX-21), which turns a signal into a browse list. Only the
+# N most extreme moves are shown; target-triggered (IN_ZONE) names are always
+# kept because those are actionable GO signals, not just big numbers.
+NOTABLE_MAX_LINES     = 5
 # ── LEAPS "buy the dip" (P12 + P7, EX-8) ─────────────────────────────────
 # John rejects "wait for the falling knife to stop" for LEAPS: a big drop on
 # CHEAP IV is a buy-cheap-optionality entry NOW, and he takes the follow-on
@@ -4964,14 +4969,33 @@ def run_scanner():
         _line = f"{_icon} *{_tk}* {_move_str}{_ctx}"
         if _etag:
             _line += f"\n  {_etag.strip()}"
-        _move_alerts.append((_c1, _is_drop, _line))
+        _tgt_trig = bool(_csp_in or _cc_in)
+        _move_alerts.append((_c1, _is_drop, _line, _tgt_trig, abs(_c5)))
 
     if _move_alerts:
-        # Sort: big drops first, then big rises
-        _move_alerts.sort(key=lambda x: (0 if x[1] else 1, x[0]))
-        briefing += "\n━━━ NOTABLE MOVES ━━━\n"
-        for _, _, _line in _move_alerts:
-            briefing += f"{_line}\n"
+        # Cap the list (EX-21): always keep target-triggered GO signals, then
+        # fill remaining slots with the largest 5-day moves. Dedupe names that
+        # already appeared in the CSP/CC opportunity sections above.
+        _already = set()
+        for _a in (_alerts_csp + _alerts_cc):
+            for _t in ALL_TICKERS:
+                if f"{_t} " in _a or f"*{_t}*" in _a:
+                    _already.add(_t)
+        _rows = [r for r in _move_alerts
+                 if not any(f"*{t}*" in r[2] for t in _already)]
+        _forced = [r for r in _rows if r[3]]
+        _rest   = sorted([r for r in _rows if not r[3]],
+                         key=lambda x: -x[4])[:max(0, NOTABLE_MAX_LINES - len(_forced))]
+        _show   = _forced + _rest
+        _hidden = len(_move_alerts) - len(_show)
+        # Big drops first, then big rises
+        _show.sort(key=lambda x: (0 if x[1] else 1, x[0]))
+        if _show:
+            briefing += "\n━━━ NOTABLE MOVES ━━━\n"
+            for _r in _show:
+                briefing += f"{_r[2]}\n"
+            if _hidden > 0:
+                briefing += f"_+{_hidden} smaller moves — see dashboard_\n"
 
     # ── Earnings this week — positions at risk ────────────────
     _earn_alerts = []

@@ -258,6 +258,11 @@ to stabilize (that was the old LEAPS-engine philosophy, explicitly removed).
   labels become "IV 22% (IVP 33% of 1yr)" — no further change needed. Scoring
   still consumes the legacy `ivp` field unchanged (deliberate: relabel first,
   re-tune scoring only after real percentiles exist). Built 2026-07-31.
+- **A26 — NOTABLE MOVES tightened + capped (EX-21).** Bucket 5-day bars raised
+  A8/B10/C13/D18 → A12/B15/C20/D28; hard cap `NOTABLE_MAX_LINES` = 5 (IN_ZONE
+  target-triggered rows always kept, remainder = largest moves, "+N smaller
+  moves" footer); deduped against the CSP/CC opportunity sections above.
+  14 → 5 lines on the Aug 5 message. Built 2026-08-05.
 - **A24 — buy_under gate on the Telegram CSP path (P27/EX-20).**
   `find_best_csp()` had no buy_under awareness, so Telegram recommended CSPs
   with assignment prices above John's target (TSM $358 effective vs $320
@@ -509,6 +514,26 @@ positions only.
   stayed over 5%. Distilled into P17; gate calibrated so that every alert he
   acted on (PATH, CLS ×2, NBIS $180 swing) passes and both NBIS noise alerts
   fail (9/9 test cases).
+
+### EX-21 — NOTABLE MOVES ballooned to 14 names in a rally (2026-08-05)
+- Aug 5 briefing listed 14 names under NOTABLE MOVES (AAPL, NVO, CRDO, PLTR,
+  NBIS, PATH, TSM, MSFT, AMZN, FIX, POWL, GOOGL, MU, NVDA). John: "too many —
+  I would like to see just the more notable."
+- Cause: not a bug — a broad rally. The A18 bucket bars (A8/B10/C13/D18 on the
+  net 5-day move) are calibrated for a normal tape; when most of the watchlist
+  is up 10-30% over five days, nearly everything clears its bar at once. A
+  move-magnitude rule alone has no ceiling on output.
+- Fix (A26), three parts: (1) raise the bars to A12/B15/C20/D28; (2) hard-cap
+  the list at `NOTABLE_MAX_LINES` = 5, keeping target-triggered (IN_ZONE) rows
+  unconditionally and filling the rest with the largest 5-day moves, with a
+  "+N smaller moves — see dashboard" footer so nothing is silently lost;
+  (3) dedupe against the CSP/CC opportunity sections — PATH appeared twice in
+  the same message (once as a CC alert, once as a notable move).
+- Result on the real message: 14 → 5 lines (NBIS +49.8, PLTR +29.6, CRDO +29.5,
+  MSFT +25.6, MU +23.8), PATH deduped.
+- Design note: a cap is the structural fix a threshold can't provide — it makes
+  the message length bounded regardless of market conditions, which is what
+  P22 ("Telegram = go sit at the computer") actually requires.
 
 ### EX-20 — TSM CSP alert above the buy target: Telegram path had no gate (2026-08-03)
 - Alert: CSP TSM @ $406.86, sell $370 put, 45 DTE, 25.3% annualized, δ0.26,
