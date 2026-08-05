@@ -1,7 +1,7 @@
 {
   "date": "2026-08-05",
   "alerted": {
-    "SPCX:down": 5,
+    "SPCX:down": 10,
     "UBER:down": 5
   },
   "scan_triggered": {
