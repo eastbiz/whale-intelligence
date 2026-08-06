@@ -258,6 +258,13 @@ to stabilize (that was the old LEAPS-engine philosophy, explicitly removed).
   labels become "IV 22% (IVP 33% of 1yr)" — no further change needed. Scoring
   still consumes the legacy `ivp` field unchanged (deliberate: relabel first,
   re-tune scoring only after real percentiles exist). Built 2026-07-31.
+- **A27 — scan timeout raised + phase instrumentation + calendar cache
+  persisted (EX-22).** `timeout-minutes` 15 → 25 in scanner.yml; `_phase()`
+  prints elapsed time at start / IBKR done / market data done / per-ticker
+  chain scan / dashboard pass / results write, so a future hang is located
+  from the last line printed; scanner.yml now commits `earnings_calendar.json`
+  (previously only earnings-watcher.yml did, so a scanner-first-of-day run
+  redid the whole Nasdaq sweep and discarded it). Built 2026-08-06.
 - **A26 — NOTABLE MOVES tightened + capped (EX-21).** Bucket 5-day bars raised
   A8/B10/C13/D18 → A12/B15/C20/D28; hard cap `NOTABLE_MAX_LINES` = 5 (IN_ZONE
   target-triggered rows always kept, remainder = largest moves, "+N smaller
@@ -514,6 +521,32 @@ positions only.
   stayed over 5%. Distilled into P17; gate calibrated so that every alert he
   acted on (PATH, CLS ×2, NBIS $180 swing) passes and both NBIS noise alerts
   fail (9/9 test cases).
+
+### EX-22 — Two scans killed by the 15-min timeout (2026-08-06)
+- John: "the last few scans were failures." Both Aug 6 scheduled runs (15:57
+  and 18:14 UTC) ended `cancelled` after 15.1 and 15.8 minutes — the
+  `timeout-minutes: 15` kill, not a crash. The 13:53 dispatch that day
+  succeeded in 2.7 min, which is the normal duration (recent runs: 2.6-3.0 min
+  for a full scan, 0.2 min for a schedule run that skips as redundant).
+- So the scan HUNG for ~12 extra minutes rather than gradually slowing.
+  **Root cause not identified** — GitHub does not retain logs for jobs killed
+  by timeout (both job-log fetches returned HTTP 404), so there is no record of
+  where it stalled. Ruled out: earnings-calendar lookups (`load_cache` is
+  memoized, 30 lookups = 0.002s) and the Nasdaq sweep for those two runs (the
+  cache was already built that day at 13:10 by the earnings-watcher, so
+  `refresh_needed()` was False).
+- Remaining suspects (unproven): a Schwab/Yahoo call hanging without an
+  effective timeout during the per-ticker chain loop, or Schwab auth
+  degradation — the token has a 7-day expiry and the last known refresh was
+  around 2026-07-31.
+- Actions (A27): raise the job timeout 15 → 25 min so a merely-slow scan
+  completes instead of dying; add `_phase()` timing prints at every major
+  stage so the NEXT occurrence names the culprit in the log; and commit
+  `earnings_calendar.json` from scanner.yml — it was rebuilt (~38 Nasdaq
+  requests, worst case ~10 min) and then thrown away on any run where the
+  scanner is first that day, which is a genuine timeout risk in its own right.
+- Lesson: a timeout kill destroys its own evidence. Instrument BEFORE the next
+  failure, not after.
 
 ### EX-21 — NOTABLE MOVES ballooned to 14 names in a rally (2026-08-05)
 - Aug 5 briefing listed 14 names under NOTABLE MOVES (AAPL, NVO, CRDO, PLTR,

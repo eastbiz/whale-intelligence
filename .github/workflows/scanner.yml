@@ -36,7 +36,10 @@ permissions:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 15  # kill hung runs — scanner should complete in under 8 min
+    # Normal scan is ~3 min. Two runs on 2026-08-06 hung and were killed at
+    # 15 min with no retained logs. Raised so a merely-slow scan finishes and
+    # leaves diagnosable output; phase timings now print inside the scanner.
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -78,6 +81,7 @@ jobs:
           if [ -f results.json ]; then
             git add -f results.json
             [ -f iv_history.json ] && git add -f iv_history.json
+            [ -f earnings_calendar.json ] && git add -f earnings_calendar.json
             [ -f exposure_history.json ] && git add -f exposure_history.json
             if git diff --staged --quiet; then
               echo "No changes to commit"

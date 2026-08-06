@@ -4593,6 +4593,20 @@ def skip_redundant_scheduled_run(max_age_min: int = 100) -> bool:
         return False
 
 
+def _phase(label: str, _t=[None]) -> None:
+    """Print elapsed time per scan phase. Two scans hung on 2026-08-06 and were
+    killed by the job timeout with no retained logs, so there was no way to see
+    WHERE it stalled. Every major phase now timestamps itself; the last line
+    printed before a kill identifies the culprit."""
+    import time as _time
+    now = _time.time()
+    if _t[0] is None:
+        _t[0] = now
+        print(f"   ⏱  {label} (t=0.0s)")
+    else:
+        print(f"   ⏱  {label} (t={now - _t[0]:.1f}s)")
+
+
 def run_scanner():
     global _IV_HISTORY
     _IV_HISTORY = load_iv_history()
@@ -4618,6 +4632,7 @@ def run_scanner():
         except Exception as e:
             print(f"   ⚠️ earnings calendar refresh failed: {e}")
 
+    _phase("start")
     print("📊 IBKR positions...")
     ibkr     = get_ibkr_positions()
 
@@ -4657,6 +4672,7 @@ def run_scanner():
 
     stk_hold = {k:v for k,v in ibkr.items() if v.get("asset_class")=="STK"}
     all_tickers = ALL_TICKERS
+    _phase("IBKR done")
     print(f"💹 Market data ({len(all_tickers)} stocks)...")
     # Use Schwab for real-time quotes if available, else Yahoo Finance
     schwab_quotes = schwab_get_quotes(all_tickers) if SCHWAB_APP_KEY else {}
@@ -5037,6 +5053,7 @@ def run_scanner():
     qty_cache = {}
     avg_cache = {}
 
+    _phase("market data done — starting per-ticker chain scan")
     print(f"\n🔍 Scanning {len(all_tickers)} stocks...")
     for ticker in all_tickers:
         # Determine tier
@@ -5764,6 +5781,7 @@ def run_scanner():
     dashboard_leaps = []
     dashboard_convexity = []
 
+    _phase("telegram sent — starting dashboard pass")
     for ticker in all_tickers:
         if ticker in CORE_STOCKS:        tier = "Core"
         elif ticker in GROWTH_STOCKS:    tier = "Growth"
@@ -7108,6 +7126,7 @@ def run_scanner():
     save_iv_history(schwab_ivp_cache)
     report_earnings_feed()
 
+    _phase("dashboard pass done — writing results")
     with open("results.json","w") as f:
         json.dump(results, f, indent=2)
     print("   💾 results.json saved")
