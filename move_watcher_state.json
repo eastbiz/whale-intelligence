@@ -3,7 +3,7 @@
   "alerted": {
     "NOW:up": 5,
     "PATH:up": 5,
-    "PLTR:up": 5,
+    "PLTR:up": 10,
     "SPCX:up": 5
   },
   "dispatched": {
@@ -13,7 +13,8 @@
   },
   "scan_triggered": {
     "PLTR:up": true,
-    "SPCX:up": true
+    "SPCX:up": true,
+    "CRDO:up": true
   },
-  "scan_trigger_count": 1
+  "scan_trigger_count": 2
 }
