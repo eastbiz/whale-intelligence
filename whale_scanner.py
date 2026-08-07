@@ -2276,6 +2276,29 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
         dist_to_breakeven  = round((breakeven - underlying) / underlying * 100, 1) if underlying > 0 else 99
         dist_to_strike     = round((strike - underlying) / underlying * 100, 1) if underlying > 0 else 99
 
+    # ── Assignment / call-away odds (A28) ──────────────────────────────
+    # |delta| IS the market's probability the option finishes ITM — i.e. the
+    # odds of assignment (CSP) or being called away (CC). It folds distance,
+    # volatility AND time-remaining into one number, which raw dist_to_strike
+    # cannot: 15% OTM on NBIS at 30 DTE is ~20% odds, the same 15% on MSFT at
+    # 10 DTE is ~2%. This is the triage signal John asked for — high odds =
+    # urgency, low odds = ignore even after a big move (EX-23).
+    assign_odds = round(abs(pos.get("pos_delta", 0) or 0) * 100, 1)
+    odds_est = False
+    if assign_odds <= 0 and underlying > 0 and strike > 0 and dte > 0:
+        # No chain contract (stale-mark path) — estimate, and say so.
+        try:
+            _iv = pos.get("atm_iv", 0.35) or 0.35
+            _d = estimate_delta(underlying, strike, dte, _iv,
+                                "P" if pos_type == "CSP" else "C")
+            if _d:
+                assign_odds = round(abs(_d) * 100, 1)
+                odds_est = True
+        except Exception:
+            pass
+    odds_txt = (f" Assignment odds ~{assign_odds:.0f}%{'  (est)' if odds_est else ''}."
+                if assign_odds > 0 else "")
+
     # ── Mark credibility check ─────────────────────────────────────────
     # Guard against STALE marks only. A live chain NBBO fetched this scan is
     # trusted as-is: on extreme-vol names (NBIS, CRDO, CLS) a put 30%+ OTM can
@@ -2364,6 +2387,8 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
             "earn_zone":       earn_zone,
             "earn_days":       earn_days,
             "mark_src":        mark_src,
+            "assign_odds":     assign_odds,   # % chance of assignment/call-away
+            "assign_odds_est": odds_est,
             "prev_profit_pct": prev_profit,
             "sort_priority":   priority.get(action, 4),
         }
@@ -2396,7 +2421,7 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
                  f"{ticker} {_move_desc} — your {pos_type} ${strike:g} is {_pos_ctx}, "
                  f"now at {_pl_txt} (${_close_cost:,.0f} to close, {dte}d left). "
                  f"Big move — review whether to close before it reverses."
-                 + pnl_swing_txt + earn_note + tp_note)
+                 + odds_txt + pnl_swing_txt + earn_note + tp_note)
 
     # ── P&L SWING — the position itself recovered hard since last scan ─
     # Catches "hugely negative yesterday → positive/breakeven today" even when
@@ -2411,14 +2436,14 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
                  + pnl_swing_txt +
                  f" Now {_pos_ctx}, ${_close_cost:,.0f} to close, {dte}d left — "
                  f"exit window if you don't want this position."
-                 + earn_note + tp_note)
+                 + odds_txt + earn_note + tp_note)
 
     # ── TAKE PROFIT ────────────────────────────────────────────────────
     # Act now — premium has decayed enough, risk/reward favours closing
     if profit_pct >= take_profit_threshold:
         return R("TAKE PROFIT",
                  f"{profit_pct}% profit captured — close now before reversal "
-                 f"(threshold: {take_profit_threshold:.0f}%)")
+                 f"(threshold: {take_profit_threshold:.0f}%)." + odds_txt)
 
     # ── EARNINGS WARNING ───────────────────────────────────────────────
     # Heads up only — decision is yours, but you need to know
@@ -2430,10 +2455,10 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
     # ── HOLD ───────────────────────────────────────────────────────────
     if pos_type == "CSP":
         return R("HOLD", f"{profit_pct}% profit, DTE {dte}, breakeven ${breakeven:.2f} "
-                         f"({dist_to_breakeven}% cushion)")
+                         f"({dist_to_breakeven}% cushion)." + odds_txt)
     else:
         return R("HOLD", f"{profit_pct}% profit, DTE {dte}, "
-                         f"{dist_to_strike}% below call strike ${strike:.2f}")
+                         f"{dist_to_strike}% below call strike ${strike:.2f}." + odds_txt)
 
 
 def score_leaps(opp: dict) -> int:
@@ -6895,6 +6920,7 @@ def run_scanner():
         _expiry = _pos.get("expiry", "")
         _mark = 0
         _mark_src = "none"
+        _pos_delta = 0.0     # |delta| = market's assignment probability (A28)
         # Normalize expiry to YYYY-MM-DD for comparison
         _exp_norm = str(_expiry).replace("-","")[:8]  # YYYYMMDD
         for _c in _contracts_opt:
@@ -6907,6 +6933,7 @@ def run_scanner():
                 if _a > 0:
                     _mark = (_b + _a) / 2 if _b > 0 else _a
                     _mark_src = "chain"
+                    _pos_delta = abs(float(_c.get("delta", 0) or 0))
                 break
         # If still 0, find closest strike
         if _mark == 0:
@@ -6919,6 +6946,7 @@ def run_scanner():
                 if _a > 0:
                     _mark = (_b + _a) / 2 if _b > 0 else _a
                     _mark_src = "chain_near"
+                    _pos_delta = abs(float(_c.get("delta", 0) or 0))
         # Final fallback: use mark derived from IBKR market_value (may be stale)
         if _mark == 0:
             _mark = _pos.get("mark_from_mv", 0)
@@ -6931,7 +6959,8 @@ def run_scanner():
                                   str(_expiry)[:10]))
         _result = position_management_engine(
             {**_pos, "type": "CSP", "tier": _tier, "mark": _mark, "mark_src": _mark_src,
-             "days_to_earnings": _earn_days, "prev_profit_pct": _prev_pp},
+             "days_to_earnings": _earn_days, "prev_profit_pct": _prev_pp,
+             "pos_delta": _pos_delta},
             mkt, PORTFOLIO_SIZE, _total_cso, _spy_day
         )
         _pos_actions.append({
@@ -6977,6 +7006,7 @@ def run_scanner():
         # intraday move. Fall back to the stale mark only if no chain quote.
         _mark_cc = 0
         _mark_src = "none"
+        _pos_delta = 0.0     # |delta| = market's call-away probability (A28)
         _contracts_opt = contracts_cache.get(_ticker, [])
         _exp_norm_cc = str(_expiry).replace("-","")[:8]
         for _c in _contracts_opt:
@@ -6989,6 +7019,7 @@ def run_scanner():
                 if _a > 0:   # need a real ask for a usable mark
                     _mark_cc = (_b + _a) / 2 if _b > 0 else _a
                     _mark_src = "chain"
+                    _pos_delta = abs(float(_c.get("delta", 0) or 0))
                 break
         if _mark_cc <= 0:
             # Fallback: position feed market-value mark (may be stale)
@@ -7000,7 +7031,8 @@ def run_scanner():
                                   str(_expiry)[:10]))
         _result = position_management_engine(
             {**_pos, "type": "CC", "tier": _tier, "mark": _mark_cc, "mark_src": _mark_src,
-             "days_to_earnings": _earn_days, "prev_profit_pct": _prev_pp},
+             "days_to_earnings": _earn_days, "prev_profit_pct": _prev_pp,
+             "pos_delta": _pos_delta},
             mkt, PORTFOLIO_SIZE, _total_cso, _spy_day
         )
         _pos_actions.append({

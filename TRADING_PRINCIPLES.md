@@ -258,6 +258,12 @@ to stabilize (that was the old LEAPS-engine philosophy, explicitly removed).
   labels become "IV 22% (IVP 33% of 1yr)" — no further change needed. Scoring
   still consumes the legacy `ivp` field unchanged (deliberate: relabel first,
   re-tune scoring only after real percentiles exist). Built 2026-07-31.
+- **A28 — assignment odds on position alerts (P28/EX-23).** Captures |delta|
+  from the position's chain contract (both CSP and CC paths) and surfaces it as
+  "Assignment odds ~X%" in the alert reason line — visible on Telegram AND the
+  dashboard Actions tab. Estimated via `estimate_delta()` and marked "(est)"
+  when no chain contract is available. Display only; no gating changed.
+  Built 2026-08-07.
 - **A27 — scan timeout raised + phase instrumentation + calendar cache
   persisted (EX-22).** `timeout-minutes` 15 → 25 in scanner.yml; `_phase()`
   prints elapsed time at start / IBKR done / market data done / per-ticker
@@ -446,6 +452,24 @@ Being near 52-week highs makes it worse, not better.
 - System status: **Actioned — A24.** `find_best_csp` (the Telegram path) now
   enforces the same buy_under rule csp_engine always had.
 
+### P28 — Triage position alerts by assignment odds (delta), not distance
+The first question on any position alert is "how likely am I actually to be
+assigned / called away?" High odds = urgency, worth analysing. Low odds = don't
+waste time, even after a big price move. Worked example: a CSP written low, the
+stock gaps 30% on earnings, then adds 5% — that extra 5% is NOT a signal,
+because assignment was already off the table.
+- **Delta is that number.** |delta| is the market's own probability the option
+  finishes ITM, folding distance, volatility and time-remaining into one figure
+  — which raw `dist_to_strike` cannot: 15% OTM on NBIS at 30 DTE is ~20% odds,
+  the same 15% on MSFT at 10 DTE is ~2%. John already tracks "Prob. ITM" at
+  entry in his sheet; the alerts simply never carried it forward.
+- Evidence: EX-23 (request). Retro-fits his real calls: NBIS $140 at 36% OTM
+  which he dismissed as noise = ~3%; CRDO $200 ITM at expiry which he closed =
+  ~88%; CLS $300 into earnings which he closed = ~25%.
+- System status: **Actioned — A28** (display, both surfaces). The delta-based
+  urgency GATE (replacing P17's crude "within 15% of strike") is proposed but
+  NOT built — awaiting John's read on the displayed numbers first.
+
 ### P16 — LEAPS are long-term investments, exempt from event-day logic
 The deep-ITM LEAPS (e.g. 10× CLS Jan'28 $180) are stock replacement held for
 years. Earnings calls don't factor into them — no trimming logic, no P15
@@ -521,6 +545,29 @@ positions only.
   stayed over 5%. Distilled into P17; gate calibrated so that every alert he
   acted on (PATH, CLS ×2, NBIS $180 swing) passes and both NBIS noise alerts
   fail (9/9 test cases).
+
+### EX-23 — "How likely is assignment?" — the missing triage number (2026-08-07)
+- John: "I always think how likely the shares might get called away or assigned.
+  If the risk is high I feel bigger urgency… if the possibility is very small I
+  do not want to waste so much time. Stock moved 30% and then an additional 5%
+  — this is not a signal for urgency." Asked to explore and discuss first.
+- The number already existed and was being discarded: the engine reads each
+  position's contract from the chain to get the mark, and `delta` sits in that
+  same record. Alerts showed `dist_to_strike` instead — a raw percentage blind
+  to volatility and time.
+- Built A28 (display only, per John's "discuss first"): `Assignment odds ~X%`
+  now appears in the reason line of BIG MOVE, P&L SWING, TAKE PROFIT and HOLD,
+  which renders on BOTH Telegram and the dashboard CSP/CC Actions tab (putting
+  it in the reason string rather than a new field means no dashboard-repo
+  change is needed). Structured `assign_odds` / `assign_odds_est` fields also
+  written to results.json for future use.
+- Fallback: when no chain contract is found (stale-mark path) the odds are
+  estimated via `estimate_delta()` and labelled "(est)" — never silently
+  presented as exact.
+- Validated against his real decisions: NBIS $140 noise → 3%; CRDO $200 closed
+  → 88%; his stated 30%-then-5% example → 2%; stale-mark fallback → 24% (est).
+- Open follow-up: use odds as the P17 urgency gate (ping when ≥15%, quiet
+  below) instead of the current dist_to_strike ≤15% rule. Proposed, not built.
 
 ### EX-22 — Two scans killed by the 15-min timeout (2026-08-06)
 - John: "the last few scans were failures." Both Aug 6 scheduled runs (15:57
