@@ -347,6 +347,7 @@ CC_DTE_MIN            = 30;   CC_DTE_MAX      = 60  # P25: never write a CC
                                                     # under 30 DTE; range 30-60,
                                                     # sweet spot 35-50
 LEAPS_DTE_MIN         = 500   # 2+ years
+LONG_CALL_DTE_WARN    = 60    # held long call (any DTE) — warn to decide close/roll within this window
 # CSP: default delta 0.25-0.30, up to 0.35 only when IVP > 50
 CSP_DELTA_MIN         = 0.25; CSP_DELTA_MAX   = 0.35  # target 0.25-0.30, hard max 0.35
 CSP_DELTA_MAX_HIGH_IV = 0.35  # allowed when IVP > 50
@@ -426,21 +427,21 @@ SYMBOL_SETTINGS = {
     # ── CORE ─────────────────────────────────────────────────────────────────
     # Updated 2026-07-19 per user table — current price targets reflecting recent run-up.
     # buy_under=0 means NO BUY (price way above target, only CC monitoring).
-    "AAPL": {"buy_under":    0, "sell_above":  360, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "AAPL": {"buy_under":    0, "sell_above":  350, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "AMZN": {"buy_under":  220, "sell_above":  330, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "GOOGL":{"buy_under":  300, "sell_above":  450, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "IBKR": {"buy_under":   70, "sell_above":  110, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "MELI": {"buy_under": 1560, "sell_above": 2000, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "MSFT": {"buy_under":  345, "sell_above":  550, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    "NOW":  {"buy_under":   90, "sell_above":  125, "csp_delta_min": 0.20, "csp_delta_max": 0.25, "cc_delta_min": 0.20, "cc_delta_max": 0.25, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    "NVDA": {"buy_under":  180, "sell_above":  225, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "NOW":  {"buy_under":   90, "sell_above":  150, "csp_delta_min": 0.20, "csp_delta_max": 0.25, "cc_delta_min": 0.20, "cc_delta_max": 0.25, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "NVDA": {"buy_under":  180, "sell_above":  240, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "TSM":  {"buy_under":  320, "sell_above":  450, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     # ── TRADING ──────────────────────────────────────────────────────────────
     "CRDO": {"buy_under":  175, "sell_above":  300, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    "FIX":  {"buy_under": 1400, "sell_above": 2200, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "FIX":  {"buy_under": 1400, "sell_above": 1900, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "MU":   {"buy_under":  450, "sell_above": 1400, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "NFLX": {"buy_under":    0, "sell_above":   90, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.32, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    "PLTR": {"buy_under":   85, "sell_above":  160, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "PLTR": {"buy_under":   85, "sell_above":  180, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "TSLA": {"buy_under":  300, "sell_above":  450, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     # ── SPECULATIVE ──────────────────────────────────────────────────────────
     "CLS":  {"buy_under":  275, "sell_above":  400, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
@@ -1405,7 +1406,14 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
                 })
                 cc_shares[underlying] = cc_shares.get(underlying, 0) + shares_covered
         elif side == "Long" and put_call == "C":
-            # Long calls — LEAPS (DTE >= 400) or BCS long leg
+            # Long calls — LEAPS (DTE >= 400) or a shorter-dated held call (e.g. a
+            # LEAPS bought further out that has since aged under 400 DTE).
+            # Previously gated to DTE >= 400 — any held long call closer to
+            # expiration than that was silently dropped from leaps_positions
+            # entirely (invisible on the dashboard, no exit tracking). Now ALL
+            # held long calls are tracked; is_leaps distinguishes the traditional
+            # long-dated ones for display, and near_expiry flags the DTE <=
+            # LONG_CALL_DTE_WARN decision window (close vs. roll).
             try:
                 from datetime import datetime as _dt
                 _exp_raw = str(expiry).strip()
@@ -1419,36 +1427,37 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
             except Exception as _e:
                 print(f"     LEAPS expiry parse error: {expiry!r} — {_e}")
                 _dte = 0
-            if _dte >= 400:
-                avg_cost  = float(pos.get("avg_cost", 0) or 0)
-                _strike_f = float(strike) if strike else 0
-                breakeven = round(_strike_f + avg_cost, 2) if avg_cost > 0 and _strike_f > 0 else None
-                try:
-                    _exp_str = _exp_dt.strftime("%b %Y")
-                except:
-                    _exp_str = str(expiry)[:7]
-                _leaps_mv = float(pos.get("market_value", 0) or 0)
-                # Resolve account label — same logic as CSP/CC
-                _leaps_acct = pos.get("account_type", "") or ("IBKR" if source == "ibkr" else source)
-                # Key by (ticker, strike, expiry, account) — preserves per-account rows
-                _lkey = (underlying, _strike_f, str(expiry), _leaps_acct)
-                if _lkey in leaps_accum:
-                    leaps_accum[_lkey]["contracts"]    += int(qty)
-                    leaps_accum[_lkey]["market_value"] += round(_leaps_mv, 0)
-                else:
-                    leaps_accum[_lkey] = {
-                        "ticker":       underlying,
-                        "strike":       _strike_f,
-                        "contracts":    int(qty),
-                        "expiry":       str(expiry),
-                        "expiry_fmt":   _exp_str,
-                        "dte":          _dte,
-                        "avg_cost":     avg_cost,
-                        "breakeven":    breakeven,
-                        "market_value": round(_leaps_mv, 0),
-                        "source":       source,
-                        "account":      _leaps_acct,
-                    }
+            avg_cost  = float(pos.get("avg_cost", 0) or 0)
+            _strike_f = float(strike) if strike else 0
+            breakeven = round(_strike_f + avg_cost, 2) if avg_cost > 0 and _strike_f > 0 else None
+            try:
+                _exp_str = _exp_dt.strftime("%b %Y")
+            except:
+                _exp_str = str(expiry)[:7]
+            _leaps_mv = float(pos.get("market_value", 0) or 0)
+            # Resolve account label — same logic as CSP/CC
+            _leaps_acct = pos.get("account_type", "") or ("IBKR" if source == "ibkr" else source)
+            # Key by (ticker, strike, expiry, account) — preserves per-account rows
+            _lkey = (underlying, _strike_f, str(expiry), _leaps_acct)
+            if _lkey in leaps_accum:
+                leaps_accum[_lkey]["contracts"]    += int(qty)
+                leaps_accum[_lkey]["market_value"] += round(_leaps_mv, 0)
+            else:
+                leaps_accum[_lkey] = {
+                    "ticker":       underlying,
+                    "strike":       _strike_f,
+                    "contracts":    int(qty),
+                    "expiry":       str(expiry),
+                    "expiry_fmt":   _exp_str,
+                    "dte":          _dte,
+                    "avg_cost":     avg_cost,
+                    "breakeven":    breakeven,
+                    "market_value": round(_leaps_mv, 0),
+                    "source":       source,
+                    "account":      _leaps_acct,
+                    "is_leaps":     _dte >= 400,
+                    "near_expiry":  _dte <= LONG_CALL_DTE_WARN,
+                }
 
     # Flush accumulated LEAPS into leaps_positions
     leaps_positions = list(leaps_accum.values())
@@ -2459,6 +2468,90 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
     else:
         return R("HOLD", f"{profit_pct}% profit, DTE {dte}, "
                          f"{dist_to_strike}% below call strike ${strike:.2f}." + odds_txt)
+
+
+def long_call_management_engine(pos: dict, mkt: dict) -> dict:
+    """
+    Exit-management for HELD long calls — LEAPS and any shorter-dated
+    stock-replacement call that has aged under the 400-DTE LEAPS line.
+    Distinct from position_management_engine, which only covers short
+    CSP/CC premium-selling positions; this covers calls YOU OWN.
+    Actions, priority order:
+      1. SELL TARGET HIT   — underlying >= the ticker's sell_above (SYMBOL_SETTINGS)
+      2. NEAR 52W HIGH     — underlying within NEAR_HIGH_SKIP (8%) of week52_high.
+                              Proxy for all-time-high — true ATH isn't tracked
+                              (would need full price history, not just a 52w window).
+      3. DECIDE: EXPIRING SOON — DTE <= LONG_CALL_DTE_WARN, no sell signal yet
+      4. HOLD              — none of the above
+    Reason line stacks whichever flags apply (mirrors the BIG MOVE convention
+    for short positions — confluence in one message, not a priority pick).
+    """
+    ticker       = pos.get("ticker", "")
+    strike       = pos.get("strike", 0)
+    dte          = pos.get("dte", 0)
+    avg_cost     = pos.get("avg_cost", 0)
+    contracts    = pos.get("contracts", 1)
+    market_value = pos.get("market_value", 0)
+    md           = mkt.get(ticker, {})
+    underlying   = md.get("price", 0)
+    week52_high  = md.get("week52_high", 0)
+
+    sell_above = SYMBOL_SETTINGS.get(ticker, {}).get("sell_above", 0)
+
+    # Prefer the broker-reported market value (real mark, includes any
+    # remaining extrinsic value) over an intrinsic-only estimate.
+    mark = round(market_value / (contracts * 100), 2) if contracts > 0 and market_value > 0 else 0.0
+    if mark <= 0:
+        mark = max(0.0, underlying - strike) if underlying > 0 and strike > 0 else 0.0
+    profit_pct = round((mark - avg_cost) / avg_cost * 100, 1) if avg_cost > 0 else 0.0
+    pnl_dollar = round((mark - avg_cost) * contracts * 100, 0) if avg_cost > 0 else 0.0
+    breakeven  = round(strike + avg_cost, 2) if avg_cost > 0 and strike > 0 else None
+    dist_to_be_pct = (round((underlying - breakeven) / underlying * 100, 1)
+                       if breakeven and underlying > 0 else None)
+
+    at_sell_target = sell_above > 0 and underlying >= sell_above
+    near_52w_high  = week52_high > 0 and underlying >= week52_high * (1 - NEAR_HIGH_SKIP)
+    expiring_soon  = dte <= LONG_CALL_DTE_WARN
+
+    flags = []
+    if at_sell_target:
+        flags.append(f"at/above sell target ${sell_above:g}")
+    if near_52w_high:
+        flags.append(f"within {NEAR_HIGH_SKIP*100:.0f}% of 52-week high (${week52_high:.2f})")
+    if expiring_soon:
+        flags.append(f"{dte}d to expiration — decide close vs. roll")
+
+    if at_sell_target or near_52w_high:
+        action        = "SELL TARGET HIT" if at_sell_target else "NEAR 52W HIGH"
+        sort_priority  = 0
+    elif expiring_soon:
+        action        = "DECIDE: EXPIRING SOON"
+        sort_priority  = 1
+    else:
+        action        = "HOLD"
+        sort_priority  = 3
+
+    reason = (f"{ticker} ${underlying:.2f} — " + "; ".join(flags)) if flags else (
+        f"{ticker} ${underlying:.2f}, {dte}d to expiry"
+        + (f" — below ${sell_above:g} target" if sell_above > 0 else ""))
+
+    return {
+        "action":         action,
+        "reason":         reason,
+        "sort_priority":  sort_priority,
+        "underlying":     round(underlying, 2),
+        "week52_high":    round(week52_high, 2),
+        "mark":           mark,
+        "profit_pct":     profit_pct,
+        "pnl_dollar":     pnl_dollar,
+        "breakeven":      breakeven,
+        "dist_to_be_pct": dist_to_be_pct,
+        "sell_above":     sell_above,
+        "near_52w_high":  near_52w_high,
+        "at_sell_target": at_sell_target,
+        "expiring_soon":  expiring_soon,
+        "dte":            dte,
+    }
 
 
 def score_leaps(opp: dict) -> int:
@@ -7066,6 +7159,48 @@ def run_scanner():
             "sort_priority":  _result["sort_priority"],
         })
 
+    # ── Held long calls (LEAPS + shorter-dated stock-replacement calls) ──
+    # Distinct from CSP/CC above — these are calls YOU OWN, not short premium
+    # you sold. compute_portfolio_exposure() no longer gates these on DTE>=400,
+    # so this now covers every held long call regardless of how close to
+    # expiration it is (previously any call under 400 DTE was silently absent
+    # from both the dashboard and here).
+    for _pos in portfolio_exposure.get("leaps_positions", []):
+        _ticker = _pos.get("ticker", "")
+        _result = long_call_management_engine(_pos, mkt)
+        _pos_actions.append({
+            "account":        _pos.get("account", ""),
+            "ticker":         _ticker,
+            "tier":           ("Core" if _ticker in CORE_STOCKS else
+                                "Growth" if _ticker in GROWTH_STOCKS else
+                                "Cyclical" if _ticker in CYCLICAL_STOCKS else "Opportunistic"),
+            "type":           "LEAPS_CALL",
+            "contracts":      _pos.get("contracts", 1),
+            "strike":         _pos.get("strike", 0),
+            "expiry":         str(_pos.get("expiry", ""))[:10],
+            "dte":            _result["dte"],
+            "underlying":     _result["underlying"],
+            "mark":           _result["mark"],
+            # 'leaps_mv' (not 'position_mv') — this is the IBKR-reported position
+            # market value, a legitimate broker mark, not a stale-prone fallback.
+            # Distinct label so the dashboard doesn't flag it as a stale price.
+            "mark_src":       "leaps_mv",
+            "avg_cost":       round(_pos.get("avg_cost", 0), 2),
+            "profit_pct":     _result["profit_pct"],
+            "pnl_dollar":     _result["pnl_dollar"],
+            "breakeven":      _result["breakeven"],
+            "dist_to_be_pct": _result["dist_to_be_pct"],
+            "sell_above":     _result["sell_above"],
+            "week52_high":    _result["week52_high"],
+            "near_52w_high":  _result["near_52w_high"],
+            "at_sell_target": _result["at_sell_target"],
+            "expiring_soon":  _result["expiring_soon"],
+            "is_leaps":       _pos.get("is_leaps", False),
+            "action":         _result["action"],
+            "reason":         _result["reason"],
+            "sort_priority":  _result["sort_priority"],
+        })
+
     _pos_actions.sort(key=lambda x: x.get("sort_priority", 3))
     _def_count   = sum(1 for p in _pos_actions if p["action"] == "DEFENSIVE")
     _close_count = sum(1 for p in _pos_actions if p["action"] in ("BIG MOVE", "P&L SWING"))
@@ -7116,6 +7251,33 @@ def run_scanner():
             send_telegram(_msg); time.sleep(2)
     else:
         print(f"   🚨 No BIG MOVE reviews this scan")
+
+    # ── HELD LONG CALL — REVIEW → Telegram ──────────────────────────────
+    # Sell-target hit, near 52-week high, or approaching expiration on a call
+    # you own. Same once-per-position-per-day dedup as BIG MOVE above.
+    _tg_longcall = []
+    for p in _pos_actions:
+        if p["type"] != "LEAPS_CALL" or p["action"] == "HOLD":
+            continue
+        _tgk = f"{p['ticker']}|LEAPS_CALL|{p['strike']:g}|{p['expiry']}"
+        if _tgk in _tg_alert_log:
+            continue
+        _tg_longcall.append((_tgk, p))
+    if _tg_longcall:
+        print(f"   📱 Sending {len(_tg_longcall)} held long-call alert(s)...")
+        send_telegram("━━━ *📞 HELD LONG CALL — REVIEW* ━━━"); time.sleep(1)
+        for _tgk, p in _tg_longcall:
+            _tg_alert_log[_tgk] = _today_str
+            _pl = f"{p['profit_pct']:.0f}% gain" if p['profit_pct'] >= 0 else f"{abs(p['profit_pct']):.0f}% loss"
+            _msg = "\n".join([
+                f"📞 *{p['ticker']} ${p['strike']:g} call — {p['action']}*",
+                f"  {p['reason']}",
+                f"  Cost basis ${p['avg_cost']:.2f} | now ~${p['mark']:.2f} ({_pl}) | {p['dte']}d left",
+                f"_Scanned {now_pt().strftime('%b %d %H:%M')} PT_"
+            ])
+            send_telegram(_msg); time.sleep(2)
+    else:
+        print(f"   📞 No held long-call alerts this scan")
 
     results = {
         "scan_time":           now_pt().strftime(SCAN_TS_FMT),
