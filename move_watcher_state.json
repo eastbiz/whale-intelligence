@@ -1,15 +1,12 @@
 {
-  "date": "2026-08-05",
+  "date": "2026-08-07",
   "alerted": {
-    "SPCX:down": 10,
-    "UBER:down": 5
+    "NOW:up": 5,
+    "PATH:up": 5,
+    "PLTR:up": 5,
+    "SPCX:up": 5
   },
-  "scan_triggered": {
-    "SPCX:down": true
-  },
-  "scan_trigger_count": 1,
   "dispatched": {
-    "13:47": true,
-    "16:41": true
+    "13:47": true
   }
 }
