@@ -8,5 +8,10 @@
   },
   "dispatched": {
     "13:47": true
-  }
+  },
+  "scan_triggered": {
+    "PLTR:up": true,
+    "SPCX:up": true
+  },
+  "scan_trigger_count": 1
 }
