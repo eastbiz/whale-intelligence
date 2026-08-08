@@ -348,6 +348,11 @@ CC_DTE_MIN            = 30;   CC_DTE_MAX      = 60  # P25: never write a CC
                                                     # sweet spot 35-50
 LEAPS_DTE_MIN         = 500   # 2+ years
 LONG_CALL_DTE_WARN    = 60    # held long call (any DTE) — warn to decide close/roll within this window
+# A29/P16: a long-call Telegram alert only makes sense for a DEEP-ITM call
+# acting as stock replacement. A far-OTM convexity LEAP (NVDA $450 with NVDA at
+# $223) needs the stock to double — "the stock is near its 52w high" is an
+# argument FOR it, not a reason to sell. Strike must be at/below spot x this.
+LONG_CALL_ITM_MAX_STRIKE_PCT = 0.90   # strike <= 90% of spot = genuinely ITM
 # CSP: default delta 0.25-0.30, up to 0.35 only when IVP > 50
 CSP_DELTA_MIN         = 0.25; CSP_DELTA_MAX   = 0.35  # target 0.25-0.30, hard max 0.35
 CSP_DELTA_MAX_HIGH_IV = 0.35  # allowed when IVP > 50
@@ -7255,27 +7260,46 @@ def run_scanner():
     # ── HELD LONG CALL — REVIEW → Telegram ──────────────────────────────
     # Sell-target hit, near 52-week high, or approaching expiration on a call
     # you own. Same once-per-position-per-day dedup as BIG MOVE above.
+    # A29 (P16): LEAPS are long-term stock replacement — John does NOT want
+    # trimming prompts on them. Only ONE case is a real decision: a DEEP-ITM
+    # call (stock replacement) whose underlying reached his sell target. So:
+    #   - "NEAR 52W HIGH" is dashboard-only (fires constantly in a bull market)
+    #   - far-OTM convexity LEAPS are excluded entirely (NVDA $450 with NVDA at
+    #     $223 — a high stock price is the THESIS, not a sell signal)
+    #   - one grouped message per ticker, not one push per contract
     _tg_longcall = []
     for p in _pos_actions:
-        if p["type"] != "LEAPS_CALL" or p["action"] == "HOLD":
+        if p["type"] != "LEAPS_CALL":
             continue
+        if p["action"] != "SELL TARGET HIT":
+            continue                      # NEAR 52W HIGH / EXPIRING → dashboard
+        _px = p.get("underlying", 0) or 0
+        _sk = p.get("strike", 0) or 0
+        if not (_px > 0 and _sk > 0 and _sk <= _px * LONG_CALL_ITM_MAX_STRIKE_PCT):
+            print(f"   🔕 long call {p['ticker']} ${_sk:g} dashboard-only: not deep ITM")
+            continue                      # far-OTM convexity — never a sell prompt
         _tgk = f"{p['ticker']}|LEAPS_CALL|{p['strike']:g}|{p['expiry']}"
         if _tgk in _tg_alert_log:
             continue
         _tg_longcall.append((_tgk, p))
     if _tg_longcall:
-        print(f"   📱 Sending {len(_tg_longcall)} held long-call alert(s)...")
-        send_telegram("━━━ *📞 HELD LONG CALL — REVIEW* ━━━"); time.sleep(1)
+        _by_tkr = {}
         for _tgk, p in _tg_longcall:
-            _tg_alert_log[_tgk] = _today_str
-            _pl = f"{p['profit_pct']:.0f}% gain" if p['profit_pct'] >= 0 else f"{abs(p['profit_pct']):.0f}% loss"
-            _msg = "\n".join([
-                f"📞 *{p['ticker']} ${p['strike']:g} call — {p['action']}*",
-                f"  {p['reason']}",
-                f"  Cost basis ${p['avg_cost']:.2f} | now ~${p['mark']:.2f} ({_pl}) | {p['dte']}d left",
-                f"_Scanned {now_pt().strftime('%b %d %H:%M')} PT_"
-            ])
-            send_telegram(_msg); time.sleep(2)
+            _by_tkr.setdefault(p["ticker"], []).append((_tgk, p))
+        print(f"   📱 Sending {len(_by_tkr)} held long-call alert(s) "
+              f"({len(_tg_longcall)} contracts grouped)...")
+        send_telegram("━━━ *📞 HELD LONG CALL — SELL TARGET HIT* ━━━"); time.sleep(1)
+        for _tkr, _rows in _by_tkr.items():
+            _p0 = _rows[0][1]
+            _lines = [f"📞 *{_tkr} — at/above your sell target*", f"  {_p0['reason']}"]
+            for _tgk, p in _rows:
+                _tg_alert_log[_tgk] = _today_str
+                _pl = (f"{p['profit_pct']:.0f}% gain" if p['profit_pct'] >= 0
+                       else f"{abs(p['profit_pct']):.0f}% loss")
+                _lines.append(f"  • ${p['strike']:g} call — cost ${p['avg_cost']:.2f} → "
+                              f"~${p['mark']:.2f} ({_pl}), {p['dte']}d left")
+            _lines.append(f"_Scanned {now_pt().strftime('%b %d %H:%M')} PT_")
+            send_telegram("\n".join(_lines)); time.sleep(2)
     else:
         print(f"   📞 No held long-call alerts this scan")
 

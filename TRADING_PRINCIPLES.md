@@ -258,6 +258,13 @@ to stabilize (that was the old LEAPS-engine philosophy, explicitly removed).
   labels become "IV 22% (IVP 33% of 1yr)" — no further change needed. Scoring
   still consumes the legacy `ivp` field unchanged (deliberate: relabel first,
   re-tune scoring only after real percentiles exist). Built 2026-07-31.
+- **A29 — LEAPS trim alerts restricted to real decisions (P16/EX-24).**
+  Telegram now sends a held-long-call alert ONLY for `SELL TARGET HIT` on a
+  DEEP-ITM call (`strike <= spot x LONG_CALL_ITM_MAX_STRIKE_PCT`, 0.90), and
+  groups them one message per ticker. "NEAR 52W HIGH" and "EXPIRING SOON"
+  remain on the dashboard but no longer push. Far-OTM convexity LEAPS are
+  excluded entirely. Verified against the real 2026-08-07 batch: 10 pushes → 1.
+  Built 2026-08-07.
 - **A28 — assignment odds on position alerts (P28/EX-23).** Captures |delta|
   from the position's chain contract (both CSP and CC paths) and surfaces it as
   "Assignment odds ~X%" in the alert reason line — visible on Telegram AND the
@@ -477,8 +484,17 @@ confluence application. Event-day exit thinking applies to SHORT premium
 positions only.
 - Evidence: stated 2026-07-21 in response to Claude's challenge on the CLS
   LEAPS riding through earnings.
-- System status: consistent with current behavior (position engine only acts
-  on short options). Encoded here so nobody "improves" LEAPS with exit alerts.
+- System status: **VIOLATED then corrected.** PR #2 (2026-08-07) added
+  `long_call_management_engine`, which pushed 10 Telegram trim prompts on
+  John's LEAPS in one batch — exactly the "improvement" this principle warned
+  against (EX-24). Resolved by A29: NEAR 52W HIGH is dashboard-only; Telegram
+  keeps only the one genuine decision — a DEEP-ITM (stock-replacement) call
+  whose underlying reached the sell target — grouped one message per ticker.
+- Refinement (2026-08-07): P16 is not "never alert on LEAPS". It is "don't
+  prompt trimming on a long-term hold because of short-term price action."
+  A deep-ITM LEAP at/above the sell target IS a real decision (it's standing in
+  for shares John would sell there). A far-OTM convexity LEAP never is — the
+  stock rising is the THESIS, not an exit signal.
 
 ---
 
@@ -545,6 +561,30 @@ positions only.
   stayed over 5%. Distilled into P17; gate calibrated so that every alert he
   acted on (PATH, CLS ×2, NBIS $180 swing) passes and both NBIS noise alerts
   fail (9/9 test cases).
+
+### EX-24 — 10 LEAPS trim alerts in one batch; P16 violated (2026-08-07)
+- John received 10 consecutive "📞 HELD LONG CALL — REVIEW" pushes: 3 AMZN and
+  6 NVDA all saying "NEAR 52W HIGH", plus PATH "SELL TARGET HIT". He asked
+  whether it was an unintended consequence.
+- Source: PR #2 that morning ("Price target updates + held long-call
+  tracking") added `long_call_management_engine`. Not from the A28 work.
+- Three distinct problems:
+  1. **Violates P16** — LEAPS are long-term stock replacement; John explicitly
+     does not want trimming prompts driven by short-term price action.
+  2. **Two alerts were nonsense**: NVDA $450 and $280 calls are far-OTM
+     convexity LEAPS (Dec-2028, $13-33 cost) with NVDA at $223. "Stock near its
+     52-week high" is an argument FOR those positions — they need NVDA to
+     double. Suggesting review because the stock rose inverts the thesis.
+  3. **Volume**: 10 pushes carrying 2 facts (AMZN near high, NVDA near high) —
+     one message per contract instead of per ticker.
+- The one defensible alert was PATH $8 (deep-ITM stock replacement, PATH $14.92
+  above the $13 sell target) — a real decision.
+- Fixed as A29 exactly per John's instruction ("NEAR 52W HIGH — yes useful on
+  dashboard, yes implement all what you said"). Replaying today's batch through
+  the new gate: **10 pushes → 1** (PATH only).
+- Lesson: a documented principle in this log did not prevent another session
+  from building against it. Principles need to be checked when work lands from
+  a different session, not just when written.
 
 ### EX-23 — "How likely is assignment?" — the missing triage number (2026-08-07)
 - John: "I always think how likely the shares might get called away or assigned.
