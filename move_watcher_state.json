@@ -1,20 +1,9 @@
 {
-  "date": "2026-08-07",
+  "date": "2026-08-10",
   "alerted": {
-    "NOW:up": 5,
-    "PATH:up": 5,
-    "PLTR:up": 10,
-    "SPCX:up": 5
+    "ANGI:down": 5
   },
   "dispatched": {
-    "13:47": true,
-    "16:41": true,
-    "18:47": true
-  },
-  "scan_triggered": {
-    "PLTR:up": true,
-    "SPCX:up": true,
-    "CRDO:up": true
-  },
-  "scan_trigger_count": 2
+    "13:47": true
+  }
 }
