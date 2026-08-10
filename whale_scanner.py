@@ -456,7 +456,7 @@ SYMBOL_SETTINGS = {
     "LULU": {"buy_under":  105, "sell_above":  150, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "NBIS": {"buy_under":  150, "sell_above":  280, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "NVO":  {"buy_under":   38, "sell_above":   60, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    "POWL": {"buy_under":  210, "sell_above":  290, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "POWL": {"buy_under":  180, "sell_above":  290, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     # ── VERY SPECULATIVE (added 2026-06-22) ──────────────────────────────────
     "UBER": {"buy_under":   65, "sell_above":   95, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "GRAB": {"buy_under":  3.1, "sell_above":  4.5, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
