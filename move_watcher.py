@@ -165,8 +165,12 @@ def near_actionable(tk, price, chg, targets, short_pos):
     # Rise toward the sell-above target (a CC could get actionable)
     if chg > 0 and sa > 0 and price >= sa * (1 - MOVE_NEAR_TARGET_PCT / 100):
         reasons.append("near sell-above")
-    # Near a strike John actually holds (getting tested, either direction)
+    # Near a SHORT strike John actually holds (getting tested, either
+    # direction). Long calls (LEAPS_CALL) are excluded — a long strike near
+    # spot is not a risk event, and pinging on it is false urgency.
     for p in short_pos.get(tk, []):
+        if p.get("type") not in ("CSP", "CC"):
+            continue
         strike = p.get("strike", 0) or 0
         if strike > 0 and abs(price - strike) / strike <= MOVE_NEAR_STRIKE_PCT / 100:
             reasons.append(f"near {p.get('type','')} ${strike:g}")
@@ -193,6 +197,13 @@ def build_line(tk, price, chg, targets, short_pos):
 
     for p in short_pos.get(tk, []):
         ptype = p.get("type", "")
+        # Only SHORT premium positions belong here. LEAPS_CALL entries are
+        # calls John OWNS (long) — labelling them "short … moving toward your
+        # strike" was both factually wrong and backwards (a rising stock is
+        # GOOD for a long call), and P16 says LEAPS aren't traded off
+        # short-term moves anyway. Skip them entirely.
+        if ptype not in ("CSP", "CC"):
+            continue
         favorable = (ptype == "CSP" and chg > 0) or (ptype == "CC" and chg < 0)
         tag = ("💰 favorable — review close"
                if favorable else "⚠ moving toward your strike")

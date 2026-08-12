@@ -258,6 +258,12 @@ to stabilize (that was the old LEAPS-engine philosophy, explicitly removed).
   labels become "IV 22% (IVP 33% of 1yr)" — no further change needed. Scoring
   still consumes the legacy `ivp` field unchanged (deliberate: relabel first,
   re-tune scoring only after real percentiles exist). Built 2026-07-31.
+- **A30 — Move Watcher no longer mislabels owned LEAPS (EX-25).**
+  `build_line()` skips non-CSP/CC types instead of printing "You hold short
+  LEAPSCALL … ⚠ moving toward your strike" (wrong direction, wrong side, and
+  the underscore broke Markdown). `near_actionable()` likewise ignores long-call
+  strikes so a long strike near spot can't trigger a false-urgency ping.
+  Built 2026-08-07.
 - **A29 — LEAPS trim alerts restricted to real decisions (P16/EX-24).**
   Telegram now sends a held-long-call alert ONLY for `SELL TARGET HIT` on a
   DEEP-ITM call (`strike <= spot x LONG_CALL_ITM_MAX_STRIKE_PCT`, 0.90), and
@@ -561,6 +567,29 @@ positions only.
   stayed over 5%. Distilled into P17; gate calibrated so that every alert he
   acted on (PATH, CLS ×2, NBIS $180 swing) passes and both NBIS noise alerts
   fail (9/9 test cases).
+
+### EX-25 — Move Watcher called owned LEAPS "short … moving toward your strike" (2026-08-07)
+- John: "This message is confusing — `You hold short LEAPSCALL $50 20280121 —
+  ⚠ moving toward your strike`. Those are LEAPS."
+- He's right on every count; one line had three defects:
+  1. **"short" is factually wrong** — LEAPS_CALL entries are calls he OWNS.
+  2. **The warning is backwards** — `favorable` only tested CSP/CC, so any
+     other type fell through to "⚠ moving toward your strike". For a LONG
+     call a rising stock is GOOD, not a warning.
+  3. **"LEAPS_CALL" rendered as "LEAPSCALL"** — Telegram Markdown ate the
+     underscore as an italic marker.
+- Root cause: same as EX-24 — PR #2 added LEAPS_CALL rows to
+  `position_actions`, and `move_watcher.build_line()` had always assumed
+  everything in that list was a short premium position. A new position TYPE
+  flowed into consumers written for the old assumption.
+- Fixed (A30): long calls are skipped in the Move Watcher's held-position
+  context AND in the `near_actionable` proximity gate (a long strike sitting
+  near spot is not a risk event and must not manufacture urgency). Consistent
+  with P16 — LEAPS aren't traded off short-term moves.
+- Pattern worth noting: this is the second consumer broken by the same upstream
+  change. When a new position type is added to `position_actions`, EVERY
+  consumer of that list needs review — the scanner's Telegram blocks, the Move
+  Watcher, and the dashboard all read it.
 
 ### EX-24 — 10 LEAPS trim alerts in one batch; P16 violated (2026-08-07)
 - John received 10 consecutive "📞 HELD LONG CALL — REVIEW" pushes: 3 AMZN and
