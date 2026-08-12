@@ -2,7 +2,7 @@
   "date": "2026-08-12",
   "alerted": {
     "CRDO:up": 10,
-    "SPCX:up": 5
+    "SPCX:up": 10
   },
   "scan_triggered": {
     "NBIS:up": true,
