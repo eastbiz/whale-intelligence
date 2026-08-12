@@ -241,6 +241,18 @@ call still marked at its pre-drop price). The engine guards against this:
 
 ## KNOWN GOTCHAS (read before editing)
 
+- **`position_actions` has multiple consumers — update ALL of them when you add
+  a position TYPE.** The list in `results.json` was originally short options
+  only (`CSP` / `CC`). When PR #2 added `LEAPS_CALL` rows, two consumers written
+  against the old assumption broke in the same week: the scanner's held-long-call
+  Telegram block pushed 10 trim alerts on LEAPS (EX-24), and the Move Watcher
+  printed "You hold **short** LEAPSCALL … ⚠ moving toward your strike" — wrong
+  side, wrong direction, and the underscore broke Markdown (EX-25). It also fed
+  long strikes into the proximity gate, manufacturing false urgency. Consumers
+  to review: the Telegram blocks in `whale_scanner.py`, `move_watcher.py`
+  (`build_line` + `near_actionable`), and the dashboard's Actions tab
+  (separate repo). Filter by type explicitly — never assume.
+
 - **Multiple CC code paths.** CC logic exists in ≥3 places: `find_best_cc()`
   (~2834), the inline CC scanner (~5108), and the inline PIO scanner (~5217).
   **Any CC behavior change must be applied to ALL paths** or unpatched paths keep
@@ -286,6 +298,23 @@ call still marked at its pre-drop price). The engine guards against this:
 ---
 
 ## WORKFLOW CONVENTIONS (how John wants work done)
+
+- **Read `TRADING_PRINCIPLES.md` BEFORE adding or changing any alert.** It is
+  not background reading — it is the spec for what may and may not notify John,
+  and it records decisions that are expensive to re-learn. A worked failure:
+  P16 ("LEAPS are long-term holds — no trimming logic") was written 2026-07-23
+  with the explicit line *"Encoded here so nobody 'improves' LEAPS with exit
+  alerts"*, and a later session shipped exactly that, sending 10 LEAPS trim
+  pushes in one batch (EX-24). Check the P-list before building; append the new
+  example/principle after. Especially relevant: P16 (LEAPS exempt), P17/P22
+  (Telegram = decision pressure only, not a browse list), P24 (earnings warns
+  convexity, gates CC/CSP), P27 (CSP must respect buy_under), P28 (assignment
+  odds drive urgency).
+
+- **One more alert is a cost, not a feature.** John's standing complaint is
+  volume: he will stop reading Telegram if it fills with things he can't act
+  on. Default to dashboard-only; promote to Telegram only when there is a
+  decision to make. Prefer one grouped message per ticker over one per contract.
 
 - **Discuss design before implementing.** Confirm scope and parameters first,
   especially for risk logic. Walk through real trade examples before coding new
