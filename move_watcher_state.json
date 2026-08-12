@@ -2,9 +2,11 @@
   "date": "2026-08-12",
   "alerted": {},
   "scan_triggered": {
-    "NBIS:up": true
+    "NBIS:up": true,
+    "CLS:up": true,
+    "CRDO:up": true
   },
-  "scan_trigger_count": 1,
+  "scan_trigger_count": 2,
   "dispatched": {
     "13:47": true
   }
