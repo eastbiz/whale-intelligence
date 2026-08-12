@@ -1,6 +1,9 @@
 {
   "date": "2026-08-12",
-  "alerted": {},
+  "alerted": {
+    "CRDO:up": 5,
+    "SPCX:up": 5
+  },
   "scan_triggered": {
     "NBIS:up": true,
     "CLS:up": true,
