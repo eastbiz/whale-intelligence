@@ -155,6 +155,18 @@ independently.**
 - **Cheap Convexity LEAPS** (`scan_convexity`) — far-OTM long-dated calls,
   STRICT MODE. Only Grade A/B passers shown, one best row per ticker, near-misses
   discarded. Distinct from deep-ITM LEAPS. Grades A+B → Telegram.
+  **Filters tightened 2026-08-12 (A31/P29)** after AAPL printed the only
+  convexity row on 22 consecutive scans — same expiry, strike just drifting with
+  spot. Root cause: every filter was RELATIVE (cheapness vs strike/spot/spread),
+  so the cheapest option won, cheapest means lowest IV, and the scanner kept
+  landing on the lowest-vol mega-cap while structurally excluding the
+  `CVX_AGGR_TICKERS` hypergrowth names it was built for. The new gate is
+  `CVX_COV20_MIN = 1.00` — reject any trade that loses money even if the stock
+  compounds at 20%/yr for the option's life (AAPL sat at 0.94-0.99). Five other
+  thresholds tightened alongside it. **If you change any `CVX_*` hard minimum,
+  re-ladder the matching PREF/EXC constant above it** — `_cvx_grade` awards A on
+  the PREF thresholds, so raising a hard min without raising PREF makes every
+  passer Grade A and *increases* Telegram volume (A and B both send).
 - **Spike CC** (`find_spike_cc`) — sell calls into an 8%+ up-spike on ANY held
   100+ share position. Overrides `spreads_only` (a CC on owned shares isn't
   naked). Goes to Telegram — but through the SAME CC gates as routine CCs

@@ -258,6 +258,21 @@ to stabilize (that was the old LEAPS-engine philosophy, explicitly removed).
   labels become "IV 22% (IVP 33% of 1yr)" — no further change needed. Scoring
   still consumes the legacy `ivp` field unchanged (deliberate: relabel first,
   re-tune scoring only after real percentiles exist). Built 2026-07-31.
+- **A31 — Cheap Convexity hard filters tightened (P29/EX-26).** Six thresholds
+  raised plus one new gate, all in the `CVX_*` block — no new plumbing, no
+  behavior changes outside `_cvx_hard_filters`:
+  `CVX_COV20_MIN = 1.00` (NEW — the honesty gate: reject anything that loses
+  money at a 20%/yr growth scenario), `CVX_CAGR_MAX` 0.25→0.18,
+  `CVX_SCORE_MIN` 20→30, `CVX_PREM_MAX` 0.12→0.05, `CVX_COV30_MIN` 1.05→1.20,
+  `CVX_BURDEN_MAX` 0.05→0.025. The PREF/EXC tiers were re-laddered above the
+  new hard minimums (CAGR_PREF 0.15, SCORE_PREF/EXC 40/50, PREM_PREF/EXC
+  0.04/0.03, COV30_PREF 1.25) — without that, every passer would have graded A
+  and Telegram volume would have gone UP, since `fmt_convex` sends A and B alike.
+  Validated by replaying all 28 historical convexity rows: 26 dropped, 2 kept
+  (the PYPL $85 Grade-A rows, now graded B under the stricter ladder). Each of
+  the six gates independently rejects all 22 AAPL rows and independently keeps
+  both PYPL Grade-A rows, so AAPL must improve on every dimension at once to
+  reappear — i.e. only if it becomes a genuinely good trade. Built 2026-08-12.
 - **A30 — Move Watcher no longer mislabels owned LEAPS (EX-25).**
   `build_line()` skips non-CSP/CC types instead of printing "You hold short
   LEAPSCALL … ⚠ moving toward your strike" (wrong direction, wrong side, and
@@ -502,9 +517,57 @@ positions only.
   for shares John would sell there). A far-OTM convexity LEAP never is — the
   stock rising is the THESIS, not an exit signal.
 
+### P29 — A convexity trade must not lose money at a plausible growth rate
+The Cheap Convexity filters were all RELATIVE — cheapness against the strike,
+against spot, against the spread. Nothing asked the absolute question: *is the
+growth rate this trade requires one the company can plausibly deliver?* Because
+`prem_pct` and `strike/ask` both reward a cheap option, and a cheap long-dated
+option means low IV, the filter systematically selected the lowest-vol mega-cap
+on the watchlist and called it convexity — while structurally excluding the
+hypergrowth names in `CVX_AGGR_TICKERS` (NBIS/PLTR/MSTR/IBIT), whose 2.5-year
+far-OTM calls cost far more than the old 12%-of-spot ceiling. That is backwards:
+convexity is the right structure precisely where a large move is credible.
+The concrete gate: **`cov20 ≥ 1.00`** — the trade must at least break even if
+the stock compounds at 20%/yr for the option's life. It was already computed on
+every row and simply never checked. AAPL sat at 0.94-0.99 for 22 straight scans:
+it needed >21%/yr for 2.3 years just to reach breakeven ($470.60 on a $301
+stock, roughly a $7T market cap by Dec 2028).
+- Evidence: EX-26 (the AAPL convexity monoculture, Aug 6-12 2026).
+- Corollary: a filter whose output does not move with price is not a signal.
+  Required CAGR stayed pinned at 20.6-21.8% while AAPL ranged $301-316, because
+  the ranker picks the lowest-CAGR passer and the binding constraint was the
+  convexity-score floor — so the scanner was solving for its own boundary and
+  re-anchoring the strike to spot each scan. Watch for this shape elsewhere:
+  if a metric never varies, it is describing the filter, not the market.
+- System status: **Actioned — A31.**
+
 ---
 
 ## Trade Examples (raw log)
+
+### EX-26 — The AAPL convexity monoculture (2026-08-06 → 08-12)
+- John: "I only keep seeing trades for AAPL in convexity. Only the expiration
+  DTE and strikes are changing, but I keep wondering if those are really good
+  trades. Especially after recent run up in stock price."
+- Verified against all 22 committed scans in that window: **every** convexity
+  row was AAPL on the **same** 2028-12-15 expiry (the only expiry with
+  liquidity in the 700-1100 DTE window, so "DTE changing" was just that one
+  expiry counting down). Strike drifted 480 → 470 → 460 → 450 tracking spot.
+  Only other ticker to appear all week: PYPL (6 rows, 2 Grade A).
+- Tell: convexity scores on all 22 AAPL rows were 20.0-21.8 — clustered just
+  over the old `CVX_SCORE_MIN` of 20. The floor was the binding constraint on
+  every single row.
+- The math was never wrong (BE $470.60, +56.1%, 20.97%/yr, cov30 1.18 all
+  re-derived correctly). The selection was wrong: nothing asked whether a 21%/yr
+  hurdle is plausible for a mature mega-cap, and `cov20 = 0.98` — a loss at a
+  20%/yr growth scenario — was displayed but not gated.
+- Also noted, not acted on (deliberately): AAPL is `buy_under: 0` and
+  `sell_above: 350`, so the row shipped as an execution candidate with
+  `zone_reason: "NO BUY (buy_under=0)"`, and the trade needs $470.60 to break
+  even — 34% above where John says he'd sell. EX-15 already settled that
+  `buy_under` should not GATE convexity (no assignment risk); surfacing the
+  conflict in `fmt_convex` remains open (C-list).
+- Fixed as A31 (tighten only — no new plumbing, per John's instruction).
 
 ### EX-1 — NBIS $180 put — swing-to-breakeven exit window
 - Wrote CSP: stock ~$242, strike **$180**, 5 contracts, premium **$10.50**

@@ -376,21 +376,38 @@ CVX_DTE_PREF_MIN      = 700    # preferred window starts
 CVX_DTE_MAX           = 1100   # preferred/acceptable ceiling
 CVX_FETCH_DAYS        = 1150   # chain fetch horizon (covers DTE_MAX + buffer)
 # ── HARD FILTERS (all must pass for main view) ──
-CVX_CAGR_MAX          = 0.25   # Required CAGR hard max (≤25%)
-CVX_CAGR_PREF         = 0.20   # preferred (<20%)
-CVX_SCORE_MIN         = 20     # Convexity Score hard min (≥20)
-CVX_SCORE_PREF        = 25     # preferred (>25)
-CVX_SCORE_EXC         = 30     # exceptional (>30)
-CVX_PREM_MAX          = 0.12   # Premium % hard max (≤12%)
-CVX_PREM_PREF         = 0.10   # preferred (<10%)
-CVX_PREM_EXC          = 0.08   # exceptional (<8%)
-CVX_COV30_MIN         = 1.05   # Coverage@30% hard min (≥1.05)
-CVX_COV30_PREF        = 1.15   # preferred (>1.15)
+# TIGHTENED 2026-08-12 (A31/P29). The old thresholds let a mediocre AAPL row
+# print on all 22 scans over Aug 6-12 — same Dec-2028 expiry every time, only
+# the strike drifting with spot (480→450). Cause: the binding constraint was
+# CVX_SCORE_MIN, and the ranker picks the LOWEST required-CAGR passer, so the
+# scanner solved for its own boundary — every AAPL row landed at convexity
+# 20.0-21.8x, just over the old floor of 20. Required CAGR stayed pinned at
+# 20.6-21.8% while AAPL ranged $301-316, i.e. the output carried no information
+# about entry timing. Calibrated against all 28 historical rows: the new values
+# reject all 22 AAPL rows and the 4 marginal PYPL Grade-B rows, and keep the
+# 2 PYPL Grade-A rows. Zero results is an expected outcome — do NOT loosen
+# these to fill the page.
+CVX_CAGR_MAX          = 0.18   # Required CAGR hard max (≤18%) — was 0.25
+CVX_CAGR_PREF         = 0.15   # preferred (<15%)
+CVX_SCORE_MIN         = 30     # Convexity Score hard min (≥30) — was 20
+CVX_SCORE_PREF        = 40     # preferred (>40)
+CVX_SCORE_EXC         = 50     # exceptional (>50)
+CVX_PREM_MAX          = 0.05   # Premium % hard max (≤5%) — was 0.12
+CVX_PREM_PREF         = 0.04   # preferred (<4%)
+CVX_PREM_EXC          = 0.03   # exceptional (<3%)
+# Coverage@20% is the honesty gate: cov20 < 1.00 means the trade LOSES money
+# even if the stock compounds at 20%/yr for the life of the option. Every AAPL
+# row sat at 0.94-0.99 — it needed >21%/yr just to break even, which for a
+# mega-cap is underwriting a growth rate the name is unlikely to deliver. This
+# value was already computed and stored on the row; it was simply never gated.
+CVX_COV20_MIN         = 1.00   # Coverage@20% hard min (≥1.00) — NEW
+CVX_COV30_MIN         = 1.20   # Coverage@30% hard min (≥1.20) — was 1.05
+CVX_COV30_PREF        = 1.25   # preferred (>1.25)
 CVX_STRIKE_PCT_MIN    = 1.25   # Strike % hard min (≥125%)
 CVX_STRIKE_PCT_PREF_LO= 1.40   # preferred band 140%–220%
 CVX_STRIKE_PCT_PREF_HI= 2.20
-CVX_BURDEN_MAX        = 0.05   # Annualized Premium Burden hard max (<5%/yr)
-CVX_BURDEN_PREF       = 0.03   # preferred (<3%/yr)
+CVX_BURDEN_MAX        = 0.025  # Annualized Premium Burden hard max (<2.5%/yr) — was 0.05
+CVX_BURDEN_PREF       = 0.015  # preferred (<1.5%/yr)
 CVX_SPREAD_MAX        = 0.15   # bid/ask spread hard ceiling (<15%)
 CVX_SPREAD_PREF       = 0.10   # preferred (<10%)
 CVX_OI_MIN            = 50     # hard min (≥50); below 50 hidden unless manual
@@ -3811,12 +3828,14 @@ def leaps_trend_action(trend: dict, ivp: float, price: float, week52_high: float
     }
 
 def _cvx_hard_filters(req_cagr, conv_score, prem_pct, cov30, dte, spread_pct, oi,
-                      strike_pct, ann_burden):
+                      strike_pct, ann_burden, cov20):
     """
     Apply STRICT-MODE hard filters. Returns a list of failure reasons (empty = passes).
-    All decimal inputs are fractions except conv_score/cov30 (ratios), dte/oi (ints).
+    All decimal inputs are fractions except conv_score/cov20/cov30 (ratios), dte/oi (ints).
     """
     fails = []
+    if cov20 < CVX_COV20_MIN:
+        fails.append(f"Cov@20% {cov20:.2f} < {CVX_COV20_MIN:.2f} (loses at 20%/yr)")
     if dte < CVX_DTE_MIN:
         fails.append(f"DTE {dte} < {CVX_DTE_MIN}")
     if req_cagr > CVX_CAGR_MAX:
@@ -3877,8 +3896,9 @@ def scan_convexity(ticker, price, contracts, ivp):
     Cheap Convexity LEAPS scanner — STRICT MODE (default).
 
     Main output: ONLY far-OTM long-dated calls passing ALL hard filters
-    (DTE>=700, Req CAGR<=25%, Convexity>=20, Premium<=12%, Cov@30%>=1.05,
-    Strike%>=125%, Burden<5%/yr, Spread<15%, OI>=50). Graded A or B.
+    (DTE>=700, Req CAGR<=18%, Convexity>=30, Premium<=5%, Cov@20%>=1.00,
+    Cov@30%>=1.20, Strike%>=125%, Burden<2.5%/yr, Spread<15%, OI>=50).
+    Graded A or B. Thresholds tightened 2026-08-12 — see the CVX_* block.
 
     Near-misses (fail >=1 hard filter but otherwise plausible, DTE>=365) are
     emitted separately with is_nearmiss=True for the hidden Diagnostics panel.
@@ -3932,7 +3952,7 @@ def scan_convexity(ticker, price, contracts, ivp):
             cov20 = cov.get(20, 0)
 
             fails = _cvx_hard_filters(req_cagr, conv_score, prem_pct, cov30, dte,
-                                      spread_pct, oi, strike_pct, ann_burden)
+                                      spread_pct, oi, strike_pct, ann_burden, cov20)
             if fails:
                 continue   # near-misses discarded — main view shows passers only
             grade, label = _cvx_grade(req_cagr, conv_score, prem_pct, cov30, dte)
