@@ -67,6 +67,28 @@ MOVE_SCAN_FRESH_MIN   = 25    # skip if a full scan completed within this many m
 MOVE_NEAR_TARGET_PCT  = 10.0  # price within 10% of buy_under / sell_above
 MOVE_NEAR_STRIKE_PCT  = 12.0  # price within 12% of a held short strike
 
+# ── Zone-landing scan trigger (A33) ──────────────────────────────────────
+# A move SMALLER than MOVE_SCAN_PCT can still be the one that matters: CRDO
+# +5.1% on 2026-08-13 landed 6.1% below the $300 sell target, i.e. squarely in
+# CC range — but the last full scan of the day had caught it at $266.73 (11.1%
+# below, OUT), so the dashboard had no CC card to show and would not get one
+# until the next morning. Size alone is the wrong trigger; WHERE the move lands
+# is the point. Same budget guards as the big-mover path — one trigger per
+# ticker/direction/day, the shared daily cap, and the freshness skip.
+#
+# These bands MUST match the scanner's target zones (A32). If the watcher used
+# its own looser numbers it would burn IBKR budget dispatching scans for rows
+# the dashboard then hides as OUT — the two-code-paths-drift failure that P30
+# is about. Imported from whale_scanner so they cannot drift; the literals are
+# a fallback only, and the source is logged on every run.
+try:
+    from whale_scanner import CSP_NEAR_PCT as ZONE_CSP_NEAR, CC_NEAR_PCT as ZONE_CC_NEAR
+    ZONE_BAND_SRC = "whale_scanner"
+except Exception as _zone_import_err:      # never let this break the watcher
+    ZONE_CSP_NEAR, ZONE_CC_NEAR = 0.05, 0.08
+    ZONE_BAND_SRC = (f"FALLBACK literals — could not import whale_scanner "
+                     f"({_zone_import_err.__class__.__name__}: {_zone_import_err})")
+
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID   = os.environ.get("TELEGRAM_CHAT_ID", "")
 
@@ -177,6 +199,26 @@ def near_actionable(tk, price, chg, targets, short_pos):
     return (bool(reasons), reasons)
 
 
+def lands_in_zone(tk, price, chg, targets):
+    """A33: after this move, is the stock AT or NEAR one of John's own targets,
+    measured with the SCANNER's bands (A32) rather than the looser ping
+    proximity? Returns (bool, reason).
+
+    Deliberately direction-aware, matching the strategy each side implies:
+      drop toward buy-under  -> a CSP may now be writable
+      rise toward sell-above -> a CC may now be writable
+    buy_under = 0 is NO BUY, so it can never trigger the buy side.
+    """
+    tgt = targets.get(tk, {})
+    bu = tgt.get("buy_under", 0) or 0
+    sa = tgt.get("sell_above", 0) or 0
+    if chg < 0 and bu > 0 and price <= bu * (1 + ZONE_CSP_NEAR):
+        return True, f"${price:,.2f} at/near buy-under ${bu:g}"
+    if chg > 0 and sa > 0 and price >= sa * (1 - ZONE_CC_NEAR):
+        return True, f"${price:,.2f} at/near sell-above ${sa:g}"
+    return False, ""
+
+
 def build_line(tk, price, chg, targets, short_pos):
     """One alert line: move + target context + held-position context."""
     arrow = "🟢▲" if chg > 0 else "🔴▼"
@@ -272,39 +314,46 @@ def run_watchdog(state: dict) -> bool:
     return changed
 
 
-def run_move_trigger(state: dict, big_movers: list) -> bool:
-    """Dispatch ONE full scan when a big mover (>=MOVE_SCAN_PCT) appears, so a
-    fresh trade candidate (LEAPS BUY_DIP, P&L) lands within ~15 min instead of
-    waiting for the next 3x/day slot. Budget-guarded. Returns True if state
-    changed. big_movers: list of (ticker, chg, key) already past MOVE_SCAN_PCT."""
-    if not big_movers:
+def run_move_trigger(state: dict, movers: list) -> bool:
+    """Dispatch ONE full scan when a mover warrants fresh candidates, so a new
+    card (LEAPS BUY_DIP, a CC that just came into range, refreshed P&L) lands
+    within ~15 min instead of waiting for the next 3x/day slot. Budget-guarded.
+    Returns True if state changed.
+
+    movers: list of (ticker, chg, key, why) where `why` is the trigger reason —
+    either a big move (>=MOVE_SCAN_PCT, A12) or a >=MOVE_ALERT_PCT move that
+    landed the price at/near a target (A33). Both share the same dedup keys and
+    the same daily cap, so adding the second path cannot increase the worst-case
+    number of scans per day.
+    """
+    if not movers:
         return False
     triggered = state.setdefault("scan_triggered", {})     # key -> True (per day)
     count = state.setdefault("scan_trigger_count", 0)
     # Only names not already used to trigger a scan today
-    fresh = [(tk, chg, key) for tk, chg, key in big_movers if key not in triggered]
+    fresh = [m for m in movers if m[2] not in triggered]
     if not fresh:
         return False
     if count >= MOVE_SCAN_MAX_PER_DAY:
-        print(f"move-trigger: {len(fresh)} big mover(s) but daily cap "
+        print(f"move-trigger: {len(fresh)} mover(s) but daily cap "
               f"({MOVE_SCAN_MAX_PER_DAY}) reached — IBKR budget guard")
         # still record them so we don't log this every 15 min
-        for tk, chg, key in fresh:
+        for tk, chg, key, why in fresh:
             triggered[key] = True
         return True
     last = last_scan_utc()
     if last is not None:
         age = (datetime.now(timezone.utc) - last).total_seconds() / 60
         if age < MOVE_SCAN_FRESH_MIN:
-            print(f"move-trigger: big mover(s) but a scan ran {age:.0f} min ago "
+            print(f"move-trigger: mover(s) but a scan ran {age:.0f} min ago "
                   f"(<{MOVE_SCAN_FRESH_MIN}) — data still fresh, not dispatching")
-            for tk, chg, key in fresh:
+            for tk, chg, key, why in fresh:
                 triggered[key] = True     # this scan already covers them
             return True
-    names = ", ".join(f"{tk} {chg:+.1f}%" for tk, chg, key in fresh)
-    print(f"move-trigger: big mover(s) [{names}] — dispatching full scan")
-    if dispatch_scanner(f"big move: {names}"):
-        for tk, chg, key in fresh:
+    names = ", ".join(f"{tk} {chg:+.1f}% ({why})" for tk, chg, key, why in fresh)
+    print(f"move-trigger: [{names}] — dispatching full scan")
+    if dispatch_scanner(f"move: {names}"):
+        for tk, chg, key, why in fresh:
             triggered[key] = True
         state["scan_trigger_count"] = count + 1
         return True
@@ -332,8 +381,11 @@ def main():
     if state.get("date") != today:
         state = {"date": today, "alerted": {}}
 
+    print(f"zone bands for the scan trigger: CSP {ZONE_CSP_NEAR:.0%} / "
+          f"CC {ZONE_CC_NEAR:.0%} (source: {ZONE_BAND_SRC})")
+
     lines = []
-    big_movers = []          # (ticker, chg, key) for names past MOVE_SCAN_PCT
+    movers = []              # (ticker, chg, key, why) for the scan trigger
     changed = False
     for tk in watch:
         price, chg = yahoo_quote(tk)
@@ -342,10 +394,16 @@ def main():
         if abs(chg) < MOVE_ALERT_PCT:
             continue
         key = f"{tk}:{'up' if chg > 0 else 'down'}"
-        # Big moves still trigger a full scan regardless of proximity — that
-        # path surfaces LEAPS BUY_DIP etc. independent of these targets.
+        # Two independent reasons to spend a scan, both evaluated BEFORE the
+        # ping gate below so neither depends on whether a Telegram line fires:
+        #   A12 — a BIG move, regardless of proximity (surfaces LEAPS BUY_DIP)
+        #   A33 — a >=5% move that LANDS the price at/near a target, which is
+        #         where a fresh CSP/CC card actually comes from
+        _in_zone, _zone_why = lands_in_zone(tk, price, chg, targets)
         if abs(chg) >= MOVE_SCAN_PCT:
-            big_movers.append((tk, chg, key))
+            movers.append((tk, chg, key, f"big move {chg:+.1f}%"))
+        elif _in_zone:
+            movers.append((tk, chg, key, _zone_why))
         # A13 proximity gate: only PING when the move lands near something
         # actionable (buy-under / sell-above / a held strike). Applied before
         # the dedup mark so a name that later moves INTO range still alerts.
@@ -368,8 +426,9 @@ def main():
     else:
         print("no new movers")
 
-    # Move-triggered full scan: a big mover gets a fresh candidate now
-    changed = run_move_trigger(state, big_movers) or changed
+    # Move-triggered full scan: a big mover, or a move that landed at/near a
+    # target, gets fresh candidates now instead of at the next slot
+    changed = run_move_trigger(state, movers) or changed
 
     # Watchdog: rescue late/dropped scheduled scans
     changed = run_watchdog(state) or changed

@@ -258,6 +258,19 @@ to stabilize (that was the old LEAPS-engine philosophy, explicitly removed).
   labels become "IV 22% (IVP 33% of 1yr)" — no further change needed. Scoring
   still consumes the legacy `ivp` field unchanged (deliberate: relabel first,
   re-tune scoring only after real percentiles exist). Built 2026-07-31.
+- **A33 — Scan trigger on a move that LANDS at/near a target (P32/EX-28).**
+  `move_watcher.py` gains `lands_in_zone()`; `run_move_trigger()` now takes
+  `(ticker, chg, key, why)` and fires on either a ≥8% move (A12, unchanged) or
+  a ≥`MOVE_ALERT_PCT` move that lands the price inside the scanner's own zone
+  bands. Both paths share `scan_triggered` / `scan_trigger_count` and
+  `MOVE_SCAN_MAX_PER_DAY`, so the worst-case scans/day is unchanged at 3 —
+  verified by test. Bands are imported from `whale_scanner`
+  (`CSP_NEAR_PCT` / `CC_NEAR_PCT`) rather than redeclared, with a logged
+  fallback, so the watcher and the dashboard cannot disagree about what "near"
+  means. Direction-aware: a drop toward buy-under triggers, a rise toward
+  buy-under does not; `buy_under = 0` (NO BUY) can never trigger the buy side.
+  Validated on the real CRDO case plus 8 edge cases including the MU
+  counterexample from A13. Built 2026-08-13.
 - **A32 — Target-zone filter rebuilt; NO BUY enforced at source (P30/P31/EX-27).**
   `compute_in_zone()` now returns `(in_zone, tier, reason)` with tiers
   AT / NEAR / OUT / NO_BUY / NO_TARGET / EXEMPT, and the IV override is gone.
@@ -622,9 +635,42 @@ Result on the 2026-08-13 data: 9 pass, 10 out, 4 excluded as NO BUY.
   same question; profitability stays with the LEAPS scoring that already owns it.
 - Evidence: EX-27. System status: **Actioned — A32.**
 
+### P32 — Trigger a scan on WHERE a move lands, not just how big it was
+The move-triggered scan (A12) fired on size alone: ≥8%. But size is a proxy,
+and a poor one — the move that matters is the one that carries a name INTO an
+actionable zone, and that move is often small because the name was already
+close. CRDO's +5.1% was not big; it was decisive, because it left the stock
+6.1% below the $300 sell target with shares held. Meanwhile a name 105% above
+its buy target can move 8% and change nothing (the MU case behind A13).
+- Corollary that makes this urgent rather than cosmetic: the last full scan of
+  the day runs ~11:47 AM PT, and the market trades until 1:00 PM PT. A move
+  landing in-zone after the final scan had no path to the dashboard until the
+  next morning. The ping said "act", the dashboard had nothing to act on.
+- The band used to decide "in zone" must be the SCANNER's, not the watcher's
+  looser ping proximity — otherwise the trigger spends IBKR budget producing
+  rows the dashboard immediately hides. Imported, not copied (P30 again).
+- Evidence: EX-28. System status: **Actioned — A33.**
+
 ---
 
 ## Trade Examples (raw log)
+
+### EX-28 — The CRDO ping with no card behind it (2026-08-13)
+- Telegram: *"▲ CRDO +5.1% today ($281.73) — Sell-above $300: now 6.1% below
+  target."* John opened the CC tab expecting a card and found none.
+- CRDO's actual path that day: **$276.91** at the 10:44 PT scan (7.7% below
+  target → NEAR, shown) → **$266.73** at the 12:47 PT scan (11.1% below → OUT,
+  hidden) → **$281.73** live on the watcher. The dashboard was showing the
+  bottom of a round-trip, and 12:47 PT was the **last full scan of the day**,
+  so it would have stayed there until the next morning.
+- Nothing was broken: both surfaces were correct about their own timestamp. But
+  A32 changed the failure MODE — before it, CRDO's IVP of 83 tripped the old IV
+  override and the row displayed anyway, out of zone, for the wrong reason.
+  Removing the override converted a stale-but-visible row into an absence.
+  A filter that is honest about staleness makes staleness matter more, not
+  less; the fix belongs in the refresh path, not by relaxing the filter.
+- Fixed as A33: a ≥5% move that lands at/near a target now dispatches a full
+  scan, so the card arrives ~15 min after the ping instead of the next day.
 
 ### EX-27 — "I forgot what IN ZONE means" (2026-08-13)
 - John, looking at the CSP list: *"I see CSP for PATH. But I also know that PATH

@@ -54,13 +54,21 @@ independently.**
   tokens. NOTE: the ≥8% move still triggers a full scan regardless of
   proximity (that path surfaces LEAPS BUY_DIP etc.), so big movers aren't lost
   — only the raw ping is gated.
-- **Move-triggered full scan** (A12, inside the Move Watcher): a ≥5% move
-  only pings the price, but a **≥8% move** (`MOVE_SCAN_PCT`) dispatches a FULL
-  scan so a fresh candidate (LEAPS BUY_DIP, refreshed P&L) lands within ~15 min
-  instead of waiting for the next 3×/day slot. IBKR-budget guards: one trigger
-  per ticker/direction/day, a hard daily cap (`MOVE_SCAN_MAX_PER_DAY` = 3), and
-  skip if a scan ran within `MOVE_SCAN_FRESH_MIN` (25) min. State keys
-  `scan_triggered` / `scan_trigger_count` in `move_watcher_state.json`.
+- **Move-triggered full scan** (A12 + A33, inside the Move Watcher): TWO
+  independent reasons to spend a scan, sharing one budget —
+  (1) **≥8% move** (`MOVE_SCAN_PCT`), regardless of where it lands (surfaces
+  LEAPS BUY_DIP etc.); (2) **≥5% move that LANDS the price AT/NEAR a target**
+  (`lands_in_zone()`), which is where a fresh CSP/CC card actually comes from.
+  A fresh candidate then lands within ~15 min instead of at the next 3×/day
+  slot. IBKR-budget guards (shared by both paths, so A33 cannot raise the
+  worst case): one trigger per ticker/direction/day, hard daily cap
+  `MOVE_SCAN_MAX_PER_DAY` = 3, skip if a scan ran within `MOVE_SCAN_FRESH_MIN`
+  (25) min. State keys `scan_triggered` / `scan_trigger_count`.
+  **`lands_in_zone()` imports `CSP_NEAR_PCT`/`CC_NEAR_PCT` from
+  `whale_scanner`** — it must use the SCANNER's zone bands (5%/8%), NOT the
+  looser `MOVE_NEAR_TARGET_PCT` (10%) ping proximity, or it burns budget
+  dispatching scans for rows the dashboard then hides as OUT. The literals in
+  `move_watcher.py` are a fallback only; the band source is logged every run.
 - **Earnings Watcher** (`earnings_watcher.py` + `earnings-watcher.yml`): twice
   a weekday — **5:15 PM ET** (after-close reporters) and **7:30 AM ET**
   (before-open reporters + overnight catch-up). Both windows were previously
