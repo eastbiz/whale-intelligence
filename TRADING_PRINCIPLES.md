@@ -258,6 +258,27 @@ to stabilize (that was the old LEAPS-engine philosophy, explicitly removed).
   labels become "IV 22% (IVP 33% of 1yr)" — no further change needed. Scoring
   still consumes the legacy `ivp` field unchanged (deliberate: relabel first,
   re-tune scoring only after real percentiles exist). Built 2026-07-31.
+- **A32 — Target-zone filter rebuilt; NO BUY enforced at source (P30/P31/EX-27).**
+  `compute_in_zone()` now returns `(in_zone, tier, reason)` with tiers
+  AT / NEAR / OUT / NO_BUY / NO_TARGET / EXEMPT, and the IV override is gone.
+  Bands: CSP at ≤ buy_under, near within `CSP_NEAR_PCT` (5%); CC at ≥ sell_above,
+  near within `CC_NEAR_PCT` (8%) — both reused from the Price Watch panel so the
+  two surfaces agree; LEAPS at ≤ buy_under, near inside
+  `buy_under × (1+g)**years` with `g` from `LEAPS_GROWTH_BY_BUCKET`
+  (A .10 / B .15 / C .20 / D .25) plus `LEAPS_GROWTH_OVERRIDE` per ticker.
+  New `is_no_buy()` blocks CSP (all three paths: dashboard `csp_engine` loop,
+  Telegram `find_best_csp`, and post-drop) and LEAPS on `buy_under = 0` — and
+  deliberately treats a ticker with NO `SYMBOL_SETTINGS` entry (BABA/META/OWL)
+  as unconfigured, NOT as NO BUY. Convexity uses the `CONVEXITY` strategy: never
+  hidden by the filter (EX-15), tagged `no_buy_name` when applicable; its
+  `STRICT_ZONE_TELEGRAM` gate was removed as it contradicted EX-15 whenever the
+  flag was flipped. LEAPS rows now carry `implied_growth_pct` /
+  `growth_allowed_pct`, shown on the card as "Assumes/yr". Dashboard button
+  renamed "🎯 At / Near Target" with AT/NEAR/NO BUY/Off-target badges.
+  Verified against the 2026-08-13 scan: filter goes from 12 rows (all out of
+  zone) to 27 rows across 17 ticker+mode combos (all genuinely at/near), and 11
+  NO BUY rows disappear at source (PATH CSP; AAPL/MSTR/NFLX/PATH LEAPS).
+  Telegram volume unchanged — `STRICT_ZONE_TELEGRAM` is still False. Built 2026-08-13.
 - **A31 — Cheap Convexity hard filters tightened (P29/EX-26).** Six thresholds
   raised plus one new gate, all in the `CVX_*` block — no new plumbing, no
   behavior changes outside `_cvx_hard_filters`:
@@ -541,9 +562,99 @@ stock, roughly a $7T market cap by Dec 2028).
   if a metric never varies, it is describing the filter, not the market.
 - System status: **Actioned — A31.**
 
+### P30 — "In zone" must mean what it says, and a NO BUY name means NO BUY
+Two separate failures of the same kind — a filter whose name promised one thing
+and whose code did another.
+
+**(a) The IV override ate the zone.** The dashboard's "In Zone Only" toggle
+tested price against the target *and then* let anything through on `IVP ≥ 70`
+(CSP/CC) or `IVP ≤ 25` (LEAPS). On the 2026-08-13 scan, 14 of 24 priced names
+cleared that override and **12 of the 12 rows the filter kept were out of zone —
+zero passed on price.** The button showed the exact opposite of its name. Worse,
+IVP ≥ 70 selects for volatility, so the override was loudest on PLTR/NBIS/CLS/
+CRDO — the names where P3 says the zone matters most. A tolerance band is fine;
+a second rule that silently readmits everything the first rule excluded is not.
+- John: *"Should it be opportunities below or above my buy/sell targets? That
+  would be logical."* Yes — and that is what the label had always claimed.
+
+**(b) `buy_under = 0` meant two opposite things.** `SYMBOL_SETTINGS` and
+`compute_in_zone` read it as NO BUY. `csp_engine` and `find_best_csp` both gated
+with `if buy_under > 0`, so 0 meant *no restriction* — a NO BUY name got an
+**unlimited** entry price, the precise inverse of the intent. That is why PATH
+(`buy_under: 0`, +32.8% over 30 days) was printing a CSP with a $13.40 effective
+entry. John: *"Buy under = 0. I do not want to purchase more of that stock. No
+CSP or LEAP should fire."* A sentinel that reads as "unset" in one file and
+"forbidden" in another will eventually be read the wrong way; make it explicit
+(`is_no_buy()`) and gate at the source.
+- Note the near-miss: POWL's CSP was *correct* — strike $180 − $6.50 premium =
+  $173.50 effective entry, 3.6% BELOW the $180 buy target, exactly P27 — while
+  the stock sat 15% above it. John chose to filter CSPs on **stock price**
+  anyway, so POWL is hidden. Deliberate: the button answers "where is the stock
+  vs my target", the same question on all three strategies.
+- Evidence: EX-27. System status: **Actioned — A32.**
+
+### P31 — A LEAPS entry band is a growth allowance, not a percentage
+A flat band cannot work across strategies. The old LEAPS rule was
+`price ≤ buy_under × 1.10`, and it excluded **23 of 23 LEAPS names** on the
+2026-08-13 scan — a wall, not a band. John: *"Isn't the price target too
+restrictive for LEAPS? There is a difference if LEAP dte is 2 years vs 3 years.
+The length of DTE gives more time for price to rise. Also some super growth
+stocks might need to be more aggressive."*
+
+Both objections are the same objection, and one formula answers both:
+
+    price ≤ buy_under × (1 + g) ** years
+
+- **DTE scales it mechanically.** 20%/yr allows 31% headroom at 1.5 years and
+  73% at 3 years. No separate rule needed.
+- **`g` carries the growth profile.** Default by bucket (A 10% / B 15% / C 20% /
+  D 25%), with a per-ticker override, because bucket grades VOLATILITY and the
+  two diverge.
+- **A drop re-enters the band on its own.** A big fall cuts the growth today's
+  price implies, so the name qualifies without any special dip rule.
+
+The number this exposes is the real content, and nothing displayed it before:
+PLTR at $176.32 against an $85 buy target over 1.44 years **implies 66%/yr**.
+That, not "107% above target", is the honest reason not to enter there.
+Result on the 2026-08-13 data: 9 pass, 10 out, 4 excluded as NO BUY.
+- Caveat recorded deliberately: the band measures **spot**, not breakeven
+  (strike + premium, 3-9% higher). Kept on spot so CSP/CC/LEAPS all answer the
+  same question; profitability stays with the LEAPS scoring that already owns it.
+- Evidence: EX-27. System status: **Actioned — A32.**
+
 ---
 
 ## Trade Examples (raw log)
+
+### EX-27 — "I forgot what IN ZONE means" (2026-08-13)
+- John, looking at the CSP list: *"I see CSP for PATH. But I also know that PATH
+  had a run up recently. 30 day change +29.89%. So in my mind it is not the best
+  time to write CSP. There are two CSP opportunities shown POWL and PATH. When I
+  click on IN ZONE it shows only POWL. I forgot what IN ZONE MEANS."*
+- Investigation found the label was the smallest problem. **Three** things were
+  wrong, and neither of the two tickers was behaving the way the name implied:
+  - **POWL showed because of the IV override, not price.** $207.09 against a
+    $180 buy target = 15.0% ABOVE it. The Price Watch panel at the top of the
+    same page called POWL `FAR`. Same ticker, same screen, opposite verdicts —
+    because the panel and the toggle were two different definitions of
+    "in zone", and only one of them had an escape hatch.
+  - **PATH was hidden for an unrelated reason** — `buy_under = 0` → NO BUY. The
+    filter never looked at the 30-day run-up John was reacting to. Right answer,
+    wrong mechanism, and the CSP row itself should never have existed (P30b).
+  - **Every kept row was out of zone** — 12 of 12 (P30a).
+- Fixed as A32. Decisions taken in the thread, all John's: kill the IV override
+  outright; measure CSP on stock price and CC on sell_above; keep a NEAR tier
+  (5% CSP / 8% CC, reusing the Price Watch panel's own APPROACHING bands so the
+  two surfaces finally agree); growth-allowance band for LEAPS by bucket; NO BUY
+  blocks CSP and LEAPS; **convexity stays exempt** (EX-15 holds — a far-OTM long
+  call has no assignment risk) but now carries a visible NO BUY tag, which
+  closes the C-list item opened by EX-26.
+- Meta-lesson, third instance of the shape (EX-15 dashboard mismatch, EX-26
+  AAPL monoculture): **when two code paths answer the same question, they will
+  drift, and the drift is invisible until someone reads both.** The Price Watch
+  panel and the opportunity filter had disagreed about POWL for as long as both
+  existed. Nothing failed loudly; the button just quietly stopped meaning
+  anything.
 
 ### EX-26 — The AAPL convexity monoculture (2026-08-06 → 08-12)
 - John: "I only keep seeing trades for AAPL in convexity. Only the expiration

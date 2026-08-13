@@ -135,6 +135,27 @@ independently.**
   shows midpoint-passing CCs.
 - **Strict filters surface rare value.** Zero results is an acceptable, expected
   outcome (especially convexity). Do NOT loosen filters to fill the page.
+- **Target zones (A32/P30/P31)** — `compute_in_zone()` answers one question on
+  every strategy: *where is the stock vs John's own buy/sell target?* Tiers are
+  AT / NEAR / OUT / NO_BUY / NO_TARGET / EXEMPT; the dashboard's
+  "🎯 At / Near Target" button keeps AT + NEAR. **There is no IV override and
+  none may be re-added** — the old one (IVP ≥ 70) cleared 14 of 24 names and
+  made 12 of 12 kept rows out-of-zone. NEAR bands: CSP 5% above buy_under, CC 8%
+  below sell_above (both shared with the Price Watch panel — keep them in sync
+  or the two surfaces disagree about the same ticker, which is exactly the bug
+  EX-27 was reported as). LEAPS uses a growth allowance,
+  `buy_under × (1+g)**years`, NOT a flat percentage: a flat ×1.10 excluded 23 of
+  23 LEAPS names. `g` per bucket (A 10 / B 15 / C 20 / D 25 %/yr) with
+  `LEAPS_GROWTH_OVERRIDE` per ticker.
+- **`buy_under = 0` means NO BUY — no CSP, no LEAPS, ever.** Use `is_no_buy()`;
+  do NOT test `buy_under > 0`. That test used to mean "no restriction", so a
+  NO BUY name got an *unlimited* entry price (PATH printed a CSP for months).
+  All three CSP paths are gated (dashboard `csp_engine` loop, Telegram
+  `find_best_csp`, post-drop) plus LEAPS. A ticker with NO `SYMBOL_SETTINGS`
+  entry at all (BABA/META/OWL) is *unconfigured*, not NO BUY — don't collapse
+  the two. **Cheap convexity is EXEMPT** (EX-15: a far-OTM long call has no
+  assignment risk); it is never hidden by the filter and only carries a
+  `no_buy_name` tag.
 - **Volatile names (NBIS, CRDO, CLS) are the whole point** of the move-based
   alerts. They jump 10%+ in a day; those are the moments that matter.
 - **CCs on explosive winners cap upside.** NBIS covered-call assignments have
@@ -245,6 +266,8 @@ call still marked at its pre-drop price). The engine guards against this:
   `watchlist` tier (META).
 - **Feature flags:** `ENABLE_PIO = False` (Position Income Optimization, noisy),
   `STRICT_ZONE_TELEGRAM = False`.
+- **Zone constants:** `CSP_NEAR_PCT` (0.05), `CC_NEAR_PCT` (0.08),
+  `LEAPS_GROWTH_BY_BUCKET`, `LEAPS_GROWTH_DEFAULT`, `LEAPS_GROWTH_OVERRIDE`.
 - **Editable alert thresholds** (top of file): `BIGMOVE_1D`, `BIGMOVE_3D`,
   `PNLSWING_MIN_IMPROVE` / `PNLSWING_FLIP_FROM` / `PNLSWING_FLIP_TO`,
   convexity `CVX_*` constants, `MAX_CC_COVERAGE_PCT`.
@@ -264,6 +287,14 @@ call still marked at its pre-drop price). The engine guards against this:
   to review: the Telegram blocks in `whale_scanner.py`, `move_watcher.py`
   (`build_line` + `near_actionable`), and the dashboard's Actions tab
   (separate repo). Filter by type explicitly — never assume.
+
+- **The dashboard carries its own STALE `SYMBOL_SETTINGS` copy** (`index.html`
+  ~line 1432, used by the settings-export table). Its numbers have drifted from
+  the scanner's — it lists AAPL `buy_under: 200` while the scanner says 0 (NO
+  BUY), NBIS 90 vs 150, PLTR 115 vs 85. Nothing in the opportunity pipeline
+  reads it, so it is display-only, but it will mislead anyone who checks targets
+  there. Not reconciled as of 2026-08-13 (out of scope for A32) — fix by
+  sourcing it from `results.json` rather than by hand-editing the copy.
 
 - **Multiple CC code paths.** CC logic exists in ≥3 places: `find_best_cc()`
   (~2834), the inline CC scanner (~5108), and the inline PIO scanner (~5217).

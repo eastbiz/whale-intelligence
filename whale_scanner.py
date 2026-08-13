@@ -497,65 +497,145 @@ BUCKETS = load_buckets("buckets.csv")
 ENABLE_PIO = False
 
 # ── Feature flag: Strict zone-only Telegram ──────────────────
-# When True: Telegram alerts ONLY fire for opportunities where the stock's
-# current price has reached the actionable zone (CSP: price ≤ buy_under,
-# CC: price ≥ sell_above, LEAPS: price ≤ buy_under × 1.10), OR an IVR
-# override applies (IVR ≥ 70 for CSP/CC, IVR ≤ 25 for LEAPS, with data
-# reliability guards). Dashboard has a separate UI toggle.
+# When True: Telegram alerts ONLY fire for opportunities that are AT or NEAR
+# their target (see compute_in_zone). Dashboard has a separate UI toggle.
 # Default False — keeps current Telegram behavior.
 STRICT_ZONE_TELEGRAM = False
 
+# ── Target-zone bands (A32/P30) ──────────────────────────────
+# "Near" tolerances reuse the Price Watch panel's APPROACHING bands so the
+# panel and the opportunity filter give the same answer for the same ticker.
+CSP_NEAR_PCT = 0.05   # CSP near = within 5% ABOVE buy_under
+CC_NEAR_PCT  = 0.08   # CC  near = within 8% BELOW sell_above
+
+# LEAPS entry band = a GROWTH ALLOWANCE, not a flat percentage:
+#     price ≤ buy_under × (1 + g) ** years
+# Two things fall out of this for free, both of which John asked for:
+#   • A longer-dated contract earns a wider band (more time for the stock to
+#     get there) — 20%/yr allows 31% headroom at 1.5y but 73% at 3y.
+#   • A big drop pulls a name back INTO the band without any special rule,
+#     because the drop cuts the growth today's price implies.
+# A flat band cannot do either: the previous ×1.10 excluded 23 of 23 LEAPS
+# names on the 2026-08-13 scan — a wall, not a band.
+# Bucket grades VOLATILITY, so it is only the default; use the override when a
+# name's growth profile and its volatility diverge.
+LEAPS_GROWTH_BY_BUCKET = {"A": 0.10, "B": 0.15, "C": 0.20, "D": 0.25}
+LEAPS_GROWTH_DEFAULT   = 0.15
+LEAPS_GROWTH_OVERRIDE  = {}          # e.g. {"NBIS": 0.35} — per-ticker g
+
+
+def is_no_buy(ticker: str) -> bool:
+    """
+    True when buy_under is EXPLICITLY 0 for this symbol — John's "I do not want
+    to purchase more of this stock" marker (AAPL / NFLX / IBIT / PATH / MSTR).
+    No CSP and no LEAPS may be generated for such a name.
+
+    A ticker with NO SYMBOL_SETTINGS entry at all (BABA / META / OWL) is
+    UNCONFIGURED, not NO BUY — it keeps its current behavior. Collapsing those
+    two cases is exactly the bug this function exists to prevent.
+    """
+    _ss = SYMBOL_SETTINGS.get(ticker) or {}
+    return "buy_under" in _ss and (_ss.get("buy_under") or 0) <= 0
+
+
+def leaps_growth_allowance(ticker: str) -> float:
+    """Annual growth allowance used to size the LEAPS entry band."""
+    if ticker in LEAPS_GROWTH_OVERRIDE:
+        return LEAPS_GROWTH_OVERRIDE[ticker]
+    return LEAPS_GROWTH_BY_BUCKET.get(get_bucket(ticker, BUCKETS), LEAPS_GROWTH_DEFAULT)
+
+
+def leaps_implied_growth(price: float, buy_under: float, dte: int):
+    """
+    Annual growth today's price implies from the buy target over the option's
+    life: (price / buy_under) ** (1/years) − 1. Returns None when undefined.
+
+    This is the number that actually decides a LEAPS entry — PLTR at $176.32
+    against an $85 buy target over 1.44 years implies 66%/yr, which is the
+    honest reason not to enter there.
+    """
+    years = (dte or 0) / 365.0
+    if buy_under <= 0 or price <= 0 or years <= 0:
+        return None
+    return (price / buy_under) ** (1.0 / years) - 1.0
+
 
 def compute_in_zone(strategy: str, price: float, buy_under: float, sell_above: float,
-                    ivr: float, atm_iv: float) -> tuple:
+                    dte: int = 0, ticker: str = "") -> tuple:
     """
-    Determine if an opportunity is in its actionable zone.
+    Where an opportunity sits relative to John's own buy/sell target.
 
-    Returns (in_zone: bool, reason: str).
+    Returns (in_zone: bool, tier: str, reason: str) where tier is one of:
+      "AT"        — price has reached the target
+      "NEAR"      — inside the tolerance band (still approaching)
+      "OUT"       — beyond the band
+      "NO_BUY"    — buy_under is 0: John does not want to own this name
+      "NO_TARGET" — no target configured for this side
+    in_zone is True for AT and NEAR only.
 
-    Zones:
-      CSP:   price ≤ buy_under  (stock is in BUY zone)
-      CC:    price ≥ sell_above (stock is at SELL target)
-      LEAPS: price ≤ buy_under × 1.10 (stock near BUY zone — stock replacement entry)
+    Bands:
+      CSP:   AT price ≤ buy_under        NEAR within CSP_NEAR_PCT above
+      CC:    AT price ≥ sell_above       NEAR within CC_NEAR_PCT below
+      LEAPS: AT price ≤ buy_under        NEAR ≤ buy_under × (1+g)**years
 
-    IVR override (relaxes zone gate when premium environment is exceptional):
-      CSP/CC: IVR ≥ 70 → premium pays enough to justify out-of-zone trade
-      LEAPS:  IVR ≤ 25 → premium so cheap that LEAPS make sense even mid-band
-
-    Reliability guard for IVR override: requires atm_iv ≥ 0.15 (15%) to confirm
-    the IVR value isn't a phantom/stale reading. Stale weekend IVP showing 7%
-    won't satisfy this guard.
+    There is NO IV override. The old one (IVR ≥ 70 for CSP/CC, IVR ≤ 25 for
+    LEAPS) cleared 14 of 24 names and accounted for 12 of the 12 rows the
+    filter kept on the 2026-08-13 scan — i.e. every row it showed was out of
+    zone, and it was loudest on exactly the volatile names where the zone
+    matters most (P3). Removed 2026-08-13 at John's instruction.
     """
-    iv_reliable = atm_iv >= 0.15
     if strategy == "CSP":
         if buy_under <= 0:
-            return (False, f"NO BUY (buy_under=0)")
+            return (False, "NO_BUY", "NO BUY — you don't want to own this name")
         if price <= buy_under:
-            return (True, f"Price ${price:.2f} ≤ Buy Below ${buy_under:.0f} — IN BUY ZONE")
-        if iv_reliable and ivr >= 70:
-            return (True, f"OUT of zone but IVR {ivr:.0f} override (premium pays)")
+            return (True, "AT", f"Price ${price:.2f} ≤ Buy Below ${buy_under:.0f} — AT BUY TARGET")
         gap = (price - buy_under) / buy_under * 100
-        return (False, f"Stock ${price:.2f} is {gap:.1f}% above Buy Below ${buy_under:.0f}")
+        if price <= buy_under * (1 + CSP_NEAR_PCT):
+            return (True, "NEAR", f"Stock ${price:.2f} is {gap:.1f}% above Buy Below ${buy_under:.0f} — approaching")
+        return (False, "OUT", f"Stock ${price:.2f} is {gap:.1f}% above Buy Below ${buy_under:.0f}")
+
     if strategy == "CC":
         if sell_above <= 0:
-            return (False, f"No sell target set")
+            return (False, "NO_TARGET", "No sell target set")
         if price >= sell_above:
-            return (True, f"Price ${price:.2f} ≥ Sell Above ${sell_above:.0f} — IN SELL ZONE")
-        if iv_reliable and ivr >= 70:
-            return (True, f"OUT of zone but IVR {ivr:.0f} override (premium pays)")
+            return (True, "AT", f"Price ${price:.2f} ≥ Sell Above ${sell_above:.0f} — AT SELL TARGET")
         gap = (sell_above - price) / sell_above * 100
-        return (False, f"Stock ${price:.2f} is {gap:.1f}% below Sell Above ${sell_above:.0f}")
+        if price >= sell_above * (1 - CC_NEAR_PCT):
+            return (True, "NEAR", f"Stock ${price:.2f} is {gap:.1f}% below Sell Above ${sell_above:.0f} — approaching")
+        return (False, "OUT", f"Stock ${price:.2f} is {gap:.1f}% below Sell Above ${sell_above:.0f}")
+
     if strategy == "LEAPS":
         if buy_under <= 0:
-            return (False, f"NO BUY (buy_under=0)")
-        threshold = buy_under * 1.10
-        if price <= threshold:
-            return (True, f"Price ${price:.2f} ≤ ${threshold:.0f} (Buy Below ×1.10) — NEAR BUY ZONE")
-        if iv_reliable and ivr <= 25:
-            return (True, f"OUT of zone but IVR {ivr:.0f} override (premium cheap)")
-        gap = (price - threshold) / threshold * 100
-        return (False, f"Stock ${price:.2f} is {gap:.1f}% above LEAPS entry zone ${threshold:.0f}")
-    return (False, "unknown strategy")
+            return (False, "NO_BUY", "NO BUY — you don't want to own this name")
+        if price <= buy_under:
+            return (True, "AT", f"Price ${price:.2f} ≤ Buy Below ${buy_under:.0f} — AT BUY TARGET")
+        g     = leaps_growth_allowance(ticker)
+        years = (dte or 0) / 365.0
+        if years <= 0:
+            # No expiry to work with — no growth allowance can be justified.
+            gap = (price - buy_under) / buy_under * 100
+            return (False, "OUT", f"Stock ${price:.2f} is {gap:.1f}% above Buy Below ${buy_under:.0f} (no DTE)")
+        band    = buy_under * (1 + g) ** years
+        implied = leaps_implied_growth(price, buy_under, dte)
+        if price <= band:
+            return (True, "NEAR",
+                    f"Entry assumes {implied*100:.0f}%/yr from Buy Below ${buy_under:.0f} "
+                    f"over {years:.1f}y — within the {g*100:.0f}%/yr allowance")
+        return (False, "OUT",
+                f"Entry assumes {implied*100:.0f}%/yr from Buy Below ${buy_under:.0f} "
+                f"over {years:.1f}y — above the {g*100:.0f}%/yr allowance")
+
+    if strategy == "CONVEXITY":
+        # Cheap convexity is EXEMPT from buy_under (EX-15/P24): a far-OTM long
+        # call carries no assignment risk, so "would I buy the shares here" is
+        # not the question. Never hidden by the target filter — but a NO BUY
+        # name is tagged so the conflict is visible on the card (C-list item
+        # opened by the AAPL convexity rows, EX-26).
+        if buy_under <= 0:
+            return (True, "EXEMPT", "⚠ NO BUY on this name — convexity exempt (no assignment risk)")
+        return (True, "EXEMPT", f"Convexity — not gated by Buy Below ${buy_under:.0f} (no assignment risk)")
+
+    return (False, "OUT", "unknown strategy")
 
 # Speculative tickers — smaller position sizing, wider OTM buffers.
 # Suppressed from Telegram CSP entry alerts (entries only on deliberate decision).
@@ -1994,7 +2074,11 @@ def csp_engine(opp: dict, spy_day_chg: float = 0,
     CSP Entry Engine v3 — price-first, risk-aware.
     Actions: BUY_SAFE, BUY_RISKY, WAIT, SKIP
     Penalty stacking limited to top 2 strongest.
-    buy_under:     per-symbol max effective entry (strike - premium). 0 = no restriction.
+    buy_under:     per-symbol max effective entry (strike - premium).
+                   0 here means "no ceiling to apply" ONLY because a NO BUY
+                   name never reaches this function — callers drop it first via
+                   is_no_buy(). Do NOT re-read 0 as "John is fine owning this"
+                   (A32): that inversion let PATH print a CSP for months.
     csp_delta_min: per-symbol delta floor. 0 = use global default.
     csp_delta_max: per-symbol delta ceiling. 0 = use global default.
     ticker:        symbol (for bucket-aware flag/threshold lookup). "" = skip bucket checks.
@@ -3455,7 +3539,9 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality, sizing=None, m
     Find best cash-secured put opportunity.
     Returns (csp_dict, timing_dict) or (None, {})
 
-    buy_under: per-symbol max effective entry (strike - premium). 0 = no limit.
+    buy_under: per-symbol max effective entry (strike - premium). 0 here means
+      "no ceiling to apply" ONLY because a NO BUY name is dropped by the caller
+      via is_no_buy() before it gets here — never read 0 as "safe to buy" (A32).
       CRITICAL (A24/EX-20): this path feeds TELEGRAM. It previously had no
       buy_under awareness at all — only the dashboard's csp_engine enforced it —
       so Telegram recommended CSPs whose assignment price was well ABOVE John's
@@ -5296,10 +5382,13 @@ def run_scanner():
                 "oi_warning":oi_warning}
 
         # ── CSP ──────────────────────────────────────────
+        # A32: buy_under = 0 means NO BUY. A CSP is an offer to buy, so a
+        # NO BUY name must not produce one at all (John, 2026-08-13).
         if (gng["sell_premium"]
                 and sizing["status"] != "OVERWEIGHT"
                 and not quality["hard_stop"]
                 and not oi_warning
+                and not is_no_buy(ticker)
                 and ticker not in LEAPS_ONLY):
             # Apply risk regime adjustments when S&P below 200MA
             q_adjusted = dict(quality)
@@ -5349,9 +5438,12 @@ def run_scanner():
                       f"{pio_cc['annualized_return']}% ann | {pnl_status} | δ{pio_cc['delta']}")
 
         # ── Post-Drop CSP (Mode 3) ───────────────────────────
+        # A32: NO BUY blocks this path too — a post-drop CSP is still an offer
+        # to buy the name, and a drop does not change that John doesn't want it.
         drop_info = detect_price_drop(ticker, md)
         if (drop_info["is_drop"]
                 and tier in DROP_CSP_ALLOWED_TIERS
+                and not is_no_buy(ticker)
                 and sizing["status"] != "OVERWEIGHT"):
             drop_csp, drop_timing = find_drop_csp(
                 ticker, price, contracts, ivdata, pir,
@@ -5628,9 +5720,8 @@ def run_scanner():
     tg_drops  = top_drops    # time-sensitive — no score gate
 
     # ── Phase 1.6: STRICT_ZONE_TELEGRAM filter ─────────────────
-    # When the flag is True, suppress Telegram alerts unless the opportunity
-    # is in its actionable zone (CSP: price ≤ buy_under; CC: price ≥ sell_above;
-    # LEAPS: price ≤ buy_under × 1.10) OR IVR override applies.
+    # When the flag is True, suppress Telegram alerts unless the opportunity is
+    # AT or NEAR its target (see compute_in_zone). No IV override any more.
     if STRICT_ZONE_TELEGRAM:
         def _apply_strict_zone(opps: list, strategy: str) -> list:
             kept = []
@@ -5640,17 +5731,12 @@ def run_scanner():
                 _bu  = _sym.get("buy_under", 0) or 0
                 _sa  = _sym.get("sell_above", 0) or 0
                 _px  = o.get("price", 0) or 0
-                _ivr = o.get("ivp", 0) or 0
-                # Pull atm_iv from nested strategy dict (csp/cc/leaps)
-                _atm_iv = 0
-                for _k in ("csp", "cc", "leaps"):
-                    if isinstance(o.get(_k), dict):
-                        _atm_iv = o[_k].get("atm_iv", 0) or _atm_iv
-                _iz, _reason = compute_in_zone(strategy, _px, _bu, _sa, _ivr, _atm_iv)
+                _iz, _tier, _reason = compute_in_zone(strategy, _px, _bu, _sa,
+                                                      dte=o.get("dte", 0) or 0, ticker=_tk)
                 if _iz:
                     kept.append(o)
                 else:
-                    print(f"   📵 TG SUPPRESS {_tk} {strategy}: {_reason}")
+                    print(f"   📵 TG SUPPRESS {_tk} {strategy} [{_tier}]: {_reason}")
             return kept
         _pre_counts = (len(tg_csps), len(tg_ccs), len(tg_leaps))
         tg_csps  = _apply_strict_zone(tg_csps,  "CSP")
@@ -5979,7 +6065,15 @@ def run_scanner():
             print(f"   SYM_SETTINGS {ticker}: buy_under={_buy_under} csp_delta={_csp_delta_min}-{_csp_delta_max}")
 
         best_csp = None; best_csp_score = -1
-        for c in puts_30_60:
+        # A32: NO BUY (buy_under = 0) means no CSP at all on this name. Note the
+        # old csp_engine gate read `if buy_under > 0`, so 0 meant "no
+        # restriction" — a NO BUY name got an UNLIMITED entry price, the exact
+        # inverse of the intent. That inversion is why PATH (buy_under 0) was
+        # printing a CSP with a $13.40 effective entry.
+        _no_buy_csp = is_no_buy(ticker)
+        if _no_buy_csp:
+            print(f"   🚫 CSP SKIP {ticker}: NO BUY (buy_under=0)")
+        for c in ([] if _no_buy_csp else puts_30_60):
             try:
                 strike = float(c["strike"])
                 dte = (datetime.strptime(c["expiry"],"%Y-%m-%d") - datetime.now()).days
@@ -6081,12 +6175,12 @@ def run_scanner():
             csp_entry["score"]        = score_csp(csp_entry)  # kept for display score badge
             csp_entry["normalized"]   = normalized_score(csp_entry["score"], "CSP")
             csp_entry["quality_label"] = quality_label(csp_entry["score"], SCORE_MAX["CSP"])
-            # Phase 1.6: In-zone determination for UI filter
-            _iz, _iz_reason = compute_in_zone(
-                "CSP", price, csp_entry.get("buy_under") or 0, 0,
-                ivp_d, ivdata.get("iv_current", 0) or 0
+            # A32: target-zone tier for the UI filter
+            _iz, _iz_tier, _iz_reason = compute_in_zone(
+                "CSP", price, csp_entry.get("buy_under") or 0, 0, ticker=ticker
             )
             csp_entry["in_zone"]      = _iz
+            csp_entry["zone_tier"]    = _iz_tier
             csp_entry["zone_reason"]  = _iz_reason
             dashboard_csps.append(csp_entry)
 
@@ -6251,12 +6345,12 @@ def run_scanner():
                     "total_shares":        int(qty_d),
                     "action_label":        cc_entry["action_label"],
                 }
-                # Phase 1.6: In-zone determination for UI filter
-                _iz_cc, _iz_cc_reason = compute_in_zone(
-                    "CC", price, _buy_under_cc or 0, _sell_above or 0,
-                    ivp_d, ivdata.get("iv_current", 0) or 0
+                # A32: target-zone tier for the UI filter
+                _iz_cc, _iz_cc_tier, _iz_cc_reason = compute_in_zone(
+                    "CC", price, _buy_under_cc or 0, _sell_above or 0, ticker=ticker
                 )
                 cc_entry["in_zone"]     = _iz_cc
+                cc_entry["zone_tier"]   = _iz_cc_tier
                 cc_entry["zone_reason"] = _iz_cc_reason
                 dashboard_ccs.append(cc_entry)
 
@@ -6345,7 +6439,13 @@ def run_scanner():
                 print(f"   DBG PIO BLOCKED {ticker}: {_cc_zone_reason}")
 
         # ── LEAPS: all with decent timing ────────────────────
-        if ticker not in LEAPS_ONLY:
+        # A32: NO BUY (buy_under = 0) blocks LEAPS as well as CSP — a deep-ITM
+        # LEAPS is a stock replacement, so it is a purchase of the name
+        # (John, 2026-08-13). Cheap convexity is deliberately NOT blocked here;
+        # it stays exempt under EX-15 and is tagged on the card instead.
+        if is_no_buy(ticker):
+            print(f"   🚫 LEAPS SKIP {ticker}: NO BUY (buy_under=0)")
+        elif ticker not in LEAPS_ONLY:
             _sym_leaps       = SYMBOL_SETTINGS.get(ticker, {})
             _leaps_buy_under = _sym_leaps.get("buy_under", 0)
             _leaps_delta_min = _sym_leaps.get("leaps_delta_min", LEAPS_DELTA_MIN)
@@ -6494,13 +6594,20 @@ def run_scanner():
                 leaps_entry["trend_label"]  = _trend_label_v
                 leaps_entry["trend_signal"] = _trend_signal_v
                 leaps_entry["trend_action"] = _trend_action_v
-                # Phase 1.6: In-zone determination for UI filter
-                _iz_l, _iz_l_reason = compute_in_zone(
+                # A32: target-zone tier for the UI filter. The band is a growth
+                # allowance scaled by this contract's own DTE, so the three
+                # bands can legitimately disagree if their expiries differ.
+                _iz_l, _iz_l_tier, _iz_l_reason = compute_in_zone(
                     "LEAPS", price, _leaps_buy_under or 0, 0,
-                    ivp_d, ivdata.get("iv_current", 0) or 0
+                    dte=_bl["dte"], ticker=ticker
                 )
+                _implied_g = leaps_implied_growth(price, _leaps_buy_under or 0, _bl["dte"])
                 leaps_entry["in_zone"]     = _iz_l
+                leaps_entry["zone_tier"]   = _iz_l_tier
                 leaps_entry["zone_reason"] = _iz_l_reason
+                # Shown on the card — this is the number that decides the entry
+                leaps_entry["implied_growth_pct"] = round(_implied_g * 100, 1) if _implied_g is not None else None
+                leaps_entry["growth_allowed_pct"] = round(leaps_growth_allowance(ticker) * 100, 1)
                 dashboard_leaps.append(leaps_entry)
                 print(f"   LEAPS [{_bdef['label']}] {ticker} ${_bl['strike']} δ{_bl['delta']} ext{ext_pct:.1f}% BE${_bl['breakeven']} {'★REC' if _is_rec else ''}")
 
@@ -6513,12 +6620,15 @@ def run_scanner():
                     _cv["tier"] = tier
                     _cv["support_levels"] = support_cache.get(ticker, {}) or {}
                     _cv["days_to_earnings"] = (lambda _ed: max(0, (_ed - datetime.now()).days) if _ed else 999)(earn_date_d)
-                    # In-zone: convexity entry favored when stock near/below buy_under (cheaper premium)
+                    # A32: convexity is EXEMPT from the target filter (EX-15) —
+                    # never hidden by it, but tagged when the name is NO BUY.
                     _cv_bu = SYMBOL_SETTINGS.get(ticker, {}).get("buy_under", 0)
-                    _iz_cv, _iz_cv_reason = compute_in_zone(
-                        "LEAPS", price, _cv_bu or 0, 0, ivp_d, ivdata.get("iv_current", 0) or 0)
+                    _iz_cv, _iz_cv_tier, _iz_cv_reason = compute_in_zone(
+                        "CONVEXITY", price, _cv_bu or 0, 0, ticker=ticker)
                     _cv["in_zone"]     = _iz_cv
+                    _cv["zone_tier"]   = _iz_cv_tier
                     _cv["zone_reason"] = _iz_cv_reason
+                    _cv["no_buy_name"] = is_no_buy(ticker)
                     _cv["buy_under"]   = _cv_bu if _cv_bu > 0 else None
                     dashboard_convexity.append(_cv)
                     _tag = "NEAR-MISS" if _cv.get("is_nearmiss") else _cv['class_label']
@@ -6549,19 +6659,10 @@ def run_scanner():
     # (2026-07-22: an AAPL Grade-B row was the only convexity all week).
     tg_convex = [o for o in dashboard_convexity
                  if o.get("classification") in ("A", "B") and not o.get("is_nearmiss")]
-    if STRICT_ZONE_TELEGRAM and tg_convex:
-        _pre = len(tg_convex)
-        _kept = []
-        for o in tg_convex:
-            _bu = SYMBOL_SETTINGS.get(o.get("ticker",""), {}).get("buy_under", 0) or 0
-            _iz, _rsn = compute_in_zone("LEAPS", o.get("price",0) or 0, _bu, 0,
-                                        o.get("ivp",0) or 0, 0)
-            if _iz:
-                _kept.append(o)
-            else:
-                print(f"   📵 TG SUPPRESS {o.get('ticker','')} CONVEXITY: {_rsn}")
-        tg_convex = _kept
-        print(f"   📵 STRICT_ZONE_TELEGRAM convexity: {_pre}→{len(tg_convex)}")
+    # A32: convexity is NOT zone-gated, even under STRICT_ZONE_TELEGRAM. EX-15
+    # settled that buy_under must not gate convexity (a far-OTM long call has
+    # no assignment risk), and the old gate here contradicted that the moment
+    # the flag was flipped. NO BUY names are tagged on the card instead.
     if tg_convex:
         print(f"   📱 Sending {len(tg_convex)} convexity alert(s) (A/B)...")
         send_telegram("━━━ *🎲 CHEAP CONVEXITY* ━━━"); time.sleep(1)
