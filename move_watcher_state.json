@@ -1,20 +1,7 @@
 {
-  "date": "2026-08-12",
-  "alerted": {
-    "CRDO:up": 10,
-    "SPCX:up": 10,
-    "NBIS:up": 30
-  },
-  "scan_triggered": {
-    "NBIS:up": true,
-    "CLS:up": true,
-    "CRDO:up": true,
-    "SPCX:up": true
-  },
-  "scan_trigger_count": 3,
+  "date": "2026-08-13",
+  "alerted": {},
   "dispatched": {
-    "13:47": true,
-    "16:41": true,
-    "18:47": true
+    "13:47": true
   }
 }
