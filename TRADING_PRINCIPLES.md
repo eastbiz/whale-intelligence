@@ -653,6 +653,47 @@ its buy target can move 8% and change nothing (the MU case behind A13).
 
 ---
 
+### P33 — Classification is conviction, and it modifies advice rather than gating it
+
+Every name carries a permanent, hand-set classification — **CORE / TRADING /
+SPECULATIVE / VERY SPECULATIVE** — that answers one question: *how willing is
+John to hold this through volatility?* It is deliberately NOT a buy/sell signal
+and NOT a filter. Valuation, IV, earnings, position size, P&L and the individual
+setup are all still evaluated on top of it.
+
+What it means at each level:
+- **CORE** — hold unless the thesis breaks. Don't suggest selling shares over
+  normal volatility or short-term overvaluation. Prioritise adding on real
+  pullbacks. CCs conservative, because assignment is *undesirable*.
+- **TRADING** — a good business he'll hold long term, but with more valuation,
+  cyclical, competitive or execution risk. Trim and write CCs more actively.
+  Assignment is fine at a good exit price.
+- **SPECULATIVE** — smaller max size. Partial profits after outsized gains. No
+  automatic averaging down on a lower price; confirm the thesis first.
+- **VERY SPECULATIVE** — small opportunistic position, never a permanent hold.
+  Never average down on price alone. Stronger warnings before binary catalysts.
+  Be ready to recommend a full exit when the thesis weakens.
+
+The distinction that matters most: **the same event produces different advice at
+different classifications.** A sharp rally on a CORE name is a conservative CC
+opportunity, not a sell. The same rally on a SPECULATIVE name is a CC *and* a
+partial-profit prompt. A sharp decline on CORE/TRADING is a possible
+accumulation; on SPECULATIVE it is a thesis-review prompt first; on VERY
+SPECULATIVE it is not an averaging-down or CSP trigger at all.
+
+**Explicitly rejected (2026-08-14):** the draft spec said "avoid routine
+cash-secured-put recommendations" for VERY SPECULATIVE. John struck that rule.
+NBIS puts are among his most-traded setups (EX-1, EX-2, EX-3) and suppressing
+them would have been a regression. Very Speculative names keep normal CSP
+eligibility; the bucket-D annualized floor and the delta band already do the
+risk work there. **Do not re-add a classification-based CSP suppression.**
+
+**Classification changes by hand only.** Nothing in the scanner reclassifies
+automatically, and a single earnings reaction is never a reason to reclassify.
+
+- Evidence: John's classification table, 2026-08-14. System status:
+  **Actioned — A34.**
+
 ## Trade Examples (raw log)
 
 ### EX-28 — The CRDO ping with no card behind it (2026-08-13)
@@ -1355,6 +1396,49 @@ rich-but-quiet opportunity (high IVP, no big move today) deserve a ping or not?
 
 ---
 
+### C15 — `SCORE_MAX["CSP"]` is 12 but `score_csp` can only reach 9
+
+`score_csp` awards Tier(3) + IVP(2) + Pullback(2) + Income(2) = **9 max**, but
+`SCORE_MAX["CSP"]` says 12. The Telegram gate is `ceil(0.75 × 12) = 9`, so a CSP
+reaches Telegram only on a *literally perfect* score — which additionally
+requires tier weight 3, i.e. **CORE names only**. Two consequences:
+- No Trading / Speculative / Very Speculative name can ever produce a routine
+  CSP Telegram alert, whatever the setup. (Post-drop and spike paths bypass the
+  score gate, so those still fire.)
+- `quality_label` divides a 9-max score by 12, so every CSP card reads one
+  quality band lower than it should on the dashboard.
+
+Deliberately NOT fixed as part of A34: setting `SCORE_MAX["CSP"] = 9` drops the
+threshold to 7, which combined with A34's higher tier weights would open routine
+CSP pings to most of the watchlist in one step. That is a volume decision, not a
+bug fix. Options, in increasing order of change: (a) fix `SCORE_MAX` for the
+label only and keep the gate at 9; (b) fix `SCORE_MAX` and raise
+`TELEGRAM_MIN_SCORE_PCT` to hold volume flat; (c) fix and accept more CSP pings.
+Needs John's call.
+
+### C16 — Partial profit-taking on SHARE positions (P33)
+
+The classification spec calls for a partial-profit prompt on Speculative and
+Very Speculative names after outsized rallies. Nothing does this today —
+`position_management_engine` covers short options only, and the dashboard's
+BUY/ADD/HOLD/TRIM label is a static allocation view, not event-driven.
+
+Not built in A34 on purpose: it needs a new row type in `position_actions`,
+which is the exact structure that broke twice in one week when `LEAPS_CALL` was
+added (EX-24 sent 10 LEAPS trim pushes; EX-25 printed "you hold short LEAPSCALL"
+with the wrong side and broken Markdown). Four consumers must be updated
+together — the Telegram blocks in `whale_scanner.py`, `move_watcher.py`
+(`build_line` + `near_actionable`), and the dashboard Actions tab in the other
+repo. Worth doing, worth doing as its own change.
+
+### C17 — Earnings exposure sizing line (P33)
+
+Before earnings, state whether the existing position already represents enough
+exposure on that name, scaled by classification (a Core name at 6% of a 8%
+target reads differently from a Very Speculative name already at its 3% cap).
+Would fold into the existing Earnings Watcher message rather than adding a new
+alert, so it costs no extra Telegram volume. Deferred with C16.
+
 ## Actioned changes (already implemented, traceable to principles)
 
 - **A1 — CRDO CSPs unblocked** (`buckets.csv`, `spreads_only` → FALSE). The flag
@@ -1412,3 +1496,50 @@ rich-but-quiet opportunity (high IVP, no big move today) deserve a ping or not?
   only when signal-worthy, then annualized + $/day. Convexity Telegram filter
   widened from Grade A only to A+B (strict mode already keeps these rare;
   cleared the "Grade B convexity → Telegram" backlog item). Built 2026-07-22.
+
+- **A34 — One classification system, and VERY SPECULATIVE finally exists**
+  (P33). The scanner carried **five** disagreeing copies of "how risky is this
+  name": the `CORE_STOCKS` / `GROWTH_STOCKS` / `CYCLICAL_STOCKS` /
+  `OPPORTUNISTIC_STOCKS` sets (the ones that actually drove logic), the
+  `tier_legacy` column in `buckets.csv`, a separate `SPECULATIVE` set, the
+  `speculative` flag in `TICKER_TARGETS`, and the section headers in
+  `SYMBOL_SETTINGS`. They disagreed on 19 of 29 names.
+
+  Worse, `VERY_SPECULATIVE_STOCKS` was defined but **never resolved**: all nine
+  copies of the tier ladder read `if t in CORE_STOCKS … else "Opportunistic"`,
+  so NBIS and MSTR were scored, sized and profit-taken exactly like CLS or KNX.
+  Fourteen of twenty-nine names shared one bottom tier.
+
+  Now: `CLASSIFICATION` (next to `SYMBOL_SETTINGS`) is the single source of
+  truth, holding John's 2026-08-14 table. `tier_of()` replaces all nine ladder
+  copies; every stock set is derived from it; `buckets.csv`'s `tier_legacy`
+  column is gone, replaced by `special` carrying only the behavioural flags
+  (WATCHLIST / EXIT_CC_ONLY) so the two files can no longer drift.
+
+  Tiers are now Core / Trading / Speculative / Very Speculative throughout —
+  `tier_weight` (3/2/1/0), `TIER_ALLOCATIONS` (12/8/5/3% hard max),
+  `TARGET_RANGES`, `score_unified` quality, the CSP 30-day yield floors,
+  support-level spacing, CC sizing and overweight bands, risk labels, and
+  `position_check`. Take-profit stays 80% for Speculative/Very Speculative and
+  90% above. `DROP_CSP_ALLOWED_TIERS` moves from {Core, Growth} to
+  {Core, Trading} per P33's "Core and Trading — evaluate for accumulation".
+
+  Also added: a dashboard-only `thesis_check` flag on CSP cards for Speculative
+  and Very Speculative names down ≥8% in a day or ≥15% over five days, so a
+  fallen speculative name reads as "confirm the thesis before adding" instead
+  of "cheap now". No alert, no Telegram. Constants `THESIS_CHECK_1D_PCT`,
+  `THESIS_CHECK_5D_PCT`. Cards and `results.json` gain a `conviction` field
+  (named to avoid colliding with convexity's `classification` grade).
+
+  Telegram volume, measured rather than assumed: the CSP path is unchanged
+  (still CORE-only and still requires a perfect card — see C15). CC and LEAPS
+  ceilings are unchanged, but the *margin* moves — a CC on a Trading name now
+  needs 8 of 10 non-tier points instead of 10 of 10, so CCs on
+  CRDO/FIX/KNX/LULU/MU/NVO/SPCX/UBER no longer require a ≥7% up day. That is
+  the intended direction (P33: Trading and Speculative names monetise
+  volatility more actively) and it stays bounded by the existing hard CC gates
+  — at/above `sell_above` plus the earnings buffer (A14/A15, P20/P21). PLTR
+  moves Growth → Speculative, so its CCs get one point *harder*. If the CC
+  volume turns out noisy, raise `TELEGRAM_MIN_SCORE_PCT`. Validated 10/10 on a
+  classification audit plus 20/20 on `bucket_config.py`. Built 2026-08-14 with
+  John's go-ahead.

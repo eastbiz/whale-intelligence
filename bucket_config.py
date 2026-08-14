@@ -8,7 +8,15 @@ Special flags supported:
   - spreads_only: Only PUT_SPREAD/CALL_SPREAD allowed (NBIS, CRDO)
   - leaps_only: Only LEAPS allowed, no premium selling (BABA)
   - cc_only: Only CC allowed — for exit-waiting positions (MSTR, OWL)
-  - WATCHLIST tier: Entry strategies blocked unless price in lower zones (META)
+  - WATCHLIST special: Entry strategies blocked unless price in lower zones (META)
+  - EXIT_CC_ONLY special: exit-waiting, same intent as cc_only (MSTR, OWL)
+
+NOTE: conviction classification (CORE / TRADING / SPECULATIVE / VERY_SPECULATIVE)
+does NOT live here. It lives in CLASSIFICATION in whale_scanner.py, which is the
+single source of truth. This file is about VOLATILITY (bucket A-D premium floors,
+delta bands, DTE) and behavioural flags only. The old `tier_legacy` column held a
+stale second copy of the classification and has been replaced by `special`, which
+carries only the behavioural flags — so the two can no longer drift apart.
 """
 
 import csv
@@ -66,7 +74,7 @@ def load_buckets(csv_path: str = "buckets.csv") -> Dict[str, dict]:
                 ticker = row["ticker"].strip().upper()
                 buckets[ticker] = {
                     "bucket": row["bucket"].strip().upper(),
-                    "tier_legacy": row.get("tier_legacy", "").strip(),
+                    "special": row.get("special", "").strip(),
                     "target_pct": float(row.get("target_pct", 0) or 0),
                     "min_ann_csp": float(row.get("min_ann_csp", 0) or 0),
                     "min_ann_cc": float(row.get("min_ann_cc", 0) or 0),
@@ -165,13 +173,13 @@ def is_leaps_allowed(ticker: str, buckets: Dict) -> bool:
 
 def is_watchlist_only(ticker: str, buckets: Dict) -> bool:
     entry = buckets.get(ticker.upper(), {})
-    return entry.get("tier_legacy", "").upper() == "WATCHLIST"
+    return entry.get("special", "").upper() == "WATCHLIST"
 
 
 def is_exit_only(ticker: str, buckets: Dict) -> bool:
-    """EXIT_CC_ONLY tier — same idea as cc_only but explicit semantic label."""
+    """EXIT_CC_ONLY — same idea as cc_only but explicit semantic label."""
     entry = buckets.get(ticker.upper(), {})
-    return entry.get("tier_legacy", "").upper().startswith("EXIT")
+    return entry.get("special", "").upper().startswith("EXIT")
 
 
 def classify_price_zone(price: float, buy_below: float, sell_above: float) -> str:

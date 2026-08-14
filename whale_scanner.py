@@ -281,18 +281,21 @@ SCHWAB_ACCOUNT_LABELS = {
 # ── Canonical tier target ranges (used everywhere) ───────────
 # Single source of truth — do not duplicate below
 TARGET_RANGES = {
-    "Core":          (5.0, 10.0),
-    "Growth":        (3.0,  6.0),
-    "Cyclical":      (2.0,  5.0),
-    "Opportunistic": (1.0,  3.0),
+    "Core":             (5.0, 10.0),
+    "Trading":          (3.0,  6.0),
+    "Speculative":      (1.5,  4.0),
+    "Very Speculative": (0.5,  2.0),
 }
 # Canonical tier allocations: (normal_max, hard_max)
 # normal_max = On Target ceiling, hard_max = Overweight trigger
+# Ladder reflects the classification spec: Speculative takes smaller maximum
+# positions than Core or Trading, and Very Speculative is sized as a small
+# opportunistic position rather than a permanent holding.
 TIER_ALLOCATIONS = {
-    "Core":          (0.08, 0.12),
-    "Growth":        (0.05, 0.08),
-    "Cyclical":      (0.04, 0.06),
-    "Opportunistic": (0.02, 0.04),
+    "Core":             (0.08,  0.12),
+    "Trading":          (0.05,  0.08),
+    "Speculative":      (0.03,  0.05),
+    "Very Speculative": (0.015, 0.03),
 }
 # Keep TIER_MAX_PCT as alias for backward compat
 TIER_MAX_PCT = {k: v[1] for k, v in TIER_ALLOCATIONS.items()}
@@ -445,43 +448,141 @@ OPP_EARNINGS_MIN      = 7
 # buy_under:  max effective entry for CSP (effective_entry <= buy_under * 1.03 hard gate)
 # sell_above: min effective exit for CC  (strike + premium >= sell_above hard gate)
 # Delta ranges are hard filters applied per strategy.
+# Per-symbol price targets and delta ranges.
+# Price targets last updated 2026-07-19 per John's table (reflecting the run-up).
+# buy_under = 0 means NO BUY (see is_no_buy) — no CSP, no LEAPS, ever.
+# AAPL and NFLX are CORE *and* NO BUY: CORE is willingness to HOLD, not
+# willingness to buy at today's price. That combination is intentional.
+# Grouped by CLASSIFICATION (defined immediately below), which is the
+# single source of truth for conviction tier. Keep the two in sync.
 SYMBOL_SETTINGS = {
-    # ── CORE ─────────────────────────────────────────────────────────────────
-    # Updated 2026-07-19 per user table — current price targets reflecting recent run-up.
-    # buy_under=0 means NO BUY (price way above target, only CC monitoring).
+    # ── CORE ────────────────────────────────────────────────────────────
+    # Highest conviction — hold through volatility; add on pullbacks
     "AAPL": {"buy_under":    0, "sell_above":  350, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "AMZN": {"buy_under":  220, "sell_above":  330, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "GOOGL":{"buy_under":  300, "sell_above":  450, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "IBKR": {"buy_under":   70, "sell_above":  110, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "MELI": {"buy_under": 1560, "sell_above": 2000, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "MSFT": {"buy_under":  345, "sell_above":  550, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "NFLX": {"buy_under":    0, "sell_above":   90, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.32, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "NOW":  {"buy_under":   90, "sell_above":  150, "csp_delta_min": 0.20, "csp_delta_max": 0.25, "cc_delta_min": 0.20, "cc_delta_max": 0.25, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "NVDA": {"buy_under":  180, "sell_above":  240, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "TSM":  {"buy_under":  320, "sell_above":  450, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    # ── TRADING ──────────────────────────────────────────────────────────────
+    # ── TRADING ─────────────────────────────────────────────────────────
+    # Willing to hold long term, but more valuation/cycle/execution risk
     "CRDO": {"buy_under":  175, "sell_above":  300, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "FIX":  {"buy_under": 1400, "sell_above": 1900, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    "MU":   {"buy_under":  450, "sell_above": 1400, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    "NFLX": {"buy_under":    0, "sell_above":   90, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.32, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    "PLTR": {"buy_under":   85, "sell_above":  180, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    "TSLA": {"buy_under":  300, "sell_above":  450, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    # ── SPECULATIVE ──────────────────────────────────────────────────────────
-    "CLS":  {"buy_under":  275, "sell_above":  400, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    "GRBK": {"buy_under":   63, "sell_above":   80, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    "IBIT": {"buy_under":    0, "sell_above":   46, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "KNX":  {"buy_under":   55, "sell_above":   80, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "LULU": {"buy_under":  105, "sell_above":  150, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    "NBIS": {"buy_under":  150, "sell_above":  280, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "MU":   {"buy_under":  450, "sell_above": 1400, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "NVO":  {"buy_under":   38, "sell_above":   60, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    "POWL": {"buy_under":  180, "sell_above":  290, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    # ── VERY SPECULATIVE (added 2026-06-22) ──────────────────────────────────
-    "UBER": {"buy_under":   65, "sell_above":   95, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    "GRAB": {"buy_under":  3.1, "sell_above":  4.5, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    "PATH": {"buy_under":    0, "sell_above": 16.0, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    "MSTR": {"buy_under":    0, "sell_above":  200, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    "PYPL": {"buy_under":   35, "sell_above":   75, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "SPCX": {"buy_under":  100, "sell_above":  150, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "UBER": {"buy_under":   65, "sell_above":   95, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    # ── SPECULATIVE ─────────────────────────────────────────────────────
+    # Higher risk — smaller size, partial profit-taking, thesis check before adding
+    "CLS":  {"buy_under":  275, "sell_above":  400, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "GRAB": {"buy_under":  3.1, "sell_above":  4.5, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "GRBK": {"buy_under":   63, "sell_above":   80, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "IBIT": {"buy_under":    0, "sell_above":   46, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "PATH": {"buy_under":    0, "sell_above": 16.0, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "PLTR": {"buy_under":   85, "sell_above":  180, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "POWL": {"buy_under":  180, "sell_above":  290, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "PYPL": {"buy_under":   35, "sell_above":   75, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "TSLA": {"buy_under":  300, "sell_above":  450, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    # ── VERY_SPECULATIVE ────────────────────────────────────────────────
+    # Small opportunistic positions — never average down on price alone
+    "MSTR": {"buy_under":    0, "sell_above":  200, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "NBIS": {"buy_under":  150, "sell_above":  280, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
 }
+
+# ── CLASSIFICATION — the single source of truth for conviction tier ──────────
+# Set 2026-08-14 from John's classification table. This is PORTFOLIO GUIDANCE,
+# not a buy/sell signal: it says how willing he is to hold the name through
+# volatility, and therefore how hard the scanner should push position size,
+# profit-taking, averaging down, and premium selling. Valuation, IV, earnings,
+# position size and the individual setup are all still evaluated on top of it.
+#
+#   CORE             — hold unless the thesis breaks; add on pullbacks;
+#                      conservative CCs because assignment is undesirable.
+#   TRADING          — good business, willing to hold, but more valuation /
+#                      cyclical / execution risk. Trim and write CCs more
+#                      actively; assignment is acceptable at a good exit price.
+#   SPECULATIVE      — smaller size, partial profits after big gains, no
+#                      automatic averaging down, thesis check before adding.
+#   VERY_SPECULATIVE — small opportunistic positions, never a permanent hold.
+#                      Never average down on price alone; stronger warnings
+#                      before binary catalysts; ready to exit on thesis damage.
+#
+# CHANGE THIS BY HAND ONLY. Nothing in the scanner reclassifies automatically —
+# that is deliberate (see "Classification Maintenance" in John's spec).
+#
+# Orthogonal to buckets.csv: bucket A-D is about VOLATILITY (premium floors,
+# delta bands, DTE). Classification is about CONVICTION. They deliberately
+# disagree in places — SPCX is bucket D (thin, needs 40% annualized) but
+# TRADING (John is willing to hold it).
+CLASSIFICATION = {
+    # ── CORE ──
+    "AAPL": "CORE",  "AMZN": "CORE",  "GOOGL": "CORE", "IBKR": "CORE",
+    "MELI": "CORE",  "MSFT": "CORE",  "NFLX":  "CORE", "NOW":  "CORE",
+    "NVDA": "CORE",  "TSM":  "CORE",
+    # ── TRADING ──
+    "CRDO": "TRADING", "FIX": "TRADING", "KNX": "TRADING", "LULU": "TRADING",
+    "MU":   "TRADING", "NVO": "TRADING", "SPCX": "TRADING", "UBER": "TRADING",
+    # ── SPECULATIVE ──
+    "CLS":  "SPECULATIVE", "GRAB": "SPECULATIVE", "GRBK": "SPECULATIVE",
+    "IBIT": "SPECULATIVE", "PATH": "SPECULATIVE", "PLTR": "SPECULATIVE",
+    "POWL": "SPECULATIVE", "PYPL": "SPECULATIVE", "TSLA": "SPECULATIVE",
+    # ── VERY SPECULATIVE ──
+    "MSTR": "VERY_SPECULATIVE", "NBIS": "VERY_SPECULATIVE",
+}
+
+# Display form of each classification — this is the `tier` string that flows
+# through every score, allocation table, card and results.json field.
+CLASSIFICATION_TIER = {
+    "CORE":             "Core",
+    "TRADING":          "Trading",
+    "SPECULATIVE":      "Speculative",
+    "VERY_SPECULATIVE": "Very Speculative",
+}
+# An unconfigured ticker gets the most cautious treatment. This matches the old
+# behaviour exactly: unknown names used to fall through to "Opportunistic",
+# which carried tier_weight 0 — "Very Speculative" also carries 0, so no score
+# moves because of this default.
+DEFAULT_CLASSIFICATION = "VERY_SPECULATIVE"
+DEFAULT_TIER           = CLASSIFICATION_TIER[DEFAULT_CLASSIFICATION]
+
+
+def classification_of(ticker: str) -> str:
+    """CORE / TRADING / SPECULATIVE / VERY_SPECULATIVE for a ticker."""
+    return CLASSIFICATION.get((ticker or "").upper(), DEFAULT_CLASSIFICATION)
+
+
+def tier_of(ticker: str) -> str:
+    """Display tier ('Core' / 'Trading' / 'Speculative' / 'Very Speculative').
+
+    Single replacement for the nine copies of
+        if t in CORE_STOCKS: ... elif t in GROWTH_STOCKS: ... else "Opportunistic"
+    that used to be scattered through this file. Every one of those copies
+    silently collapsed VERY_SPECULATIVE into the bottom tier, so the very
+    speculative names were indistinguishable from the merely speculative ones.
+    """
+    return CLASSIFICATION_TIER[classification_of(ticker)]
+
+
+def is_core(ticker: str) -> bool:
+    return classification_of(ticker) == "CORE"
+
+
+def is_very_speculative(ticker: str) -> bool:
+    return classification_of(ticker) == "VERY_SPECULATIVE"
+
+
+def needs_thesis_check(ticker: str) -> bool:
+    """Speculative and Very Speculative names must not be treated as automatic
+    accumulation candidates just because they fell. A decline is a prompt to
+    re-check the thesis first (John's spec, 'When the stock falls sharply')."""
+    return classification_of(ticker) in ("SPECULATIVE", "VERY_SPECULATIVE")
+
 
 # ── Phase 1: Load bucket assignments ──
 # Buckets define spreads_only / leaps_only / cc_only flags and bucket-aware
@@ -653,8 +754,19 @@ DROP_IVP_MIN          = 40    # preferred >50
 DROP_EARNINGS_MIN     = 7     # hard stop
 DROP_SIZE_FACTOR      = 0.60  # 50-70% of normal position size
 
-# Quality tiers allowed for post-drop CSP
-DROP_CSP_ALLOWED_TIERS = {"Core", "Growth"}
+# ── Thesis check (classification spec) ───────────────────────
+# A Speculative / Very Speculative name that has fallen this hard gets a
+# "confirm the thesis before adding" flag on its card instead of reading as a
+# straightforward dip-buy. Dashboard-only — no alert, no Telegram.
+THESIS_CHECK_1D_PCT   = -0.08   # >=8% single-day drop
+THESIS_CHECK_5D_PCT   = -0.15   # or >=15% over 5 days
+
+# Quality tiers allowed for post-drop CSP.
+# Per the classification spec: "For Core and Trading stocks, evaluate whether
+# the decline creates an accumulation opportunity." Speculative and Very
+# Speculative names get a thesis check instead of an automatic add — a lower
+# price is not by itself a reason to average down.
+DROP_CSP_ALLOWED_TIERS = {"Core", "Trading"}
 # Liquidity requirements
 MIN_OPEN_INTEREST     = 1000
 MIN_DAILY_VOLUME      = 100
@@ -666,7 +778,8 @@ MIN_PREMIUM_PCT_45_60 = 0.020 # 2.0% for 45-60 DTE
 MAX_SECTOR_PCT        = 0.25  # 25% max per sector
 
 # ── Stock universe defined below at canonical location ──────
-# (see CORE_STOCKS / GROWTH_STOCKS / CYCLICAL_STOCKS / OPPORTUNISTIC_STOCKS)
+# (derived from CLASSIFICATION — see CORE_STOCKS / TRADING_STOCKS /
+#  SPECULATIVE_STOCKS / VERY_SPECULATIVE_STOCKS)
 
 
 # ── Schwab API ───────────────────────────────────────────
@@ -1891,7 +2004,8 @@ def calc_support_levels(closes_21d: list, closes_63d: list, tier: str) -> dict:
     remains the hard gate for CSP/LEAPS qualification.
     """
     # Tier-specific volatility spacing between levels
-    _spread = {"Core": 0.03, "Growth": 0.05, "Cyclical": 0.04, "Opportunistic": 0.07}.get(tier, 0.05)
+    _spread = {"Core": 0.03, "Trading": 0.04, "Speculative": 0.05,
+               "Very Speculative": 0.07}.get(tier, 0.05)
 
     def _swing_lows(closes, window=3):
         """Local minima: closes[i] is lowest in a 2*window+1 band and preceded by a decline."""
@@ -1969,7 +2083,7 @@ def calc_support_levels(closes_21d: list, closes_63d: list, tier: str) -> dict:
 
 def tier_weight(tier: str) -> int:
     """Quality points by tier. Used in all strategy scores."""
-    return {"Core": 3, "Growth": 2, "Cyclical": 1, "Opportunistic": 0}.get(tier, 0)
+    return {"Core": 3, "Trading": 2, "Speculative": 1, "Very Speculative": 0}.get(tier, 0)
 
 def tier_target_range(tier: str) -> tuple:
     """Target allocation range (low%, high%) by tier — used as fallback."""
@@ -2104,7 +2218,7 @@ def csp_engine(opp: dict, spy_day_chg: float = 0,
                 return {"action": "SKIP", "drop_type": "WEAK", "yield_30d": 0,
                         "flags": ["BUCKET: watchlist — needs >15% pullback"], "sort_key": 0}
 
-    tier      = opp.get("tier", "Opportunistic")
+    tier      = opp.get("tier", DEFAULT_TIER)
     delta     = abs(opp.get("delta", 0))
     dte       = opp.get("dte", 30)
     strike    = opp.get("strike", 0)
@@ -2175,7 +2289,7 @@ def csp_engine(opp: dict, spy_day_chg: float = 0,
     flags.extend(penalties[:2])
 
     # Downgrades: only if strongest penalty present (applies to all tiers,
-    # including Opportunistic — previously Opportunistic was hard-skipped
+    # including the speculative ones — the bottom tier used to be hard-skipped
     # here, which meant high-IVP setups on speculative names were discarded
     # before yield was ever checked)
     if below_200 or at_lows:
@@ -2184,7 +2298,8 @@ def csp_engine(opp: dict, spy_day_chg: float = 0,
 
     # ── Step 3: Yield validation ───────────────────────────────
     yield_30d = (premium / strike) * (30 / dte) if strike > 0 and dte > 0 else 0
-    min_yields = {"Core": 0.015, "Growth": 0.020, "Opportunistic": 0.025, "Cyclical": 0.020}
+    min_yields = {"Core": 0.015, "Trading": 0.020,
+                  "Speculative": 0.025, "Very Speculative": 0.025}
     base_min   = min_yields.get(tier, 0.020)
     threshold  = base_min * (0.80 if ivp < 30 else 1.20 if ivp > 60 else 1.0)
 
@@ -2343,7 +2458,7 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
     prem_received = abs(pos.get("premium_received", 0))
     mark          = pos.get("mark", 0)
     mark_src      = pos.get("mark_src", "chain")   # 'chain' = live, else may be stale
-    tier          = pos.get("tier", "Opportunistic")
+    tier          = pos.get("tier", DEFAULT_TIER)
     earn_days     = pos.get("days_to_earnings", 999)
     assignment_intent = pos.get("assignment_intent", False)
 
@@ -2464,7 +2579,8 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
     earn_risk = earn_days <= 5
 
     # Per-tier profit thresholds
-    is_speculative = tier in ("Opportunistic",) or pos.get("speculative", False)
+    is_speculative = (tier in ("Speculative", "Very Speculative")
+                      or pos.get("speculative", False))
     take_profit_threshold = 80.0 if is_speculative else 90.0
 
     # ── P&L swing since last scan (prev value injected by caller) ──────
@@ -2724,7 +2840,7 @@ def position_decision(current_pct: float, tier: str) -> str:
     Position sizing decision per code patch guide section 8.
     Returns BUY / HOLD / TRIM based on current exposure vs tier allocation.
     """
-    allocs = TIER_ALLOCATIONS.get(tier, TIER_ALLOCATIONS["Opportunistic"])
+    allocs = TIER_ALLOCATIONS.get(tier, TIER_ALLOCATIONS[DEFAULT_TIER])
     min_alloc, max_alloc = allocs
     if current_pct < min_alloc:
         return "BUY"
@@ -2763,10 +2879,11 @@ def score_unified(opp: dict, mode: str = "CSP") -> float:
     Build component scores from opportunity dict and call unified_score().
     Returns 0-10 for display.
     """
-    tier = opp.get("tier", "Opportunistic")
+    tier = opp.get("tier", DEFAULT_TIER)
 
     # Quality (0-1)
-    quality = {"Core": 1.0, "Growth": 0.85, "Cyclical": 0.55, "Opportunistic": 0.20}.get(tier, 0.20)
+    quality = {"Core": 1.0, "Trading": 0.85, "Speculative": 0.55,
+               "Very Speculative": 0.20}.get(tier, 0.20)
 
     # Safety (0-1) — delta constraint applied here per patch guide section 3
     safety = 0.0
@@ -2820,34 +2937,23 @@ def score_unified(opp: dict, mode: str = "CSP") -> float:
 
 
 # ── Stock universe ────────────────────────────────────────────────────────────
-CORE_STOCKS = {
-    "AAPL", "AMZN", "GOOGL", "MSFT", "NVDA", "TSM",
-    "MELI", "IBKR",
-}
-GROWTH_STOCKS = {
-    "NOW", "NFLX", "PLTR",
-}
-CYCLICAL_STOCKS = {
-    "MU", "FIX", "CRDO", "TSLA",
-}
-OPPORTUNISTIC_STOCKS = {
-    "CLS", "GRBK", "IBIT", "KNX", "LULU", "NBIS", "NVO", "POWL",
-}
-# Very Speculative tier (added 2026-06-22) — was missing from ALL_TICKERS,
-# so these were configured but never actually pulled into market data / scanned.
-VERY_SPECULATIVE_STOCKS = {
-    "UBER", "GRAB", "PATH", "MSTR", "PYPL", "SPCX",
-}
+# All derived from CLASSIFICATION (defined next to SYMBOL_SETTINGS) — that dict
+# is the only place a ticker's conviction tier is written down. These sets exist
+# so existing membership tests keep reading naturally; do not hand-edit them.
+def _by_classification(name: str) -> set:
+    return {t for t, c in CLASSIFICATION.items() if c == name}
 
-ALL_TICKERS = sorted(
-    CORE_STOCKS | GROWTH_STOCKS | CYCLICAL_STOCKS | OPPORTUNISTIC_STOCKS
-    | VERY_SPECULATIVE_STOCKS
-)
+CORE_STOCKS             = _by_classification("CORE")
+TRADING_STOCKS          = _by_classification("TRADING")
+SPECULATIVE_STOCKS      = _by_classification("SPECULATIVE")
+VERY_SPECULATIVE_STOCKS = _by_classification("VERY_SPECULATIVE")
+
+ALL_TICKERS = sorted(CLASSIFICATION)
 
 # TARGET_RANGES defined at top of file
 
-# Speculative — wider OTM buffers required
-SPECULATIVE = {"IBIT", "CLS", "GRBK", "KNX", "LULU", "NBIS", "NVO", "POWL"} | VERY_SPECULATIVE_STOCKS
+# Speculative — wider OTM buffers required (LEAPS timing gate)
+SPECULATIVE = SPECULATIVE_STOCKS | VERY_SPECULATIVE_STOCKS
 
 # LEAPS/CSP only — no CC income generation
 LEAPS_ONLY = {"IBIT"}
@@ -2893,21 +2999,13 @@ def position_check(ticker: str, ibkr: dict) -> dict:
     Check current position size and return sizing info.
     Returns: status, current_pct, max_pct, room_usd, quantity, tier, avg_cost
     """
-    TIER_MAX = {"Core": 8.0, "Growth": 5.0, "Cyclical": 4.0, "Opportunistic": 2.5}
+    TIER_MAX = {"Core": 8.0, "Trading": 5.0,
+                "Speculative": 4.0, "Very Speculative": 2.5}
 
-    # Determine tier
-    tier = "Core"
-    if ticker in CORE_STOCKS:        tier = "Core"
-    elif ticker in GROWTH_STOCKS:    tier = "Growth"
-    elif ticker in CYCLICAL_STOCKS:  tier = "Cyclical"
-    else:                            tier = "Opportunistic"
-
+    tier        = tier_of(ticker)
     max_pct     = TIER_MAX.get(tier, 2.5)
     # Tier-aware max — use canonical TIER_MAX_PCT
-    tier_key = ("Core" if ticker in CORE_STOCKS else
-                "Growth" if ticker in GROWTH_STOCKS else
-                "Cyclical" if ticker in CYCLICAL_STOCKS else "Opportunistic")
-    tier_max_frac = TIER_MAX_PCT.get(tier_key, 0.03)
+    tier_max_frac = TIER_MAX_PCT.get(tier, 0.03)
     if max_pct / 100 < tier_max_frac * 0.5:  # if original max_pct is too low, use tier
         max_pct = tier_max_frac * 100
     max_usd     = PORTFOLIO_SIZE * max_pct / 100
@@ -3527,10 +3625,8 @@ def timing_score(strategy, pir, ivp, is_spec=False, ivp_override=None) -> dict:
 
 def get_max_alloc(ticker: str) -> float:
     """Return max allocation as decimal for a ticker based on tier."""
-    if ticker in CORE_STOCKS:        return 0.08
-    elif ticker in GROWTH_STOCKS:    return 0.05
-    elif ticker in CYCLICAL_STOCKS:  return 0.04
-    else:                            return 0.025
+    return {"Core": 0.08, "Trading": 0.05,
+            "Speculative": 0.04, "Very Speculative": 0.025}.get(tier_of(ticker), 0.025)
 
 
 def find_best_csp(ticker, price, contracts, ivdata, pir, quality, sizing=None, market_weak=False,
@@ -3621,7 +3717,7 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality, sizing=None, m
             iv   = round(float(c.get("iv", 0) or atm_iv) * 100, 1)
             timing = timing_score("CSP", pir, ivdata["ivp"])
             # Canonical score — delta and annualized are not multiplied
-            _s = {"tier": quality.get("tier", "Opportunistic") if quality else "Opportunistic",
+            _s = {"tier": quality.get("tier", DEFAULT_TIER) if quality else DEFAULT_TIER,
                   "delta": delta, "dte": dte, "ivp": ivdata["ivp"],
                   "annualized_return": annualized,
                   "pullback_pct": (1 - pir) * 100,
@@ -4090,12 +4186,12 @@ def find_best_leaps(ticker, price, contracts, ivdata, pir):
     """Deep ITM LEAPS — delta ≥0.75 (no upper cap), BE% and extrinsic% are primary gates."""
     is_spec = ticker in SPECULATIVE
     timing  = timing_score("LEAPS", pir, ivdata["ivp"], is_spec)
-    # Per spec: LEAPS timing should not hard-reject Core/Growth
+    # Per spec: LEAPS timing should not hard-reject Core/Trading
     # Use contract quality first, timing as scoring penalty
-    is_core_growth = ticker in CORE_STOCKS or ticker in GROWTH_STOCKS
-    if not timing["recommend"] and not is_core_growth:
+    is_core_trading = classification_of(ticker) in ("CORE", "TRADING")
+    if not timing["recommend"] and not is_core_trading:
         return None, timing
-    # For Core/Growth: continue but score will reflect poor timing
+    # For Core/Trading: continue but score will reflect poor timing
     if not contracts or price <= 0: return None, timing
 
     atm_iv = ivdata["iv_current"]
@@ -4329,7 +4425,7 @@ def find_opp_cc(ticker: str, price: float, qty: float, avg_cost: float,
         annualized = (mid / price) * (365 / dte) * 100
         max_contracts = int(qty // 100)
         # Canonical CC score — no premium×delta bias
-        _s = {"tier": "Opportunistic", "delta": delta, "ivp": ivdata.get("ivp", 50),
+        _s = {"tier": DEFAULT_TIER, "delta": delta, "ivp": ivdata.get("ivp", 50),
               "annualized_return": annualized, "strike": strike, "breakeven": 0}
         score = score_cc(_s) + (oi / 50000)  # small liquidity bonus
         if score > best_score:
@@ -5057,8 +5153,7 @@ def run_scanner():
         _sc21 = _smd.get("closes_21d", [])
         _sc63 = _smd.get("closes_63d", [])
         if _sc21 or _sc63:
-            _tier = ("Core" if _stk in CORE_STOCKS else "Growth" if _stk in GROWTH_STOCKS
-                     else "Cyclical" if _stk in CYCLICAL_STOCKS else "Opportunistic")
+            _tier = tier_of(_stk)
             _sl = calc_support_levels(_sc21, _sc63, _tier)
             if _sl:
                 support_cache[_stk] = _sl
@@ -5286,10 +5381,7 @@ def run_scanner():
     print(f"\n🔍 Scanning {len(all_tickers)} stocks...")
     for ticker in all_tickers:
         # Determine tier
-        if ticker in CORE_STOCKS:        tier = "Core"
-        elif ticker in GROWTH_STOCKS:    tier = "Growth"
-        elif ticker in CYCLICAL_STOCKS:  tier = "Cyclical"
-        else:                            tier = "Opportunistic"
+        tier    = tier_of(ticker)
         is_core = (tier == "Core")
         md    = mkt.get(ticker,{})
         price = md.get("price",0)
@@ -5399,7 +5491,7 @@ def run_scanner():
             if csp:
                 # below_min trades still shown but scored lower
                 score_mult = 0.5 if csp.get("below_min") else 1.0
-                _s = {"tier": base.get("tier","Opportunistic"),
+                _s = {"tier": base.get("tier",DEFAULT_TIER),
                       "delta": csp.get("delta",0),
                       "ivp": base.get("ivp",50),
                       "annualized_return": csp.get("annualized_return",0),
@@ -5425,7 +5517,7 @@ def run_scanner():
                 ticker, price, qty, avg, contracts, ivdata, pos_status, pnl_status,
                 already_covered=portfolio_exposure.get("cc_shares_covered",{}).get(ticker, 0))
             if pio_cc:
-                _s = {"tier": base.get("tier","Opportunistic"),
+                _s = {"tier": base.get("tier",DEFAULT_TIER),
                       "delta": pio_cc.get("delta",0),
                       "ivp": base.get("ivp",50),
                       "annualized_return": pio_cc.get("annualized_return",0),
@@ -5475,7 +5567,7 @@ def run_scanner():
             if spike_cc:
                 spike_opps.append({**base, "spike_cc": spike_cc,
                     "spike_info": spike_info,
-                    "score": score_cc({"tier": base.get("tier","Opportunistic"),
+                    "score": score_cc({"tier": base.get("tier",DEFAULT_TIER),
                       "delta": spike_cc.get("delta",0), "ivp": base.get("ivp",50),
                       "annualized_return": spike_cc.get("annualized_return",0),
                       "strike": spike_cc.get("strike",0),
@@ -5504,7 +5596,7 @@ def run_scanner():
                                buy_under=SYMBOL_SETTINGS.get(ticker, {}).get("buy_under", 0))
             if cc:
                 cc_opps.append({**base,"cc":cc,
-                    "score":score_cc({"tier":base.get("tier","Opportunistic"),
+                    "score":score_cc({"tier":base.get("tier",DEFAULT_TIER),
                                       "delta":cc.get("delta",0),"ivp":base.get("ivp",50),
                                       "annualized_return":cc.get("annualized_return",0),
                                       "strike":cc.get("strike",0),
@@ -5533,7 +5625,7 @@ def run_scanner():
         else:
             leaps = None
             leaps_timing = {}
-            if leaps_blocked and tier in ("Core","Growth"):
+            if leaps_blocked and tier in ("Core","Trading"):
                 print(f"  [{tier}] {ticker}: LEAPS hard stop (earnings/price)")
         if leaps:
             _tl = leaps.get("trend_label", "")
@@ -5543,7 +5635,7 @@ def run_scanner():
                 "trend_label":  _tl,
                 "trend_signal": _ts,
                 "trend_action": _ta_action,
-                "score": score_leaps({"tier": base.get("tier","Opportunistic"),
+                "score": score_leaps({"tier": base.get("tier",DEFAULT_TIER),
                                       "delta": leaps.get("delta",0), "ivp": base.get("ivp",100),
                                       "extrinsic_pct": leaps.get("extrinsic_pct",100),
                                       "dte": leaps.get("dte",0)})})
@@ -5556,7 +5648,7 @@ def run_scanner():
             pmcc, _ = find_pmcc_short_call(ticker, price, existing_leaps, contracts, ivdata, pir)
             if pmcc:
                 pmcc_opps.append({**base,"pmcc":pmcc,"existing_leaps":existing_leaps,
-                    "score":score_cc({"tier":base.get("tier","Opportunistic"),
+                    "score":score_cc({"tier":base.get("tier",DEFAULT_TIER),
                                       "delta":pmcc.get("delta",0),"ivp":base.get("ivp",50),
                                       "annualized_return":pmcc.get("annualized_return",0),
                                       "strike":pmcc.get("strike",0),
@@ -5625,9 +5717,7 @@ def run_scanner():
                 sc = schwab_get_option_chain(ticker, from_d, to_d)
                 if sc:
                     contracts_t = sc
-            tier_t = ("Core" if ticker in CORE_STOCKS else
-                      "Growth" if ticker in GROWTH_STOCKS else
-                      "Cyclical" if ticker in CYCLICAL_STOCKS else "Opportunistic")
+            tier_t = tier_of(ticker)
             sizing_t = position_check(ticker, ibkr)
             cc_opp = find_opp_cc(ticker, price, qty, avg, contracts_t, ivdata_t)
             if cc_opp:
@@ -5855,6 +5945,10 @@ def run_scanner():
         d = {
             "ticker":            ticker,
             "tier":              o.get("tier",""),
+            # Conviction classification, spelled out for the dashboard. NOT the
+            # same field as convexity's "classification" (which is a grade A/B),
+            # hence the distinct name.
+            "conviction":        classification_of(ticker),
             "price":             o.get("price",0),
             "ivp":               round(o.get("ivp",0),1),
             "mode":              mode,
@@ -5931,7 +6025,7 @@ def run_scanner():
                 if annualized < 5 or annualized > 200: continue
                 otm_pct = round((price - strike) / price * 100, 1)
                 iv = round(float(c.get("iv", 0) or 0) * 100, 1)
-                _s = {"tier": "Opportunistic", "delta": delta, "dte": dte, "ivp": 50,
+                _s = {"tier": DEFAULT_TIER, "delta": delta, "dte": dte, "ivp": 50,
                       "annualized_return": annualized, "pullback_pct": 0,
                       "market_weak": spy_regime.get("market_weak", False), "warnings": []}
                 score = score_csp(_s)
@@ -5980,7 +6074,7 @@ def run_scanner():
                 annualized = (mid / strike) * (365 / dte) * 100
                 if annualized < 3 or annualized > 200: continue
                 # Use canonical CC score — not annualized × delta
-                _opp = {"tier": "Opportunistic", "delta": delta, "ivp": 50,
+                _opp = {"tier": DEFAULT_TIER, "delta": delta, "ivp": 50,
                         "annualized_return": annualized, "strike": strike,
                         "breakeven": avg_cost}
                 score = score_cc(_opp)
@@ -6012,10 +6106,7 @@ def run_scanner():
 
     _phase("telegram sent — starting dashboard pass")
     for ticker in all_tickers:
-        if ticker in CORE_STOCKS:        tier = "Core"
-        elif ticker in GROWTH_STOCKS:    tier = "Growth"
-        elif ticker in CYCLICAL_STOCKS:  tier = "Cyclical"
-        else:                            tier = "Opportunistic"
+        tier = tier_of(ticker)
 
         md    = mkt.get(ticker, {})
         price = md.get("price", 0)
@@ -6091,7 +6182,8 @@ def run_scanner():
                 if ann < 2 or ann > 300: continue
 
                 # Suggested contracts based on tier sizing
-                _sizes = {"Core": 40000, "Growth": 25000, "Cyclical": 20000, "Opportunistic": 12500}
+                _sizes = {"Core": 40000, "Trading": 25000,
+                          "Speculative": 20000, "Very Speculative": 12500}
                 _target_cso = _sizes.get(tier, 12500)
                 _contracts = max(1, round(_target_cso / (strike * 100)))
 
@@ -6144,9 +6236,9 @@ def run_scanner():
             if below_ma200: warnings.append("Below 200MA")
             if md.get("pct_above_ma50",0)*100 > 8: warnings.append(">8% above MA50")
             # Risk level: based on tier and warnings
-            if tier == "Core" and not warnings:          risk_level = "Low"
-            elif tier in ("Core","Growth") and warnings: risk_level = "Medium"
-            elif tier == "Opportunistic":                risk_level = "Elevated"
+            if tier == "Core" and not warnings:           risk_level = "Low"
+            elif tier in ("Core","Trading") and warnings: risk_level = "Medium"
+            elif tier in ("Speculative","Very Speculative"): risk_level = "Elevated"
             else:                                        risk_level = "Medium"
             # Breakeven = strike (for CSP, breakeven = strike - premium)
             breakeven = round(best_csp["strike"] - best_csp["premium"], 2)
@@ -6172,6 +6264,24 @@ def run_scanner():
             csp_entry["effective_entry"]  = best_csp.get("effective_entry")   # strike - premium
             csp_entry["buy_under"]        = best_csp.get("buy_under")         # None if no setting
             csp_entry["support_levels"]   = support_cache.get(ticker, {}) or {}
+            csp_entry["conviction"]       = classification_of(ticker)
+            # ── Thesis check (classification spec, "When the stock falls sharply") ──
+            # A Speculative / Very Speculative name that just fell hard is NOT an
+            # automatic accumulation candidate — a lower price is not a reason to
+            # add. Flag the card so it reads as "re-check the thesis first"
+            # instead of "cheap now". Dashboard-only: this sets a field on an
+            # existing card, it does not create an alert and never reaches
+            # Telegram. It also stays out of `warnings`, because `passes_quality`
+            # is derived from that list and this is a prompt, not a defect.
+            _thesis_drop = (_drop_1d <= THESIS_CHECK_1D_PCT
+                            or _drop_5d <= THESIS_CHECK_5D_PCT)
+            csp_entry["thesis_check"] = bool(needs_thesis_check(ticker) and _thesis_drop)
+            csp_entry["thesis_note"]  = (
+                f"{classification_of(ticker).replace('_', ' ').title()} name down "
+                f"{abs(_drop_1d)*100:.1f}% today / {abs(_drop_5d)*100:.1f}% over 5 days — "
+                f"confirm the thesis is intact before adding exposure."
+                if csp_entry["thesis_check"] else None
+            )
             csp_entry["score"]        = score_csp(csp_entry)  # kept for display score badge
             csp_entry["normalized"]   = normalized_score(csp_entry["score"], "CSP")
             csp_entry["quality_label"] = quality_label(csp_entry["score"], SCORE_MAX["CSP"])
@@ -6218,7 +6328,7 @@ def run_scanner():
 
             # Determine if overweight to set delta range
             global_pct_d = (qty_d * price / PORTFOLIO_SIZE * 100) if PORTFOLIO_SIZE > 0 else 0
-            tier_max = {"Core":10,"Growth":6,"Cyclical":5,"Opportunistic":3}.get(tier,3)
+            tier_max = {"Core":10,"Trading":6,"Speculative":5,"Very Speculative":3}.get(tier,3)
             is_overweight = global_pct_d > tier_max
             # Use per-symbol cc_delta range when available, else fall back to global defaults
             d_min = _cc_dmin if _cc_dmin > 0 else 0.20
@@ -6485,7 +6595,7 @@ def run_scanner():
             elif tier == "Core":
                 _recommended_band = "conservative" # Core → safer stock replacement
             else:
-                _recommended_band = "sweet_spot"   # Growth/Trading → sweet spot
+                _recommended_band = "sweet_spot"   # Trading/Speculative → sweet spot
 
             for c in leaps_calls:
                 try:
@@ -6858,10 +6968,8 @@ def run_scanner():
         # Skip duplicate alias symbols (Spec §6)
         if ticker in GROUPED_TICKERS:  continue
 
-        tier = ("Core" if ticker in CORE_STOCKS else
-                "Growth" if ticker in GROWTH_STOCKS else
-                "Cyclical" if ticker in CYCLICAL_STOCKS else
-                "Opportunistic" if ticker in OPPORTUNISTIC_STOCKS else "Other")
+        # "Other" = held but not on the watchlist, so it has no classification
+        tier = tier_of(ticker) if ticker in CLASSIFICATION else "Other"
 
         target_low, target_high = ticker_target_range(ticker, tier)
         exposure = exposure_map.get(ticker, 0.0)
@@ -7130,9 +7238,7 @@ def run_scanner():
 
     for _pos in portfolio_exposure.get("csp_positions", []):
         _ticker = _pos.get("ticker","")
-        _tier = ("Core" if _ticker in CORE_STOCKS else
-                 "Growth" if _ticker in GROWTH_STOCKS else
-                 "Cyclical" if _ticker in CYCLICAL_STOCKS else "Opportunistic")
+        _tier = tier_of(_ticker)
         # Get current option mark from contracts cache
         _contracts_opt = contracts_cache.get(_ticker, [])
         _strike = _pos.get("strike", 0)
@@ -7215,9 +7321,7 @@ def run_scanner():
 
     for _pos in portfolio_exposure.get("cc_positions", []):
         _ticker = _pos.get("ticker","")
-        _tier = ("Core" if _ticker in CORE_STOCKS else
-                 "Growth" if _ticker in GROWTH_STOCKS else
-                 "Cyclical" if _ticker in CYCLICAL_STOCKS else "Opportunistic")
+        _tier = tier_of(_ticker)
         _strike = _pos.get("strike", 0)
         _expiry = _pos.get("expiry", "")
         # Prefer the LIVE chain NBBO (fresh Schwab quote this scan) over the
@@ -7297,9 +7401,7 @@ def run_scanner():
         _pos_actions.append({
             "account":        _pos.get("account", ""),
             "ticker":         _ticker,
-            "tier":           ("Core" if _ticker in CORE_STOCKS else
-                                "Growth" if _ticker in GROWTH_STOCKS else
-                                "Cyclical" if _ticker in CYCLICAL_STOCKS else "Opportunistic"),
+            "tier":           tier_of(_ticker),
             "type":           "LEAPS_CALL",
             "contracts":      _pos.get("contracts", 1),
             "strike":         _pos.get("strike", 0),

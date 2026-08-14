@@ -164,6 +164,20 @@ independently.**
   the two. **Cheap convexity is EXEMPT** (EX-15: a far-OTM long call has no
   assignment risk); it is never hidden by the filter and only carries a
   `no_buy_name` tag.
+- **Classification is conviction, not a filter (P33/A34).** Every name carries a
+  hand-set `CLASSIFICATION`: **CORE / TRADING / SPECULATIVE / VERY_SPECULATIVE**.
+  It says how willing John is to hold the name through volatility, and it
+  *modifies* the recommendation rather than deciding whether one appears. Same
+  event, different advice: a sharp rally on CORE is a conservative CC, not a
+  sell; on SPECULATIVE it is a CC **plus** a partial-profit prompt. A sharp drop
+  on CORE/TRADING may be accumulation; on SPECULATIVE it is a thesis check
+  first; on VERY SPECULATIVE it is not an averaging-down trigger at all.
+  Changes are manual only — nothing reclassifies automatically, and one earnings
+  reaction is never a reason to reclassify.
+  **Do NOT add a classification-based CSP suppression.** The draft spec proposed
+  "avoid routine CSPs on VERY SPECULATIVE"; John struck it (2026-08-14) because
+  NBIS puts are among his most-traded setups. Bucket D's 40% annualized floor
+  and the delta band already do that risk work.
 - **Volatile names (NBIS, CRDO, CLS) are the whole point** of the move-based
   alerts. They jump 10%+ in a day; those are the moments that matter.
 - **CCs on explosive winners cap upside.** NBIS covered-call assignments have
@@ -262,11 +276,28 @@ call still marked at its pre-drop price). The engine guards against this:
 
 ## Configuration
 
-- **`SYMBOL_SETTINGS`** dict in `whale_scanner.py` (~line 164) — per-ticker
-  buy_under / sell_above / delta ranges / flags. `buy_under = 0` means NO BUY
-  (currently AAPL, NFLX, IBIT, PATH, MSTR).
-- **`buckets.csv`** — ticker → bucket (A–D) + special flags. Must sit in the
-  same directory as `whale_scanner.py` and `bucket_config.py`.
+- **`CLASSIFICATION`** dict in `whale_scanner.py` (just below `SYMBOL_SETTINGS`)
+  — ticker → CORE / TRADING / SPECULATIVE / VERY_SPECULATIVE. **The single
+  source of truth for conviction tier.** `tier_of()` / `classification_of()` /
+  `is_core()` / `is_very_speculative()` / `needs_thesis_check()` read it;
+  `CORE_STOCKS`, `TRADING_STOCKS`, `SPECULATIVE_STOCKS`,
+  `VERY_SPECULATIVE_STOCKS`, `SPECULATIVE` and `ALL_TICKERS` are all *derived*
+  from it — never hand-edit those. Display tiers are `Core` / `Trading` /
+  `Speculative` / `Very Speculative`; an unconfigured ticker resolves to
+  `Very Speculative` (weight 0, the same treatment the old code gave unknowns).
+- **`SYMBOL_SETTINGS`** dict in `whale_scanner.py` (~line 448) — per-ticker
+  buy_under / sell_above / delta ranges / flags, grouped by classification.
+  `buy_under = 0` means NO BUY (currently AAPL, NFLX, IBIT, PATH, MSTR).
+  Note AAPL and NFLX are CORE *and* NO BUY: CORE describes willingness to hold,
+  not willingness to buy at today's price. That is intentional (2026-08-14) —
+  do not "fix" it by inventing a buy_under.
+- **`buckets.csv`** — ticker → bucket (A–D) + behavioural flags. **Orthogonal to
+  classification:** bucket is about VOLATILITY (premium floors, delta bands,
+  DTE), classification is about CONVICTION, and they deliberately disagree in
+  places (SPCX is bucket D but TRADING). The `special` column carries only
+  WATCHLIST / EXIT_CC_ONLY — it replaced `tier_legacy`, which held a stale
+  second copy of the classification. Do not re-add a classification column here.
+  Must sit in the same directory as `whale_scanner.py` and `bucket_config.py`.
 - **`bucket_config.py`** — bucket loader + `strategy_allowed()` gate. Must be
   co-located for `load_buckets()` to import.
 - **Special flags:** `spreads_only` (NBIS, CRDO — block naked CSP/CC, route to
@@ -303,6 +334,19 @@ call still marked at its pre-drop price). The engine guards against this:
   reads it, so it is display-only, but it will mislead anyone who checks targets
   there. Not reconciled as of 2026-08-13 (out of scope for A32) — fix by
   sourcing it from `results.json` rather than by hand-editing the copy.
+
+- **Never write a new `if t in CORE_STOCKS … else "Opportunistic"` ladder.**
+  There used to be nine copies of that ladder, and every one of them silently
+  collapsed VERY_SPECULATIVE into the bottom tier — so NBIS and MSTR were
+  scored, sized and profit-taken exactly like CLS or KNX for months. Call
+  `tier_of(ticker)`. Any new tier-keyed map must cover all four display tiers.
+
+- **`SCORE_MAX["CSP"]` (12) does not match `score_csp`'s real maximum (9).**
+  The Telegram gate is `ceil(0.75 × 12) = 9`, so a routine CSP alert requires a
+  literally perfect score, which requires tier weight 3 — **CORE names only**.
+  It also makes every CSP card's `quality_label` read one band low. Left alone
+  deliberately; see C15 in `TRADING_PRINCIPLES.md` for the three options and why
+  fixing it silently would open routine CSP pings to most of the watchlist.
 
 - **Multiple CC code paths.** CC logic exists in ≥3 places: `find_best_cc()`
   (~2834), the inline CC scanner (~5108), and the inline PIO scanner (~5217).
@@ -406,6 +450,15 @@ call still marked at its pre-drop price). The engine guards against this:
 
 ## Open items / backlog
 
+- Classification-driven alerts still to build: partial profit-taking on SHARE
+  positions and the earnings-exposure sizing line (C16 / C17 in
+  `TRADING_PRINCIPLES.md`). C16 needs a new `position_actions` row type — the
+  structure that broke twice with `LEAPS_CALL` (EX-24/EX-25), so it needs all
+  four consumers updated together.
+- `BABA`, `META` and `OWL` are configured in `buckets.csv` but are NOT in
+  `CLASSIFICATION`, so they are not in `ALL_TICKERS` and have never been
+  scanned. Their `leaps_only` / `watchlist` / `cc_only` handling is live code
+  with no live ticker behind it. Either classify them or drop the rows.
 - Spread scanner for CRDO/NBIS on normal (non-spike) days — built standalone
   (`spread_scanner.py`), never integrated.
 - PATH / cheap-stock spike-CC filters too strict (premium floor, liquidity).
