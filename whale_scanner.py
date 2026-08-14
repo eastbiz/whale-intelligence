@@ -249,7 +249,7 @@ TG_POS_NEAR_STRIKE     = 15.0   # dist-to-strike% that makes any move relevant
 # not just clear the expiry. Blocks CCs held through earnings AND CCs that
 # expire right up against it (rich earnings-IV premium, assignment-before-pop).
 CC_EARNINGS_BUFFER_DAYS = 5
-# ── CC Telegram proximity band by classification (A35, P34) ──────────────
+# ── CC Telegram proximity band by classification (A37, P34) ──────────────
 # A14/P20 required the stock to be AT or ABOVE sell_above before a CC could
 # ping. Replayed over 21 archived scans that rule killed 166 of 176 covered
 # calls and ALL 57 spike CCs — PLTR sat 2% under its $180 target eleven separate
@@ -468,10 +468,13 @@ OPP_EARNINGS_MIN      = 7
 # sell_above: min effective exit for CC  (strike + premium >= sell_above hard gate)
 # Delta ranges are hard filters applied per strategy.
 # Per-symbol price targets and delta ranges.
-# Price targets last updated 2026-07-19 per John's table (reflecting the run-up).
-# buy_under = 0 means NO BUY (see is_no_buy) — no CSP, no LEAPS, ever.
-# AAPL and NFLX are CORE *and* NO BUY: CORE is willingness to HOLD, not
-# willingness to buy at today's price. That combination is intentional.
+# Targets reconciled against John's own Price Alert table 2026-08-14 (A35);
+# no ticker carries buy_under = 0 today.
+# buy_under = 0 means NO BUY (see is_no_buy) — no CSP, no LEAPS, ever. The gate
+# still works, it just has no members. Do NOT read intent into a 0 you find
+# here: the five that used to carry one turned out to be stale config, and a
+# note in this file once rationalized them as deliberate when they were not.
+# Ask John before treating a 0 as a decision.
 # Grouped by CLASSIFICATION (defined immediately below), which is the
 # single source of truth for conviction tier. Keep the two in sync.
 SYMBOL_SETTINGS = {
@@ -2137,7 +2140,7 @@ def tier_position_status(tier: str, exposure_pct: float) -> str:
     else:                                         return "Overweight"
 
 # Max scores per strategy (for normalization)
-# A35: CSP was 12 while score_csp can only reach 9 — Tier(3) + IVP(2) +
+# A37: CSP was 12 while score_csp can only reach 9 — Tier(3) + IVP(2) +
 # Pullback(2) + Income(2). The Telegram gate is ceil(0.75 × max), so the bar sat
 # at 9-out-of-9: a routine CSP alert needed a literally perfect card AND tier
 # weight 3, i.e. CORE only. Over 21 archived scans not one CSP ever pinged (best
@@ -4606,7 +4609,7 @@ def send_telegram(msg: str):
 
 
 def send_telegram_grouped(sections: list, limit: int = 3500):
-    """Send several alert sections as ONE Telegram message (A35).
+    """Send several alert sections as ONE Telegram message (A37).
 
     Alerts used to go out one message per contract plus one per section header.
     Over 21 archived scans that turned 4.2 actual trade ideas per day into 11.2
@@ -5838,7 +5841,7 @@ def run_scanner():
             return True
         _px = o.get("price", 0) or 0
         _sa = SYMBOL_SETTINGS.get(_tk, {}).get("sell_above", 0) or 0
-        # A35: band widens by classification — CORE still needs the target
+        # A37: band widens by classification — CORE still needs the target
         # reached, the rest ping once the stock is within their band of it.
         _tol  = CC_TELEGRAM_TOL_BY_TIER.get(tier_of(_tk), 0.0)
         _floor = _sa * (1 - _tol)
@@ -5940,7 +5943,7 @@ def run_scanner():
     #    Spike CC sent FIRST — it's the low-risk, time-sensitive priority (sell
     #    calls into a spike on shares you already own).
     #
-    #    A35: one ticker, one call idea. A stock that rallies into its sell
+    #    A37: one ticker, one call idea. A stock that rallies into its sell
     #    target usually produces BOTH a routine CC and a spike CC in the same
     #    scan — two messages (plus two section headers) for one decision about
     #    one stock. In the 21-scan replay PLTR did exactly this on 8 of 8

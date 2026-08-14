@@ -692,7 +692,7 @@ risk work there. **Do not re-add a classification-based CSP suppression.**
 automatically, and a single earnings reaction is never a reason to reclassify.
 
 - Evidence: John's classification table, 2026-08-14. System status:
-  **Actioned — A34.**
+  **Actioned — A36.**
 
 ### P34 — Judge the alert rules by the notification count they produce, not by the rules
 
@@ -727,7 +727,7 @@ section header per section turned 4.2 trade ideas per day into 11.2 Telegram
 messages — the overhead outnumbered the content almost 3 to 1. That is the P22
 failure mode arriving through the back door.
 
-- Evidence: the 2026-08-14 replay. System status: **Actioned — A35.**
+- Evidence: the 2026-08-14 replay. System status: **Actioned — A37.**
 
 ## Trade Examples (raw log)
 
@@ -1431,7 +1431,7 @@ rich-but-quiet opportunity (high IVP, no big move today) deserve a ping or not?
 
 ---
 
-### ~~C15~~ — GRADUATED → A35 (fixed 2026-08-14, `SCORE_MAX["CSP"]` = 9, bar now 7)
+### ~~C15~~ — GRADUATED → A37 (fixed 2026-08-14, `SCORE_MAX["CSP"]` = 9, bar now 7)
 ### C15 (original text) — `SCORE_MAX["CSP"]` is 12 but `score_csp` can only reach 9
 
 `score_csp` awards Tier(3) + IVP(2) + Pullback(2) + Income(2) = **9 max**, but
@@ -1444,8 +1444,8 @@ requires tier weight 3, i.e. **CORE names only**. Two consequences:
 - `quality_label` divides a 9-max score by 12, so every CSP card reads one
   quality band lower than it should on the dashboard.
 
-Deliberately NOT fixed as part of A34: setting `SCORE_MAX["CSP"] = 9` drops the
-threshold to 7, which combined with A34's higher tier weights would open routine
+Deliberately NOT fixed as part of A36: setting `SCORE_MAX["CSP"] = 9` drops the
+threshold to 7, which combined with A36's higher tier weights would open routine
 CSP pings to most of the watchlist in one step. That is a volume decision, not a
 bug fix. Options, in increasing order of change: (a) fix `SCORE_MAX` for the
 label only and keep the gate at 9; (b) fix `SCORE_MAX` and raise
@@ -1459,7 +1459,7 @@ Very Speculative names after outsized rallies. Nothing does this today —
 `position_management_engine` covers short options only, and the dashboard's
 BUY/ADD/HOLD/TRIM label is a static allocation view, not event-driven.
 
-Not built in A34 on purpose: it needs a new row type in `position_actions`,
+Not built in A36 on purpose: it needs a new row type in `position_actions`,
 which is the exact structure that broke twice in one week when `LEAPS_CALL` was
 added (EX-24 sent 10 LEAPS trim pushes; EX-25 printed "you hold short LEAPSCALL"
 with the wrong side and broken Markdown). Four consumers must be updated
@@ -1533,7 +1533,7 @@ alert, so it costs no extra Telegram volume. Deferred with C16.
   widened from Grade A only to A+B (strict mode already keeps these rare;
   cleared the "Grade B convexity → Telegram" backlog item). Built 2026-07-22.
 
-- **A34 — One classification system, and VERY SPECULATIVE finally exists**
+- **A36 — One classification system, and VERY SPECULATIVE finally exists**
   (P33). The scanner carried **five** disagreeing copies of "how risky is this
   name": the `CORE_STOCKS` / `GROWTH_STOCKS` / `CYCLICAL_STOCKS` /
   `OPPORTUNISTIC_STOCKS` sets (the ones that actually drove logic), the
@@ -1580,7 +1580,7 @@ alert, so it costs no extra Telegram volume. Deferred with C16.
   classification audit plus 20/20 on `bucket_config.py`. Built 2026-08-14 with
   John's go-ahead.
 
-- **A35 — Alert volume tuned against replayed history, not intuition** (P34).
+- **A37 — Alert volume tuned against replayed history, not intuition** (P34).
   Three changes, each measured over the 21 archived scans before shipping.
   (1) **CC proximity band by classification** (`CC_TELEGRAM_TOL_BY_TIER`).
   A14/P20's at-or-above-`sell_above` rule was binary — 2% away was silenced
@@ -1588,7 +1588,7 @@ alert, so it costs no extra Telegram volume. Deferred with C16.
   (assignment is undesirable there), TRADING gets 2%, Speculative and Very
   Speculative 3% — straight from John's own spec, which says assignment is
   acceptable on Trading names at a good exit price and that speculative names
-  should monetise volatility actively. This is the first real payoff of the A34
+  should monetise volatility actively. This is the first real payoff of the A36
   classification work. (2) **`SCORE_MAX["CSP"]` 12 → 9** (C15, resolved).
   `score_csp` can only reach 9, so the `ceil(0.75 × 12) = 9` gate demanded a
   perfect card AND tier weight 3 — CORE only, and in practice never. The bar is
@@ -1601,9 +1601,10 @@ alert, so it costs no extra Telegram volume. Deferred with C16.
   message via `send_telegram_grouped()` instead of one message per contract plus
   a header per section. Splits only if it would exceed Telegram's limit, and
   always on a card boundary.
-  Measured result: trade ideas 0.8 → 4.2 per day; total notifications 8.7 → 12.4
-  per day; scans that send nothing 18/21 → 5/21. John picked this volume from a
-  menu of measured options. Levers if it drifts: `CC_TELEGRAM_TOL_BY_TIER` per
+  Measured result (re-run after merging the A35 target reconciliation, since
+  `sell_above` drives the CC gate): trade ideas 0.8 → 4.0 per day; total
+  notifications 7.6 → 12.4 per day; scans that send nothing 17/21 → 5/21. John
+  picked this volume from a menu of measured options. Levers if it drifts: `CC_TELEGRAM_TOL_BY_TIER` per
   tier, `TELEGRAM_MIN_SCORE_PCT` globally. Validated 3/3 on the grouper plus a
   full replay. Built 2026-08-14.
   **Not touched:** the LEAPS trend gate (1,192 of 1,194 rows die there) —

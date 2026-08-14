@@ -164,7 +164,7 @@ independently.**
   the two. **Cheap convexity is EXEMPT** (EX-15: a far-OTM long call has no
   assignment risk); it is never hidden by the filter and only carries a
   `no_buy_name` tag.
-- **Classification is conviction, not a filter (P33/A34).** Every name carries a
+- **Classification is conviction, not a filter (P33/A36).** Every name carries a
   hand-set `CLASSIFICATION`: **CORE / TRADING / SPECULATIVE / VERY_SPECULATIVE**.
   It says how willing John is to hold the name through volatility, and it
   *modifies* the recommendation rather than deciding whether one appears. Same
@@ -308,12 +308,13 @@ call still marked at its pre-drop price). The engine guards against this:
   `watchlist` tier (META).
 - **Feature flags:** `ENABLE_PIO = False` (Position Income Optimization, noisy),
   `STRICT_ZONE_TELEGRAM = False`.
-- **Alert-volume levers (A35/P34)** — the dials to turn if Telegram drifts:
+- **Alert-volume levers (A37/P34)** — the dials to turn if Telegram drifts:
   `CC_TELEGRAM_TOL_BY_TIER` (how far below `sell_above` a CC may ping, by
   classification: Core 0%, Trading 2%, Speculative/Very Speculative 3%) and
   `TELEGRAM_MIN_SCORE_PCT` (0.75, global). Current measured volume: ~4.2 trade
-  ideas and ~12.4 total notifications per day. Re-measure by replaying, don't
-  estimate.
+  ideas and ~12.4 total notifications per day (up from 0.8 and 7.6). Re-measure
+  by replaying, don't estimate — and re-run the replay after ANY change to
+  `sell_above`, since that value is what the CC gate compares against.
 - **Zone constants:** `CSP_NEAR_PCT` (0.05), `CC_NEAR_PCT` (0.08),
   `LEAPS_GROWTH_BY_BUCKET`, `LEAPS_GROWTH_DEFAULT`, `LEAPS_GROWTH_OVERRIDE`.
 - **Editable alert thresholds** (top of file): `BIGMOVE_1D`, `BIGMOVE_3D`,
