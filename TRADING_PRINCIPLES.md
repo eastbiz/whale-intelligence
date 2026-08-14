@@ -1712,3 +1712,30 @@ alert, so it costs no extra Telegram volume. Deferred with C16.
   measured volume from 4.0 to 2.8 ideas/day and total notifications from 12.4 to
   10.8. Left for John, since it lowers the volume he chose in A37.
   Built 2026-08-14.
+
+- **A40 — CC bucket annualized floor enforced, on all three CC paths** (EX-29,
+  John's go-ahead 2026-08-14). `get_min_annualized_cc` was imported by
+  `whale_scanner.py` and never called, so the per-bucket CC premium floor
+  (A 10% / B 14% / C 22% / D 30%) was enforced nowhere at all — the CC twin of
+  the CSP bug in A39. Now applied in `find_best_cc` (strict/Telegram), the
+  inline dashboard CC scanner, and the inline PIO scanner (dormant behind
+  `ENABLE_PIO`, kept in step so it cannot come back stale).
+  **Gate basis matters:** `find_best_cc` reports annualized on a PRICE basis
+  (`mid/price`) while both inline scanners use `mid/strike`. On an OTM call
+  strike > price, so the same contract scores higher in `find_best_cc` — gating
+  each path on its own number would have let Telegram pass CCs the dashboard
+  blocks, recreating EX-29 exactly. All three therefore gate on the strike
+  basis; displayed numbers are unchanged. The underlying two-formula
+  inconsistency is left alone (it moves every CC card's headline figure) and
+  logged here as a follow-up.
+  Measured over the 21-scan replay, matching the forecast given to John before
+  he approved it: trade ideas 4.0 → 2.8/day, total notifications 12.4 → 10.8/day,
+  silent scans 5/21 → 9/21. Blocked: PLTR CCs at 21.0-21.8% against a 22% floor,
+  PATH CCs at 23.4-29.5% against 30%. Several sit just under the line, which is
+  what a hard floor does.
+  **Spike CCs are deliberately NOT gated** by this floor — they are
+  time-sensitive calls on shares already owned, and the volume John approved was
+  measured with them excluded.
+  Also settled: John chose to KEEP the 3% buy_under grace on CSP effective entry
+  (a $300 target admits assignment up to $309), on both paths, unchanged.
+  Built 2026-08-14.

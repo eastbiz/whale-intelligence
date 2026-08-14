@@ -3880,6 +3880,17 @@ def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir, already_c
         annualized = (mid / price) * (365 / dte) * 100
         if annualized > MAX_ANNUALIZED: continue  # filter bad data only
         if annualized < 3: continue  # reject truly garbage premiums
+        # Bucket CC floor (A40). Gate on the STRIKE basis in every CC path so
+        # Telegram and dashboard agree — this function reports annualized on a
+        # price basis (mid/price) while the two inline CC scanners use
+        # mid/strike, and strike > price on an OTM call, so gating on each
+        # path's own number would let Telegram pass trades the dashboard blocks.
+        # That is exactly the EX-29 failure. The displayed `annualized` above is
+        # deliberately left untouched.
+        if ticker and BUCKETS and strike > 0:
+            _cc_floor = get_min_annualized_cc(ticker, BUCKETS)
+            if _cc_floor > 0 and (mid / strike) * (365 / dte) * 100 < _cc_floor:
+                continue
         score = (timing["score"]/100) * mid * (1 + atm_iv) * (1 - abs(dte-37)/37)
         if score > best_score:
             best_score = score
@@ -6477,6 +6488,10 @@ def run_scanner():
                     if int(c.get("open_interest",0) or 0) < 50: continue
                     ann = (mid/strike)*(365/dte)*100
                     if ann < 3 or ann > 300: continue
+                    # Bucket CC floor (A40) — a volatile name must pay for its
+                    # volatility, same principle as the CSP floor (A39).
+                    _cc_floor = get_min_annualized_cc(ticker, BUCKETS) if BUCKETS else 0
+                    if _cc_floor > 0 and ann < _cc_floor: continue
                     ppd = mid / dte
                     # Canonical CC score — consistent with main scan
                     _opp = {"tier": tier, "delta": delta, "ivp": ivp_d,
@@ -6600,6 +6615,8 @@ def run_scanner():
                         if not (d_min <= delta <= d_max): continue
                         ann = (mid/strike)*(365/dte)*100
                         if ann < 3: continue
+                        _cc_floor = get_min_annualized_cc(ticker, BUCKETS) if BUCKETS else 0
+                        if _cc_floor > 0 and ann < _cc_floor: continue
                         _s = {"tier": tier, "delta": delta, "ivp": ivp_d,
                               "annualized_return": ann, "strike": strike,
                               "breakeven": avg_d}

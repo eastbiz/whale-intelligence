@@ -324,9 +324,11 @@ call still marked at its pre-drop price). The engine guards against this:
   `STRICT_ZONE_TELEGRAM = False`.
 - **Alert-volume levers (A37/P34)** — the dials to turn if Telegram drifts:
   `CC_TELEGRAM_TOL_BY_TIER` (how far below `sell_above` a CC may ping, by
-  classification: Core 0%, Trading 2%, Speculative/Very Speculative 3%) and
-  `TELEGRAM_MIN_SCORE_PCT` (0.75, global). Current measured volume: ~4.2 trade
-  ideas and ~12.4 total notifications per day (up from 0.8 and 7.6). Re-measure
+  classification: Core 0%, Trading 2%, Speculative/Very Speculative 3%),
+  `TELEGRAM_MIN_SCORE_PCT` (0.75, global), and the per-bucket annualized floors
+  in `buckets.csv` (`min_ann_csp` / `min_ann_cc`) now that both are enforced.
+  Current measured volume: ~2.8 trade ideas and ~10.8 total notifications per
+  day (up from 0.8 and 7.6). Re-measure
   by replaying, don't estimate — and re-run the replay after ANY change to
   `sell_above`, since that value is what the CC gate compares against.
 - **Zone constants:** `CSP_NEAR_PCT` (0.05), `CC_NEAR_PCT` (0.08),
@@ -418,8 +420,10 @@ it reads `results.json`.
   CSP at 22.7% pinged Telegram while the dashboard hid it (EX-29, fixed A39).
   Rule of thumb: if John can see it in Telegram he must be able to find it on
   the dashboard — a ping with no card behind it is always a bug in one of the
-  two paths. **Still broken for CC:** `get_min_annualized_cc` is imported and
-  never called, so the CC bucket floor is enforced nowhere.
+  two paths. Both floors are now enforced on every path (A39 CSP, A40 CC).
+  **Watch the gate basis:** `find_best_cc` reports annualized as `mid/price`
+  while the two inline CC scanners use `mid/strike`; all three gate on the
+  strike basis so they agree, but the displayed figures still differ by path.
 
 - **Multiple CC code paths.** CC logic exists in ≥3 places: `find_best_cc()`
   (~2834), the inline CC scanner (~5108), and the inline PIO scanner (~5217).
