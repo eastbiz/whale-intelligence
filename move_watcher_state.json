@@ -1,19 +1,7 @@
 {
-  "date": "2026-08-13",
-  "alerted": {
-    "CLS:up": 5,
-    "CRDO:up": 5,
-    "PATH:up": 5,
-    "PLTR:up": 5
-  },
+  "date": "2026-08-14",
+  "alerted": {},
   "dispatched": {
-    "13:47": true,
-    "16:41": true,
-    "18:47": true
-  },
-  "scan_triggered": {
-    "ANGI:up": true,
-    "PATH:up": true
-  },
-  "scan_trigger_count": 1
+    "13:47": true
+  }
 }
