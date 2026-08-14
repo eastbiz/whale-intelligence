@@ -412,6 +412,15 @@ it reads `results.json`.
   out as one grouped message via `send_telegram_grouped()`; a ticker producing
   both a routine CC and a spike CC in one scan sends only the spike.
 
+- **CSP and CC each have a Telegram path and a dashboard path, and they drift.**
+  `csp_engine` (dashboard) and `find_best_csp` (Telegram) must enforce the SAME
+  rules. They didn't: the bucket annualized floor was dashboard-only, so a TSLA
+  CSP at 22.7% pinged Telegram while the dashboard hid it (EX-29, fixed A39).
+  Rule of thumb: if John can see it in Telegram he must be able to find it on
+  the dashboard — a ping with no card behind it is always a bug in one of the
+  two paths. **Still broken for CC:** `get_min_annualized_cc` is imported and
+  never called, so the CC bucket floor is enforced nowhere.
+
 - **Multiple CC code paths.** CC logic exists in ≥3 places: `find_best_cc()`
   (~2834), the inline CC scanner (~5108), and the inline PIO scanner (~5217).
   **Any CC behavior change must be applied to ALL paths** or unpatched paths keep

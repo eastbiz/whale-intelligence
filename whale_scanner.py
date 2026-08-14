@@ -3734,6 +3734,19 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality, sizing=None, m
             below_min     = annualized < CSP_MIN_ANNUALIZED
             if annualized > MAX_ANNUALIZED: continue  # filter bad data
             if annualized < 5: continue  # reject truly garbage premiums
+            # Bucket-aware annualized floor (A39/EX-29). csp_engine — the
+            # DASHBOARD path — hard-rejects here (A:12 B:18 C:28 D:40); this
+            # Telegram path only compared against the global CSP_MIN_ANNUALIZED
+            # (20%) and merely set `below_min`. The two paths therefore
+            # disagreed, and Telegram sent trades the dashboard refused to show:
+            # TSLA $315P at 22.7% annualized cleared the global 20% but failed
+            # bucket C's 28%, so it pinged with no card behind it (2026-08-14).
+            # The gap was invisible until A37 made routine CSP alerts reachable
+            # at all. A volatile name must pay for its volatility on BOTH paths.
+            if ticker and BUCKETS:
+                _bkt_min_ann = get_min_annualized_csp(ticker, BUCKETS)
+                if _bkt_min_ann > 0 and annualized < _bkt_min_ann:
+                    continue
 
             otm_pct       = round((price - strike) / price * 100, 1)
             # Use room_usd from live position data — never suggest more than remaining budget

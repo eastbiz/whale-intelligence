@@ -761,6 +761,32 @@ did not ask for them yet, since he is happy with how LEAPS behave today.
 
 ## Trade Examples (raw log)
 
+### EX-29 — TSLA CSP pinged Telegram with no card on the dashboard (2026-08-14)
+- Alert: `💰 CSP — TSLA @ $336.85 / 🔥 EXCELLENT / Sell Put $315 / 34 DTE /
+  Annualized 22.7%`. John: *"Should it fire? My buy below is $300. And normally
+  whatever is on Telegram I can find on dashboard. And I do not think this is
+  excellent day for Tesla CSP."*
+- All three objections were right, and they share one root cause.
+- **The two CSP paths did not enforce the same rules.** `csp_engine` (dashboard)
+  hard-rejects on the BUCKET annualized floor — A 12%, B 18%, C 28%, D 40%.
+  `find_best_csp` (Telegram) only compared against the global
+  `CSP_MIN_ANNUALIZED` (20%) and set a soft `below_min` flag; it never called
+  `get_min_annualized_csp`. TSLA is bucket C. At 22.7% it cleared the global 20%
+  and failed the bucket's 28% — so Telegram sent it and the dashboard correctly
+  refused to show it. The missing card was the same bug as the bad alert.
+- **Latent until A37.** Before routine CSP alerts became reachable, nothing ever
+  traversed this path to Telegram, so the divergence was invisible. Opening a
+  gate means auditing what is behind it: the parity check should have been part
+  of A37, not a bug report from John the next morning.
+- **"EXCELLENT" describes timing, not the trade.** That string comes from
+  `timing_score` and means "high ATM IV + near 52-week low." It says nothing
+  about whether the contract pays enough for the risk. A volatile name at 22.7%
+  is a poor CSP however good the entry timing looks.
+- Still open for John: effective entry was $308.32 against a $300 buy target.
+  Both paths allow a 3% grace (`buy_under * 1.03` = $309), so they agree — but
+  it means "buy below $300" is enforced as "buy below $309".
+- Fixed as A39.
+
 ### EX-28 — The CRDO ping with no card behind it (2026-08-13)
 - Telegram: *"▲ CRDO +5.1% today ($281.73) — Sell-above $300: now 6.1% below
   target."* John opened the CC tab expecting a card and found none.
@@ -1668,3 +1694,21 @@ alert, so it costs no extra Telegram volume. Deferred with C16.
   PLTR produced 63 LEAPS rows. The conclusion drawn from it (no notification
   impact) happened to hold for a different reason: PLTR produced 0 rows on the
   strict Telegram path regardless.
+
+- **A39 — CSP bucket floor applied to the Telegram path too** (EX-29). The
+  dashboard's `csp_engine` hard-rejected below the bucket annualized floor
+  (A 12 / B 18 / C 28 / D 40); the Telegram path `find_best_csp` checked only the
+  global 20% and set a soft flag. TSLA $315P at 22.7% annualized therefore
+  pinged Telegram while the dashboard refused the card — one bug producing both
+  a bad alert and the missing card. `find_best_csp` now calls
+  `get_min_annualized_csp` and hard-rejects, identically to the dashboard.
+  Verified against the live contract: 22.7% < 28% → blocked. No effect on the
+  21-scan replay (the archived TSLA CSPs paid 29.9-32.1%, above the floor), so
+  measured volume is unchanged at ~4.0 ideas/day.
+  **Found but NOT fixed:** `get_min_annualized_cc` is imported by
+  `whale_scanner.py` and never called — the CC bucket floor (A 10 / B 14 / C 22 /
+  D 30) is enforced on no path at all. Applying it would drop PLTR CCs
+  (19.6-21.8% against a 22% floor) and PATH CCs (23.4-29.6% against 30%), taking
+  measured volume from 4.0 to 2.8 ideas/day and total notifications from 12.4 to
+  10.8. Left for John, since it lowers the volume he chose in A37.
+  Built 2026-08-14.
