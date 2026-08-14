@@ -7554,6 +7554,14 @@ def run_scanner():
         "analysis":       analysis,
         "total_opps":     len(all_opps),
         "price_watch":    price_watch_list,
+        # A34: the dashboard used to carry its OWN hand-typed copy of these
+        # numbers for its positions CSV export. By 2026-08-13 all 29 tickers
+        # disagreed with the scanner (AAPL 200 vs 0, NBIS 90/190 vs 150/280,
+        # PLTR 115 vs 85) and 6 were missing entirely — a second set of buy/sell
+        # targets, silently wrong, on a page John reads. Publishing them here
+        # makes SYMBOL_SETTINGS the single source: update it, and the dashboard
+        # follows on the next scan with nothing to remember.
+        "symbol_settings": SYMBOL_SETTINGS,
     }
 
     # Debug: print trend fields for all LEAPS in review_candidates

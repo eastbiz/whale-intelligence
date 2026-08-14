@@ -311,6 +311,37 @@ call still marked at its pre-drop price). The engine guards against this:
   `PNLSWING_MIN_IMPROVE` / `PNLSWING_FLIP_FROM` / `PNLSWING_FLIP_TO`,
   convexity `CVX_*` constants, `MAX_CC_COVERAGE_PCT`.
 
+### CHANGING A buy_under / sell_above TARGET (John's standing instruction)
+
+When John asks to change a buy-under or sell-above target, **edit exactly one
+place and verify the rest derive from it:**
+
+1. **`SYMBOL_SETTINGS` in `whale_scanner.py` — the ONLY place a target number
+   is typed.** Change it here and nowhere else.
+2. **Verify nothing else hardcodes it.** Everything else must read the value,
+   not restate it. As of A34 the readers are: `move_watcher.py` and
+   `earnings_watcher.py` (both load targets from `results.json`), and the
+   dashboard's positions-CSV export (reads `data.symbol_settings`, published by
+   the scanner). Run this after any target change — it must print nothing:
+   ```
+   grep -rn "buy_under:\s*[0-9]\|buy_under\"\?:\s*[0-9]" ../whale-dashboard/index.html \
+     | grep -v "LAST-RESORT fallback"
+   ```
+3. **Update the NO BUY list below** if a target moves to/from 0, and say so in
+   the reply — it changes whether CSP/LEAPS can fire at all for that name.
+4. **State the consequence back to John**: where the stock sits versus the new
+   target, and whether that flips the name into or out of the zone.
+
+Why this rule exists: the dashboard used to hand-maintain a second copy of every
+target. By 2026-08-13 **all 29 tickers disagreed** with the scanner and 6 were
+missing — AAPL 200 vs 0, NBIS 90/190 vs 150/280, PLTR 115 vs 85 — and those
+wrong numbers were being exported into a CSV. Fixed in A34 by publishing
+`symbol_settings` in `results.json`; the literal left in `index.html` is a
+fallback for old data and **must never be edited to change a target**.
+
+Never let a target number exist in two files. If a new consumer needs targets,
+it reads `results.json`.
+
 ---
 
 ## KNOWN GOTCHAS (read before editing)
