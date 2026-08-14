@@ -1609,3 +1609,15 @@ alert, so it costs no extra Telegram volume. Deferred with C16.
   full replay. Built 2026-08-14.
   **Not touched:** the LEAPS trend gate (1,192 of 1,194 rows die there) —
   flagged, and John chose to leave it for now.
+  **LEAPS side-effects of A36, measured because John asked (2026-08-14):
+  Telegram LEAPS alerts are 0 before and 0 after — identical.** The dip logic,
+  `leaps_trend_action`, `score_leaps`, `LEAPS_DIP_*` and `_tg_leaps_filter` were
+  not edited at all. Three names change internally, and only on the dashboard:
+  KNX, LULU and NVO are the sole tickers where bucket allows LEAPS *and*
+  classification moved (Opportunistic → Trading). They gain the
+  poor-timing bypass in `find_best_leaps` (a candidate is now produced and
+  score-penalised instead of dropped), leave the `SPECULATIVE` set that feeds
+  `timing_score`, and score 2 points higher from tier weight. PLTR loses the
+  bypass but is bucket C, so LEAPS were never allowed for it anyway. These
+  follow from the reclassification John asked for; special-casing LEAPS against
+  his own classification would be the inconsistent choice.
