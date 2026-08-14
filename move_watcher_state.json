@@ -1,7 +1,13 @@
 {
   "date": "2026-08-14",
-  "alerted": {},
+  "alerted": {
+    "NBIS:up": 5
+  },
   "dispatched": {
     "13:47": true
-  }
+  },
+  "scan_triggered": {
+    "NBIS:up": true
+  },
+  "scan_trigger_count": 1
 }
