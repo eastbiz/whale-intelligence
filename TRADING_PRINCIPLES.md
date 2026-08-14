@@ -729,6 +729,36 @@ failure mode arriving through the back door.
 
 - Evidence: the 2026-08-14 replay. System status: **Actioned — A37.**
 
+### P35 — Volatility justifies stricter criteria for a strategy, never removing it
+
+John, 2026-08-14: *"I am not sure there should be any rule about LEAPS not being
+allowed. We can have stricter criteria for more volatile or risky stock, but I do
+not want LEAPS not allowed for those."*
+
+`buckets.csv` defaulted `leaps_allowed` to FALSE for buckets C and D — 16 of the
+29 watchlist names, including NFLX (a CORE holding) and TSLA, the name John
+bought LEAPS on into a −14% dip (EX-8). A bucket says how much premium a name
+must pay for its volatility; it must not decide that a strategy is off the table.
+
+Two things this exposed:
+- **The ban was never enforced.** `whale_scanner.py` does not import
+  `is_leaps_allowed` or `strategy_allowed`; it gates inline. Across 21 archived
+  scans twelve "banned" tickers produced LEAPS rows anyway — TSLA 63, PLTR 63,
+  NBIS 11. The rule was a landmine, not a filter: wiring `strategy_allowed()` in
+  (it advertises itself as the "master gate") would have silently removed LEAPS
+  from half the watchlist.
+- **A stated rule is not evidence of behaviour.** This is P34 again in another
+  costume — the file said one thing, the scans said another, and only replaying
+  the archive settled it. Check what the code actually calls before reasoning
+  from what a config column says.
+
+Fix: `leaps_allowed` is TRUE for every bucket and row; the flag survives as a
+manual per-ticker escape hatch with no members. Stricter bucket-scaled LEAPS
+criteria are welcome as a follow-up — John left the door open, and deliberately
+did not ask for them yet, since he is happy with how LEAPS behave today.
+
+- Evidence: John, 2026-08-14; EX-8. System status: **Actioned — A38.**
+
 ## Trade Examples (raw log)
 
 ### EX-28 — The CRDO ping with no card behind it (2026-08-13)
@@ -1621,3 +1651,20 @@ alert, so it costs no extra Telegram volume. Deferred with C16.
   bypass but is bucket C, so LEAPS were never allowed for it anyway. These
   follow from the reclassification John asked for; special-casing LEAPS against
   his own classification would be the inconsistent choice.
+
+- **A38 — Bucket-level LEAPS ban removed** (P35). `leaps_allowed` defaulted to
+  FALSE for buckets C and D, covering 16 of 29 tickers. Now TRUE everywhere, in
+  both `BUCKET_DEFAULTS` and all 32 `buckets.csv` rows; the per-ticker flag
+  remains as a manual escape hatch with no members. Zero live behaviour change,
+  because the flag was never read by the scanner — which is the other half of
+  the finding: `strategy_allowed()` and `is_leaps_allowed()` are not imported by
+  `whale_scanner.py` at all, so the whole "master gate" is advisory. Both are now
+  labelled NOT WIRED IN, in the code and in CLAUDE.md, so nobody wires them in
+  believing they merely formalise current behaviour. Self-tests updated: TSLA and
+  NBIS LEAPS now pass at low IVR and are blocked only by the IVR rule at high IVR
+  (22/22). Built 2026-08-14.
+  Correction on record: an earlier reply in that session claimed "PLTR is bucket
+  C, so LEAPS were never allowed for it anyway." False — the ban was inert and
+  PLTR produced 63 LEAPS rows. The conclusion drawn from it (no notification
+  impact) happened to hold for a different reason: PLTR produced 0 rows on the
+  strict Telegram path regardless.

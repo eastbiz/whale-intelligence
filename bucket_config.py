@@ -48,7 +48,7 @@ BUCKET_DEFAULTS = {
         "delta_cc_min": 0.20, "delta_cc_max": 0.30,
         "dte_min": 21, "dte_max": 35,
         "max_position_pct": 5.0,
-        "leaps_allowed": False, "leaps_only": False,
+        "leaps_allowed": True, "leaps_only": False,
         "spreads_only": False, "cc_only": False,
     },
     "D": {
@@ -57,7 +57,7 @@ BUCKET_DEFAULTS = {
         "delta_cc_min": 0.15, "delta_cc_max": 0.20,
         "dte_min": 21, "dte_max": 35,
         "max_position_pct": 3.0,
-        "leaps_allowed": False, "leaps_only": False,
+        "leaps_allowed": True, "leaps_only": False,
         "spreads_only": True, "cc_only": False,
     },
 }
@@ -165,6 +165,14 @@ def is_cc_only(ticker: str, buckets: Dict) -> bool:
 
 
 def is_leaps_allowed(ticker: str, buckets: Dict) -> bool:
+    """Per-ticker LEAPS opt-out. TRUE for every bucket as of 2026-08-14.
+
+    Buckets C and D used to default this to FALSE, which read as "LEAPS are not
+    allowed on volatile names" — 16 of the 29 watchlist tickers, including NFLX
+    (CORE) and TSLA, on which John bought LEAPS into a -14% dip (EX-8). John's
+    instruction: volatility may justify STRICTER LEAPS criteria, never a ban.
+    The flag survives as a manual per-ticker escape hatch; nothing sets it False.
+    """
     entry = buckets.get(ticker.upper())
     if entry:
         return bool(entry.get("leaps_allowed", True))
@@ -208,6 +216,15 @@ def classify_ivr_regime(ivr: float) -> str:
 def strategy_allowed(ticker: str, buckets: Dict, strategy: str,
                      ivr: float, price_zone: str) -> Tuple[bool, str]:
     """
+    NOT WIRED INTO whale_scanner.py. The scanner imports load_buckets,
+    get_bucket, get_min_annualized_csp/cc and the is_*_only flags — it does NOT
+    import this function or is_leaps_allowed, and implements its own gating
+    inline. So every rule below is advisory today. That mattered: the bucket
+    LEAPS ban lived here and read as authoritative, but across 21 archived scans
+    twelve supposedly-banned tickers produced LEAPS rows anyway (TSLA 63, PLTR
+    63, NBIS 11). Wiring this in without auditing each rule would silently
+    change live behaviour for half the watchlist.
+
     Master gate: is this strategy allowed for this ticker right now?
 
     strategy in {"CSP", "CC", "LEAPS", "PUT_SPREAD", "CALL_SPREAD"}
@@ -307,7 +324,9 @@ if __name__ == "__main__":
         ("NBIS", "PUT_SPREAD", 65, "lower_band", True, "NBIS spread OK"),
         ("META", "CSP", 60, "mid_low", False, "META watchlist blocks mid-zone"),
         ("META", "CSP", 60, "lower_band", True, "META CSP OK in lower"),
-        ("TSLA", "LEAPS", 80, "lower_band", False, "TSLA C bucket no LEAPS"),
+        ("TSLA", "LEAPS", 80, "lower_band", False, "TSLA LEAPS blocked by high IVR, not by bucket"),
+        ("TSLA", "LEAPS", 20, "lower_band", True,  "TSLA C bucket LEAPS OK at low IVR (no bucket ban)"),
+        ("NBIS", "LEAPS", 20, "lower_band", True,  "NBIS D bucket LEAPS OK at low IVR (no bucket ban)"),
         ("NVDA", "LEAPS", 20, "lower_band", True, "NVDA LEAPS OK at low IVR"),
         ("AAPL", "CSP", 35, "upper_band", False, "AAPL no CSP in upper band"),
         ("TSLA", "CSP", 35, "lower_band", False, "TSLA C bucket needs IVR>50"),

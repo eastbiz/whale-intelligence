@@ -301,11 +301,25 @@ call still marked at its pre-drop price). The engine guards against this:
   WATCHLIST / EXIT_CC_ONLY — it replaced `tier_legacy`, which held a stale
   second copy of the classification. Do not re-add a classification column here.
   Must sit in the same directory as `whale_scanner.py` and `bucket_config.py`.
-- **`bucket_config.py`** — bucket loader + `strategy_allowed()` gate. Must be
-  co-located for `load_buckets()` to import.
+- **`bucket_config.py`** — bucket loader + `strategy_allowed()`. Must be
+  co-located for `load_buckets()` to import. **`strategy_allowed()` and
+  `is_leaps_allowed()` are NOT wired into `whale_scanner.py`** — the scanner
+  imports only `load_buckets`, `get_bucket`, `get_min_annualized_csp/cc` and the
+  `is_*_only` flags, and gates everything else inline. `strategy_allowed()`
+  calls itself the "master gate" but is advisory: its LEAPS ban was inert, and
+  across 21 archived scans twelve supposedly-banned tickers produced LEAPS rows
+  anyway. Audit every rule in it before wiring it in — doing so blind would
+  change live behaviour for half the watchlist.
 - **Special flags:** `spreads_only` (NBIS, CRDO — block naked CSP/CC, route to
   spreads), `leaps_only` (BABA), `cc_only` (MSTR, OWL — exit-waiting), and
   `watchlist` tier (META).
+- **LEAPS are never banned by volatility class (2026-08-14, John's
+  instruction).** `leaps_allowed` is TRUE for every bucket and every row.
+  Buckets C and D used to default it FALSE, which read as "no LEAPS on volatile
+  names" and covered 16 of 29 tickers — including NFLX (CORE) and TSLA, the name
+  John bought LEAPS on into a −14% dip (EX-8). Volatility may justify STRICTER
+  LEAPS criteria; it must not remove the strategy. The flag remains as a manual
+  per-ticker escape hatch with no members. Do not re-default it to FALSE.
 - **Feature flags:** `ENABLE_PIO = False` (Position Income Optimization, noisy),
   `STRICT_ZONE_TELEGRAM = False`.
 - **Alert-volume levers (A37/P34)** — the dials to turn if Telegram drifts:
