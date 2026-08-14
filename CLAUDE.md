@@ -287,10 +287,13 @@ call still marked at its pre-drop price). The engine guards against this:
   `Very Speculative` (weight 0, the same treatment the old code gave unknowns).
 - **`SYMBOL_SETTINGS`** dict in `whale_scanner.py` (~line 448) — per-ticker
   buy_under / sell_above / delta ranges / flags, grouped by classification.
-  `buy_under = 0` means NO BUY (currently AAPL, NFLX, IBIT, PATH, MSTR).
-  Note AAPL and NFLX are CORE *and* NO BUY: CORE describes willingness to hold,
-  not willingness to buy at today's price. That is intentional (2026-08-14) —
-  do not "fix" it by inventing a buy_under.
+  All 29 tickers were reconciled against John's own Price Alert table on
+  2026-08-14 (A35) and **every name now has a real buy target — none is 0.**
+  `buy_under = 0` still means NO BUY and the `is_no_buy()` gate still works;
+  it simply has no members today. Do not infer intent from a 0 you find in
+  future: the five that carried one (AAPL/NFLX/IBIT/PATH/MSTR) turned out to be
+  stale config, not a decision, and an earlier note in this file rationalized
+  them as deliberate when they were not. Ask John.
 - **`buckets.csv`** — ticker → bucket (A–D) + behavioural flags. **Orthogonal to
   classification:** bucket is about VOLATILITY (premium floors, delta bands,
   DTE), classification is about CONVICTION, and they deliberately disagree in
