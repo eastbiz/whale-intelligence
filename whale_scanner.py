@@ -249,6 +249,25 @@ TG_POS_NEAR_STRIKE     = 15.0   # dist-to-strike% that makes any move relevant
 # not just clear the expiry. Blocks CCs held through earnings AND CCs that
 # expire right up against it (rich earnings-IV premium, assignment-before-pop).
 CC_EARNINGS_BUFFER_DAYS = 5
+# ── CC Telegram proximity band by classification (A35, P34) ──────────────
+# A14/P20 required the stock to be AT or ABOVE sell_above before a CC could
+# ping. Replayed over 21 archived scans that rule killed 166 of 176 covered
+# calls and ALL 57 spike CCs — PLTR sat 2% under its $180 target eleven separate
+# times in silence. A binary gate treats "2% away" and "40% away" identically.
+# The band is now classification-aware, straight from John's spec:
+#   CORE             — assignment is UNDESIRABLE, so no band. Must be at/above.
+#   TRADING          — "assignment is acceptable if the stock reaches a
+#                       sufficiently attractive exit price."
+#   SPECULATIVE /    — "covered calls may be used actively to monetize
+#   VERY SPECULATIVE    volatility."
+# Measured effect: ~0.8 → ~4.0 opportunity alerts/day. Raise a tier's number to
+# hear about it earlier, set it to 0.0 to require the target to be reached.
+CC_TELEGRAM_TOL_BY_TIER = {
+    "Core":             0.00,
+    "Trading":          0.02,
+    "Speculative":      0.03,
+    "Very Speculative": 0.03,
+}
 # Notable-move thresholds by bucket (C11/EX-13/EX-14). A move is "notable" when
 # the NET 5-day move clears the bar for that stock's volatility class — scaled
 # by bucket (stable) not by hand-maintained price targets, and on the 5-day net
@@ -2118,7 +2137,15 @@ def tier_position_status(tier: str, exposure_pct: float) -> str:
     else:                                         return "Overweight"
 
 # Max scores per strategy (for normalization)
-SCORE_MAX = {"CSP": 12, "CC": 13, "LEAPS": 13, "PIO": 13, "PMCC": 13}
+# A35: CSP was 12 while score_csp can only reach 9 — Tier(3) + IVP(2) +
+# Pullback(2) + Income(2). The Telegram gate is ceil(0.75 × max), so the bar sat
+# at 9-out-of-9: a routine CSP alert needed a literally perfect card AND tier
+# weight 3, i.e. CORE only. Over 21 archived scans not one CSP ever pinged (best
+# scored 7). Correcting the max to 9 moves the bar to 7 — reachable — and also
+# fixes quality_label, which was dividing a 9-max score by 12 and so printed
+# every CSP card one quality band low. Post-drop and spike CSPs bypass this gate
+# entirely and are unaffected.
+SCORE_MAX = {"CSP": 9, "CC": 13, "LEAPS": 13, "PIO": 13, "PMCC": 13}
 
 # Telegram green-light threshold — only trades scoring ≥ this % of SCORE_MAX get sent.
 # Dashboard always shows everything. Raise to reduce Telegram noise; lower to see more.
@@ -4578,6 +4605,47 @@ def send_telegram(msg: str):
         print(f"TG: {e}")
 
 
+def send_telegram_grouped(sections: list, limit: int = 3500):
+    """Send several alert sections as ONE Telegram message (A35).
+
+    Alerts used to go out one message per contract plus one per section header.
+    Over 21 archived scans that turned 4.2 actual trade ideas per day into 11.2
+    Telegram messages — the overhead outnumbered the content nearly 3 to 1, which
+    is exactly the "Telegram is a browse list, not a go-sit-at-the-computer
+    signal" complaint (P22). Same content, grouped.
+
+    `sections` is a list of (header, [body, ...]). Empty sections are dropped.
+    Splits into continuation messages only if the text would exceed Telegram's
+    limit, and always splits on a body boundary so no card is cut in half.
+    """
+    blocks = []
+    for header, bodies in sections:
+        bodies = [b for b in bodies if b]
+        if not bodies:
+            continue
+        blocks.append(header)
+        blocks.extend(bodies)
+    if not blocks:
+        return 0
+
+    msgs, cur = [], ""
+    for b in blocks:
+        candidate = (cur + "\n\n" + b) if cur else b
+        if cur and len(candidate) > limit:
+            msgs.append(cur)
+            cur = b
+        else:
+            cur = candidate
+    if cur:
+        msgs.append(cur)
+
+    for i, m in enumerate(msgs):
+        send_telegram(m)
+        if i < len(msgs) - 1:
+            time.sleep(2)
+    return len(msgs)
+
+
 def fmt_quality(q) -> str:
     """Format quality summary for Telegram alerts."""
     warnings = q.get("warnings", [])
@@ -5770,9 +5838,19 @@ def run_scanner():
             return True
         _px = o.get("price", 0) or 0
         _sa = SYMBOL_SETTINGS.get(_tk, {}).get("sell_above", 0) or 0
-        if _sa > 0 and _px < _sa:
-            print(f"   🔕 CC {_tk} dashboard-only: ${_px:.2f} < sell target ${_sa:g}")
+        # A35: band widens by classification — CORE still needs the target
+        # reached, the rest ping once the stock is within their band of it.
+        _tol  = CC_TELEGRAM_TOL_BY_TIER.get(tier_of(_tk), 0.0)
+        _floor = _sa * (1 - _tol)
+        if _sa > 0 and _px < _floor:
+            _band = (f" (within {_tol*100:.0f}% = ${_floor:.2f})" if _tol > 0 else "")
+            print(f"   🔕 CC {_tk} [{tier_of(_tk)}] dashboard-only: "
+                  f"${_px:.2f} < sell target ${_sa:g}{_band}")
             return False
+        if _sa > 0 and _px < _sa:
+            print(f"   🔔 CC {_tk} [{tier_of(_tk)}]: ${_px:.2f} is within "
+                  f"{(1 - _px/_sa)*100:.1f}% of sell target ${_sa:g} — inside the "
+                  f"{_tol*100:.0f}% band")
         _cc  = o.get(cc_key, {}) or {}
         _dte = _cc.get("dte", 0) or 0
         _d2e = o.get("quality", {}).get("days_to_earnings", 999)
@@ -5861,21 +5939,29 @@ def run_scanner():
     # 2. Green-light trade alerts.
     #    Spike CC sent FIRST — it's the low-risk, time-sensitive priority (sell
     #    calls into a spike on shares you already own).
-    if tg_spikes:
-        send_telegram("━━━ *⚡ SPIKE CC (sell into strength)* ━━━"); time.sleep(1)
-        for o in tg_spikes: send_telegram(fmt_spike_cc(o)); time.sleep(2)
-    if tg_drops:
-        send_telegram("━━━ *🔻 POST-DROP CSP* ━━━"); time.sleep(1)
-        for o in tg_drops: send_telegram(fmt_drop_csp(o)); time.sleep(2)
-    if tg_csps:
-        send_telegram("━━━ *✅ CSP* ━━━"); time.sleep(1)
-        for o in tg_csps: send_telegram(fmt_csp(o)); time.sleep(2)
-    if tg_ccs:
-        send_telegram("━━━ *✅ COVERED CALL* ━━━"); time.sleep(1)
-        for o in tg_ccs: send_telegram(fmt_cc(o)); time.sleep(2)
-    if tg_leaps:
-        send_telegram("━━━ *✅ LEAPS* ━━━"); time.sleep(1)
-        for o in tg_leaps: send_telegram(fmt_leaps(o)); time.sleep(2)
+    #
+    #    A35: one ticker, one call idea. A stock that rallies into its sell
+    #    target usually produces BOTH a routine CC and a spike CC in the same
+    #    scan — two messages (plus two section headers) for one decision about
+    #    one stock. In the 21-scan replay PLTR did exactly this on 8 of 8
+    #    qualifying scans, which alone was two thirds of the alert volume.
+    #    The spike wins: same action, but it carries the "sell into strength"
+    #    framing and is the time-sensitive one.
+    _spike_tk = {o.get("ticker", "") for o in tg_spikes}
+    _dupes    = [o.get("ticker", "") for o in tg_ccs if o.get("ticker", "") in _spike_tk]
+    if _dupes:
+        print(f"   🔗 CC folded into spike CC (same ticker, same scan): {', '.join(sorted(set(_dupes)))}")
+    tg_ccs = [o for o in tg_ccs if o.get("ticker", "") not in _spike_tk]
+
+    _n_msgs = send_telegram_grouped([
+        ("━━━ *⚡ SPIKE CC (sell into strength)* ━━━", [fmt_spike_cc(o) for o in tg_spikes]),
+        ("━━━ *🔻 POST-DROP CSP* ━━━",                 [fmt_drop_csp(o) for o in tg_drops]),
+        ("━━━ *✅ CSP* ━━━",                            [fmt_csp(o)      for o in tg_csps]),
+        ("━━━ *✅ COVERED CALL* ━━━",                   [fmt_cc(o)       for o in tg_ccs]),
+        ("━━━ *✅ LEAPS* ━━━",                          [fmt_leaps(o)    for o in tg_leaps]),
+    ])
+    _n_ideas = len(tg_spikes) + len(tg_drops) + len(tg_csps) + len(tg_ccs) + len(tg_leaps)
+    print(f"   📱 {_n_ideas} trade ideas sent as {_n_msgs} Telegram message(s)")
 
     # PMCC — dashboard only (never sent to Telegram)
 

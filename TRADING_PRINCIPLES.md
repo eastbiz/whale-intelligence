@@ -694,6 +694,41 @@ automatically, and a single earnings reaction is never a reason to reclassify.
 - Evidence: John's classification table, 2026-08-14. System status:
   **Actioned — A34.**
 
+### P34 — Judge the alert rules by the notification count they produce, not by the rules
+
+John's own words (2026-08-14): *"I'm not able to judge anymore the rules how they
+are set up... I just hope I will get the right enough amount of notification
+about opportunities. That's the thing I am able to judge."*
+
+The rules have passed the point where reading them predicts the output. So any
+change to alert gating must now be **measured against archived scans before it
+ships**, and reported to John as notifications-per-day, not as thresholds.
+`results.json` is committed on every run, so `git rev-list HEAD -- results.json`
+is a replayable record of real opportunities. Replay the gate over it, count.
+
+What the first replay found (21 scans, 5 trading days, 2026-08-07 → 08-13):
+- **4 routine opportunity alerts in 5 days. 18 of 21 scans sent nothing.** The
+  system was far on the "too little" side, not the "too many" side everyone
+  including me assumed.
+- Nearly all Telegram traffic was *position* alerts (~6/day) about names he
+  already held. New-opportunity alerts were effectively off.
+- The binding constraint was **not** scoring or classification — those moved the
+  count by 0.4/day. It was three specific gates:
+  - the CC sell-target rule killed **166 of 176** CCs and **57 of 57** spike CCs;
+  - the LEAPS trend gate killed **1,192 of 1,194** LEAPS rows;
+  - the CSP bar was set above the maximum a CSP could score, so routine CSP
+    alerts were mathematically impossible and had never once fired.
+- The near-misses were exactly the moments he cares about: **PLTR sat 2% under
+  its $180 sell target eleven separate times** in silence; NVDA 6-7% under $240
+  nineteen times.
+
+Corollary: **count messages, not ideas.** One alert per contract plus one
+section header per section turned 4.2 trade ideas per day into 11.2 Telegram
+messages — the overhead outnumbered the content almost 3 to 1. That is the P22
+failure mode arriving through the back door.
+
+- Evidence: the 2026-08-14 replay. System status: **Actioned — A35.**
+
 ## Trade Examples (raw log)
 
 ### EX-28 — The CRDO ping with no card behind it (2026-08-13)
@@ -1396,7 +1431,8 @@ rich-but-quiet opportunity (high IVP, no big move today) deserve a ping or not?
 
 ---
 
-### C15 — `SCORE_MAX["CSP"]` is 12 but `score_csp` can only reach 9
+### ~~C15~~ — GRADUATED → A35 (fixed 2026-08-14, `SCORE_MAX["CSP"]` = 9, bar now 7)
+### C15 (original text) — `SCORE_MAX["CSP"]` is 12 but `score_csp` can only reach 9
 
 `score_csp` awards Tier(3) + IVP(2) + Pullback(2) + Income(2) = **9 max**, but
 `SCORE_MAX["CSP"]` says 12. The Telegram gate is `ceil(0.75 × 12) = 9`, so a CSP
@@ -1543,3 +1579,32 @@ alert, so it costs no extra Telegram volume. Deferred with C16.
   volume turns out noisy, raise `TELEGRAM_MIN_SCORE_PCT`. Validated 10/10 on a
   classification audit plus 20/20 on `bucket_config.py`. Built 2026-08-14 with
   John's go-ahead.
+
+- **A35 — Alert volume tuned against replayed history, not intuition** (P34).
+  Three changes, each measured over the 21 archived scans before shipping.
+  (1) **CC proximity band by classification** (`CC_TELEGRAM_TOL_BY_TIER`).
+  A14/P20's at-or-above-`sell_above` rule was binary — 2% away was silenced
+  exactly like 40% away. Now CORE still requires the target to be reached
+  (assignment is undesirable there), TRADING gets 2%, Speculative and Very
+  Speculative 3% — straight from John's own spec, which says assignment is
+  acceptable on Trading names at a good exit price and that speculative names
+  should monetise volatility actively. This is the first real payoff of the A34
+  classification work. (2) **`SCORE_MAX["CSP"]` 12 → 9** (C15, resolved).
+  `score_csp` can only reach 9, so the `ceil(0.75 × 12) = 9` gate demanded a
+  perfect card AND tier weight 3 — CORE only, and in practice never. The bar is
+  now 7 and reachable; it also fixes `quality_label`, which had been printing
+  every CSP card one band low. Post-drop and spike CSPs bypass the score gate and
+  are unaffected. (3) **One ticker, one message.** A stock rallying into its
+  target produced both a routine CC and a spike CC in the same scan — the
+  routine CC is now folded into the spike (same action, spike carries the
+  time-sensitive framing), and all remaining sections go out as a single grouped
+  message via `send_telegram_grouped()` instead of one message per contract plus
+  a header per section. Splits only if it would exceed Telegram's limit, and
+  always on a card boundary.
+  Measured result: trade ideas 0.8 → 4.2 per day; total notifications 8.7 → 12.4
+  per day; scans that send nothing 18/21 → 5/21. John picked this volume from a
+  menu of measured options. Levers if it drifts: `CC_TELEGRAM_TOL_BY_TIER` per
+  tier, `TELEGRAM_MIN_SCORE_PCT` globally. Validated 3/3 on the grouper plus a
+  full replay. Built 2026-08-14.
+  **Not touched:** the LEAPS trend gate (1,192 of 1,194 rows die there) —
+  flagged, and John chose to leave it for now.

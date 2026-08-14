@@ -305,6 +305,12 @@ call still marked at its pre-drop price). The engine guards against this:
   `watchlist` tier (META).
 - **Feature flags:** `ENABLE_PIO = False` (Position Income Optimization, noisy),
   `STRICT_ZONE_TELEGRAM = False`.
+- **Alert-volume levers (A35/P34)** — the dials to turn if Telegram drifts:
+  `CC_TELEGRAM_TOL_BY_TIER` (how far below `sell_above` a CC may ping, by
+  classification: Core 0%, Trading 2%, Speculative/Very Speculative 3%) and
+  `TELEGRAM_MIN_SCORE_PCT` (0.75, global). Current measured volume: ~4.2 trade
+  ideas and ~12.4 total notifications per day. Re-measure by replaying, don't
+  estimate.
 - **Zone constants:** `CSP_NEAR_PCT` (0.05), `CC_NEAR_PCT` (0.08),
   `LEAPS_GROWTH_BY_BUCKET`, `LEAPS_GROWTH_DEFAULT`, `LEAPS_GROWTH_OVERRIDE`.
 - **Editable alert thresholds** (top of file): `BIGMOVE_1D`, `BIGMOVE_3D`,
@@ -341,12 +347,21 @@ call still marked at its pre-drop price). The engine guards against this:
   scored, sized and profit-taken exactly like CLS or KNX for months. Call
   `tier_of(ticker)`. Any new tier-keyed map must cover all four display tiers.
 
-- **`SCORE_MAX["CSP"]` (12) does not match `score_csp`'s real maximum (9).**
-  The Telegram gate is `ceil(0.75 × 12) = 9`, so a routine CSP alert requires a
-  literally perfect score, which requires tier weight 3 — **CORE names only**.
-  It also makes every CSP card's `quality_label` read one band low. Left alone
-  deliberately; see C15 in `TRADING_PRINCIPLES.md` for the three options and why
-  fixing it silently would open routine CSP pings to most of the watchlist.
+- **Tune alert gating against replayed history, never by reading the rules
+  (P34).** `results.json` is committed every run, so `git rev-list HEAD --
+  results.json` is a replayable archive of real opportunities. Replay any gating
+  change over it and report the result to John as **notifications per day**,
+  which is the only thing he can now judge. The 2026-08-14 replay found the
+  system sending 4 opportunity alerts in 5 days with 18 of 21 scans silent —
+  the opposite of the "too noisy" assumption everyone was working from. It also
+  showed that classification and scoring moved the count by 0.4/day while three
+  specific gates decided everything: the CC sell-target rule (killed 166/176
+  CCs and 57/57 spike CCs), the LEAPS trend gate (1,192/1,194), and the CSP
+  score bar (unreachable, never once fired).
+- **Count MESSAGES, not ideas.** One send per contract plus a section header
+  turned 4.2 trade ideas/day into 11.2 Telegram messages. Trade alerts now go
+  out as one grouped message via `send_telegram_grouped()`; a ticker producing
+  both a routine CC and a spike CC in one scan sends only the spike.
 
 - **Multiple CC code paths.** CC logic exists in ≥3 places: `find_best_cc()`
   (~2834), the inline CC scanner (~5108), and the inline PIO scanner (~5217).
