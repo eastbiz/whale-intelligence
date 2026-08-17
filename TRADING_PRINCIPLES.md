@@ -808,7 +808,7 @@ The numbers, from the 2026-08-17 diversification work (JD/ZTS, Dec-2028 expiry,
 
 | name | spot | buy_under | bucket g | band at bucket g | band at g=0 |
 |------|------|-----------|----------|------------------|-------------|
-| JD   | $28  | $25       | 20% (C)  | **$38.32**       | $25.00      |
+| JD   | $28  | $26       | 20% (C)  | **$39.85**       | $26.00      |
 | ZTS  | ~$74 | $70       | 15% (B)  | **$97.11**       | $70.00      |
 
 Both would have printed a LEAPS card **immediately**, on names John had just
@@ -828,9 +828,9 @@ Fix: `LEAPS_GROWTH_OVERRIDE = 0.0`, which collapses the band to a flat
   the target, and `compute_in_zone` returns AT at or below it. That is intended:
   "approaching" is a growth concept.
 - **The implied-growth line stays useful, and is the number to read.** JD at $28
-  against a $25 target over 2.34 years implies 5.0%/yr. For a name John is not
+  against a $26 target over 2.34 years implies 3.2%/yr. For a name John is not
   an expert on, that single figure is judgeable on its own terms in a way that
-  "12% above target" is not — which was P31's original point, applied to a
+  "7.7% above target" is not — which was P31's original point, applied to a
   thesis P31 did not anticipate.
 - Watch the spot figures in this entry: they are illustrative context, not
   config. JD was written up at $29 on the first pass and corrected to $28 by
@@ -1985,7 +1985,8 @@ adding two tickers. Four separate defects, in rough priority order:
   (55%) is AI-linked**, i.e. the leveraged, expiring quarter of the portfolio is
   the most concentrated part of it. Rows sum to 91.4%; the missing 8.6% is
   unexplained and is logged as C18.
-  Config: both TRADING, `buy_under` JD $25 (John's own number) / ZTS $70,
+  Config: both TRADING, `buy_under` JD $26 (John's own number, raised from an
+  initial $25 on 2026-08-17) / ZTS $70,
   `sell_above` 0 (no sell view yet — reads NO_TARGET, not a target of zero),
   bucket C / B, `leaps_only` TRUE, `LEAPS_GROWTH_OVERRIDE` 0.0, `TICKER_TARGETS`
   3.0% each. JD carries `speculative: True` so a 0% holding reads "Not Held"

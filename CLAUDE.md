@@ -158,8 +158,8 @@ independently.**
   **A growth allowance is wrong for a VALUE name (A42/P37)** — the thesis is
   re-rating to fair value, not compounding into today's price. Set
   `LEAPS_GROWTH_OVERRIDE = 0.0` (JD, ZTS today) and the band collapses to a flat
-  `price ≤ buy_under`. At their bucket defaults JD's band was $38.32 against a
-  $25 target and ZTS's was **$97.11 against a $70 target — 31% ABOVE spot**, so
+  `price ≤ buy_under`. At their bucket defaults JD's band was $39.85 against a
+  $26 target and ZTS's was **$97.11 against a $70 target — 31% ABOVE spot**, so
   both would have printed a card instantly on names John had just said he wanted
   to buy only on a great entry. `0.0` is a real setting, not "unset":
   `leaps_growth_allowance` tests `in`, not truthiness — never rewrite it as

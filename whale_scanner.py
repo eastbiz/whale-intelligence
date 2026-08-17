@@ -508,7 +508,7 @@ SYMBOL_SETTINGS = {
     # Both carry LEAPS_GROWTH_OVERRIDE = 0.0: the entry band is FLAT at
     # buy_under, because the thesis is re-rating to fair value, not compounding
     # into the price (see the growth-allowance note below).
-    "JD":   {"buy_under":   25, "sell_above":    0, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "JD":   {"buy_under":   26, "sell_above":    0, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "KNX":  {"buy_under":   55, "sell_above":   80, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "LULU": {"buy_under":  105, "sell_above":  150, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "MU":   {"buy_under":  450, "sell_above": 1400, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
@@ -663,12 +663,11 @@ CC_NEAR_PCT  = 0.08   # CC  near = within 8% BELOW sell_above
 # g = 0.0 is a legitimate, deliberate setting, NOT "unset". It collapses the
 # band to a flat `price <= buy_under` — the correct model for a VALUE name,
 # where the thesis is a re-rating to fair value rather than compounding into
-# today's price. Worked example (2026-08-17): JD at $28 with buy_under $25 and
+# today's price. Worked example (2026-08-17): JD at $28 with buy_under $26 and
 # a Dec-2028 expiry (~2.34y) would be IN ZONE at its own bucket-C g=0.20 (band
-# $38.32), at g=0.15 (band $34.68) and even at g=0.10 (band $31.25) — i.e. every
-# growth allowance on the ladder hands out a card TODAY
-# on a name John explicitly wants to buy at $25. At g=0.0 the band is $25 and
-# the card waits. `leaps_growth_allowance` tests `in` (not truthiness), so 0.0
+# $39.85), at g=0.15 (band $36.07) and even at g=0.10 (band $32.50) — i.e. every
+# growth allowance on the ladder hands out a card TODAY on a name John
+# explicitly wants to buy at $26. At g=0.0 the band is $26 and the card waits. `leaps_growth_allowance` tests `in` (not truthiness), so 0.0
 # is honoured rather than falling through to the bucket default.
 LEAPS_GROWTH_BY_BUCKET = {"A": 0.10, "B": 0.15, "C": 0.20, "D": 0.25}
 LEAPS_GROWTH_DEFAULT   = 0.15
