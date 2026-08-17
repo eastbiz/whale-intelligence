@@ -353,6 +353,12 @@ call still marked at its pre-drop price). The engine guards against this:
   `sell_above`, since that value is what the CC gate compares against.
 - **Zone constants:** `CSP_NEAR_PCT` (0.05), `CC_NEAR_PCT` (0.08),
   `LEAPS_GROWTH_BY_BUCKET`, `LEAPS_GROWTH_DEFAULT`, `LEAPS_GROWTH_OVERRIDE`.
+- **`zone_gap()` (A43)** publishes the distance to target as a NUMBER
+  (`zone_gap_pct`, signed, % of the target) plus a short label
+  (`zone_gap_label`, e.g. "2.2% below sell") on CSP / CC / LEAPS rows, so the
+  card badge reads "Near target · 2.2% below sell". Same arithmetic as the gap
+  inside `compute_in_zone`'s reason string — if you change one, change both, or
+  the badge and its own tooltip will disagree.
 - **Editable alert thresholds** (top of file): `BIGMOVE_1D`, `BIGMOVE_3D`,
   `PNLSWING_MIN_IMPROVE` / `PNLSWING_FLIP_FROM` / `PNLSWING_FLIP_TO`,
   convexity `CVX_*` constants, `MAX_CC_COVERAGE_PCT`.
@@ -365,13 +371,13 @@ place and verify the rest derive from it:**
 1. **`SYMBOL_SETTINGS` in `whale_scanner.py` — the ONLY place a target number
    is typed.** Change it here and nowhere else.
 2. **Verify nothing else hardcodes it.** Everything else must read the value,
-   not restate it. As of A34 the readers are: `move_watcher.py` and
-   `earnings_watcher.py` (both load targets from `results.json`), and the
-   dashboard's positions-CSV export (reads `data.symbol_settings`, published by
-   the scanner). Run this after any target change — it must print nothing:
+   not restate it. As of A43 the readers are `move_watcher.py` and
+   `earnings_watcher.py` (both load targets from `results.json`). The dashboard
+   no longer holds any target literal at all — the CSV export that carried the
+   last copy was removed with the export itself. Run this after any target
+   change — it must print nothing:
    ```
-   grep -rn "buy_under:\s*[0-9]\|buy_under\"\?:\s*[0-9]" ../whale-dashboard/index.html \
-     | grep -v "LAST-RESORT fallback"
+   grep -rn "buy_under:\s*[0-9]\|buy_under\"\?:\s*[0-9]" ../whale-dashboard/index.html
    ```
 3. **Update the NO BUY list below** if a target moves to/from 0, and say so in
    the reply — it changes whether CSP/LEAPS can fire at all for that name.
@@ -404,13 +410,30 @@ it reads `results.json`.
   (`build_line` + `near_actionable`), and the dashboard's Actions tab
   (separate repo). Filter by type explicitly — never assume.
 
-- **The dashboard carries its own STALE `SYMBOL_SETTINGS` copy** (`index.html`
-  ~line 1432, used by the settings-export table). Its numbers have drifted from
-  the scanner's — it lists AAPL `buy_under: 200` while the scanner says 0 (NO
-  BUY), NBIS 90 vs 150, PLTR 115 vs 85. Nothing in the opportunity pipeline
-  reads it, so it is display-only, but it will mislead anyone who checks targets
-  there. Not reconciled as of 2026-08-13 (out of scope for A32) — fix by
-  sourcing it from `results.json` rather than by hand-editing the copy.
+- **RESOLVED (A43): the dashboard's stale `SYMBOL_SETTINGS` copy is gone.** It
+  lived in `downloadPositionsCSV()` and went with it when John asked for the CSV
+  button to be removed. No target literal exists in `index.html` any more — keep
+  it that way; a new consumer reads `data.symbol_settings` from `results.json`.
+
+- **A broker feed can fail SILENTLY and the page will still assert a number.**
+  `schwab_get_accounts()` returns `[]` on failure rather than raising, and the
+  2026-08-17 06:43 scan published a Positions tab in which every Schwab-held
+  name read "Watchlist / not owned" and `portfolio_size` was 40% of the truth
+  (EX-32). `schwab_live` did NOT catch it — that flag tracks **quotes only**,
+  and quotes were fine. As of A43 an empty Schwab position feed sets
+  `positions_feed.ok = false` in `results.json` and raises a red banner on the
+  Positions tab. **Check `positions_feed` before believing anything on that
+  tab**, and if you add another feed, give it the same treatment: IBKR has had
+  stale-data protection for months and Schwab had none, which is exactly why
+  this went unnoticed.
+
+- **Loop variables leak in Python, and this file is one long function.**
+  `run_scanner` runs a Telegram pass over every ticker, then a *second*
+  dashboard pass over every ticker. Names from the first pass are still bound
+  during the second. The LEAPS row builder read `earn_date` (first pass) instead
+  of `earn_date_d` (second pass), so 22 of 23 LEAPS cards showed one unrelated
+  ticker's earnings date for months (EX-31). Inside the dashboard pass the
+  correct suffix is `_d`. Nothing raises when you get this wrong.
 
 - **Never write a new `if t in CORE_STOCKS … else "Opportunistic"` ladder.**
   There used to be nine copies of that ladder, and every one of them silently

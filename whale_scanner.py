@@ -790,6 +790,36 @@ def compute_in_zone(strategy: str, price: float, buy_under: float, sell_above: f
 
     return (False, "OUT", "unknown strategy")
 
+def zone_gap(strategy: str, price: float, buy_under: float, sell_above: float) -> tuple:
+    """
+    How far the stock is from the target `compute_in_zone` measures it against,
+    as a plain percentage. Returns (pct, label):
+
+      pct   — SIGNED, price relative to the target, as a % OF THE TARGET.
+              Positive = price is above the target, negative = below.
+              CSP/LEAPS target is buy_under; CC target is sell_above.
+      label — short plain-English form for the card badge, e.g.
+              "3.2% above buy" / "1.8% below sell".
+
+    Same arithmetic as the gap already embedded in compute_in_zone's reason
+    string — this exposes it as a number so the dashboard never has to parse
+    prose or re-derive it from a second copy of the targets (the drift that
+    A34 was fixing). Returns (None, "") when there is no target on that side.
+    """
+    if price <= 0:
+        return (None, "")
+    if strategy == "CC":
+        target, side = sell_above, "sell"
+    elif strategy in ("CSP", "LEAPS"):
+        target, side = buy_under, "buy"
+    else:                                    # CONVEXITY etc. — not gated
+        return (None, "")
+    if not target or target <= 0:
+        return (None, "")
+    pct = (price - target) / target * 100.0
+    direction = "above" if pct >= 0 else "below"
+    return (round(pct, 1), f"{abs(pct):.1f}% {direction} {side}")
+
 # Speculative tickers — smaller position sizing, wider OTM buffers.
 # Suppressed from Telegram CSP entry alerts (entries only on deliberate decision).
 # CC alerts still sent when approaching sell_above (useful for existing positions).
@@ -5191,6 +5221,30 @@ def run_scanner():
     schwab_accounts  = schwab_get_accounts() if SCHWAB_APP_KEY else []
     schwab_positions = schwab_parse_positions(schwab_accounts) if schwab_accounts else {}
 
+    # ── Schwab position-feed guard ───────────────────────────────────────────
+    # IBKR has stale-data protection above; Schwab had NONE. When the accounts
+    # endpoint hiccups (it returns [] without raising) the scan carried on with
+    # IBKR-only positions and published a positions table in which every
+    # Schwab-held name looked UNOWNED: NFLX/UBER/IBIT/PYPL/MSTR fell into the
+    # "Watchlist" section on the 2026-08-17 06:43 scan, portfolio_size collapsed
+    # from $19.5M to $7.7M, and held names outside ALL_TICKERS vanished from the
+    # table entirely — all silently. Quotes still worked that run, so
+    # `schwab_live` (quotes-only) stayed True and nothing looked wrong (EX-32).
+    # We cannot recover the missing positions mid-run, so make it LOUD and
+    # publish the fact, rather than letting the dashboard state "not owned".
+    schwab_feed_ok = True
+    schwab_feed_note = ""
+    if SCHWAB_APP_KEY and not schwab_positions:
+        schwab_feed_ok = False
+        schwab_feed_note = (
+            "Schwab returned no positions this scan "
+            f"({len(schwab_accounts)} accounts). IRA/CRT/Personal holdings are "
+            "MISSING — ownership, exposure %, portfolio size and CC coverage "
+            "are understated. Not a config change."
+        )
+        print("   ⚠️⚠️  SCHWAB POSITION FEED EMPTY — " + schwab_feed_note)
+    # ─────────────────────────────────────────────────────────────────────────
+
     # Always initialize these — used later in exposure map building
     schwab_account_map = {}   # ticker -> "IRA" / "CRT" / "Personal"
     schwab_mv_by_acct  = {}   # ticker -> {acct: market_value}
@@ -6486,6 +6540,10 @@ def run_scanner():
             csp_entry["in_zone"]      = _iz
             csp_entry["zone_tier"]    = _iz_tier
             csp_entry["zone_reason"]  = _iz_reason
+            # Same gap the reason string quotes, as a number for the card badge
+            (csp_entry["zone_gap_pct"],
+             csp_entry["zone_gap_label"]) = zone_gap(
+                "CSP", price, csp_entry.get("buy_under") or 0, 0)
             dashboard_csps.append(csp_entry)
 
         # ── CC: owned positions only ─────────────────────────
@@ -6660,6 +6718,9 @@ def run_scanner():
                 cc_entry["in_zone"]     = _iz_cc
                 cc_entry["zone_tier"]   = _iz_cc_tier
                 cc_entry["zone_reason"] = _iz_cc_reason
+                (cc_entry["zone_gap_pct"],
+                 cc_entry["zone_gap_label"]) = zone_gap(
+                    "CC", price, _buy_under_cc or 0, _sell_above or 0)
                 dashboard_ccs.append(cc_entry)
 
             # ── PIO: position income ─────────────────────────
@@ -6881,7 +6942,13 @@ def run_scanner():
                     "signal":       f"{_bl['ext_label']} | {_pullback:.0f}% off highs",
                     "risk_note":    ", ".join(warnings) if warnings else None,
                     "buy_under":    _leaps_buy_under if _leaps_buy_under > 0 else None,
-                    "days_to_earnings": (lambda _ed: max(0, (_ed - datetime.now()).days) if _ed else 999)(earn_date),
+                    # earn_date_d — the THIS-ticker earnings date fetched at the
+                    # top of the dashboard pass. This used to read `earn_date`,
+                    # a leftover from the earlier Telegram loop, so every LEAPS
+                    # row on the dashboard carried the LAST ticker of that loop's
+                    # earnings date — one identical "⚠ Earn Nd" badge on all of
+                    # them, right or wrong (EX-31).
+                    "days_to_earnings": (lambda _ed: max(0, (_ed - datetime.now()).days) if _ed else 999)(earn_date_d),
                 }
                 leaps_entry["score"] = score_leaps(leaps_entry)
                 leaps_entry["normalized"] = normalized_score(leaps_entry["score"], "LEAPS")
@@ -6915,6 +6982,12 @@ def run_scanner():
                 leaps_entry["in_zone"]     = _iz_l
                 leaps_entry["zone_tier"]   = _iz_l_tier
                 leaps_entry["zone_reason"] = _iz_l_reason
+                # Distance to buy_under. NOTE: the LEAPS band is a growth
+                # allowance, not this flat gap — the gap is context, the tier
+                # is the verdict.
+                (leaps_entry["zone_gap_pct"],
+                 leaps_entry["zone_gap_label"]) = zone_gap(
+                    "LEAPS", price, _leaps_buy_under or 0, 0)
                 # Shown on the card — this is the number that decides the entry
                 leaps_entry["implied_growth_pct"] = round(_implied_g * 100, 1) if _implied_g is not None else None
                 leaps_entry["growth_allowed_pct"] = round(leaps_growth_allowance(ticker) * 100, 1)
@@ -7732,8 +7805,14 @@ def run_scanner():
         # than parsing scan_time, which carries no machine-readable zone.
         "scan_time_iso":       now_pt().isoformat(timespec="seconds"),
         "scan_date":           now_pt().strftime("%Y-%m-%d"),
+        # schwab_live tracks QUOTES only — it stays True when the positions
+        # endpoint fails, so it must never be read as "positions are good".
         "schwab_live":         len(schwab_quotes) > 0,
         "schwab_last_success": now_pt().strftime(SCAN_TS_FMT) if len(schwab_quotes) > 0 else None,
+        # Position-feed health (EX-32). ok=False means the Positions tab is
+        # missing whole accounts and "Watchlist"/"not owned" rows are wrong.
+        "positions_feed":     {"ok": schwab_feed_ok, "note": schwab_feed_note,
+                               "schwab_accounts": len(schwab_accounts)},
         "execution_candidates": execution_candidates,   # strict — Telegram quality
         "review_candidates":    review_candidates,      # relaxed — dashboard review
         "dashboard_opportunities": review_candidates,   # alias for dashboard compat

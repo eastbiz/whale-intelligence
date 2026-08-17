@@ -864,6 +864,55 @@ short it, and it is already EXEMPT from the target gate by P24/EX-15.
 
 ## Trade Examples (raw log)
 
+### EX-32 — The Watchlist said John didn't own stock he owns (2026-08-17)
+- John: *"The Watchlist — some of the positions I own but they keep showing as
+  nothing is owned. Is it because I do not have them on official list of stocks
+  with price targets?"*
+- No — the opposite. Being on the watchlist is what kept those names visible at
+  all. On the **06:43 scan** the Schwab accounts endpoint returned nothing
+  (`schwab_get_accounts()` returns `[]` on failure, it does not raise), so
+  `schwab_positions` was empty and the run continued on IBKR data alone:
+  - NFLX, UBER, IBIT, PYPL, MSTR — all Schwab-held — fell into the **Watchlist**
+    section, i.e. "not owned", while John holds 6,000 NFLX and 13,105 IBIT.
+  - `portfolio_size` collapsed from **$19.5M to $7.68M** (the IBKR slice), so
+    every exposure % on the page was ~2.5× too large.
+  - Held names *not* on the watchlist (ZTS, NLCP, OWL, IIPR-A, FISV, ANGI)
+    vanished from the table entirely — 39 rows became 33.
+  - CC coverage read 0% on those names, and the sizing/allocation actions were
+    computed from the wrong denominator.
+- **Nothing on the page said any of this.** `schwab_live` was `True` and the
+  scan looked clean, because that flag tracks Schwab **quotes**, not positions —
+  quotes worked fine that run. The next scan (07:07) came back complete.
+- IBKR has had stale-feed protection since the Flex caching incident; Schwab
+  had none. The asymmetry is the whole bug.
+- Fixed as A43: detect the empty position feed, log it loudly, publish
+  `positions_feed.ok = false` in `results.json`, and show a red banner over the
+  Positions tab telling John to ignore the table until the next scan. The scan
+  cannot recover the missing positions mid-run — the fix is to stop the page
+  asserting "not owned" when the truth is "not fetched".
+- Principle it supports: same family as P2 — **a confident-but-wrong number is
+  worse than no number.** "Not owned" is a number.
+
+### EX-31 — Every LEAPS card carried the same earnings date (2026-08-17)
+- John: *"On LEAPS tab it seems every stock shows Earn 35d."*
+- Real, and it had been on every LEAPS card since the dashboard pass was added.
+  The LEAPS row builder read `earn_date` — a variable left over from the
+  **earlier Telegram loop** — instead of `earn_date_d`, the date fetched for the
+  ticker being processed. Python leaks loop variables, so every LEAPS row got
+  the earnings date of whichever ticker that earlier loop happened to finish on.
+- Measured on the 2026-08-17 12:31 scan: **22 of 23 LEAPS tickers** carried
+  CRDO's 14 days. The one correct row was CRDO's own. Real values ranged 8–84
+  days — NVDA was 8 days out and labelled 14; MELI/NVO were 78 and labelled 14.
+- The convexity block three lines below used `earn_date_d` correctly, which is
+  why the bug survived: the correct spelling was sitting next to the wrong one.
+- Blast radius is display-only — `days_to_earnings` on a *dashboard* LEAPS row
+  feeds no gate. `score_leaps` ignores it, `_tg_leaps_filter` ignores it, and
+  neither watcher reads it. The Telegram LEAPS path runs off the earlier loop's
+  own rows and was never affected. Still: an "⚠ Earn 14d" badge that is wrong on
+  22 of 23 names trains John to ignore the badge, which is how a real one gets
+  missed.
+- Fixed as A43.
+
 ### EX-30 — Exit advice inside the entry alert (2026-08-17)
 - Alert: `⚡ SPIKE CC — PLTR @ $174.63 … ⚠️ Exit when 50-70% of premium captured
   / ⚠️ Close early if stock reverses sharply`.
@@ -1954,4 +2003,36 @@ adding two tickers. Four separate defects, in rough priority order:
   Zero change to alert volume on the existing 29 names — no shared gate was
   touched, only per-ticker flags plus `leaps_only`, which today has no other
   live members. BABA's behaviour would change if it were ever classified.
+  Built 2026-08-17.
+- **A43 — Dashboard UI pass: target distance, LEAPS earnings fix, Schwab
+  position-feed guard, CSV export removed** (EX-31, EX-32; John's requests
+  2026-08-17). Four independent items, no alert-gating change among them —
+  Telegram volume is untouched.
+  1. **Distance to target on every opportunity card.** The AT / NEAR / OFF
+     badge now reads `Near target · 2.2% below sell`, `Off target · 10.1%
+     above buy`. New `zone_gap()` in `whale_scanner.py` returns the SIGNED
+     percentage of price vs the target that strategy is measured against
+     (`buy_under` for CSP/LEAPS, `sell_above` for CC) plus a short label;
+     published as `zone_gap_pct` / `zone_gap_label` on CSP, CC and LEAPS rows.
+     It is the same arithmetic already embedded in `compute_in_zone`'s reason
+     string, exposed as a number so the dashboard never parses prose or
+     re-derives it from a second copy of the targets — the drift A34 fixed.
+     Verified equal to `zone_reason` and to Price Watch's `pct_from_buy` on
+     LULU (10.1% on all three). Badge degrades to the old text on a
+     `results.json` written before this.
+  2. **LEAPS earnings badge fixed** (EX-31) — one-word fix, `earn_date` →
+     `earn_date_d`, in the LEAPS row builder. Was showing one ticker's earnings
+     date on all 23 LEAPS names. Display-only; no gate read the field.
+  3. **Schwab position-feed guard** (EX-32) — new. When `SCHWAB_APP_KEY` is set
+     but the position fetch comes back empty, the scan prints a loud warning and
+     publishes `positions_feed: {ok, note, schwab_accounts}` in `results.json`;
+     the dashboard shows a red banner over the Positions tab. Deliberately does
+     NOT try to patch the data — the positions are not fetchable mid-run, so the
+     fix is to stop the page asserting "not owned". Note `schwab_live` covers
+     QUOTES only and must never be read as position health.
+  4. **Positions CSV export removed** at John's request (unused). This also
+     deletes the last hand-maintained `SYMBOL_SETTINGS` copy in `index.html`
+     — the stale-targets gotcha in `CLAUDE.md` (AAPL 200 vs 0, NBIS 90 vs 150,
+     PLTR 115 vs 85) is now gone rather than merely unread, and no target
+     literal survives outside `whale_scanner.py`.
   Built 2026-08-17.
