@@ -791,6 +791,76 @@ Rules that follow:
   the reduced-size warning is computed. Those are not exits.
 
 - Evidence: John, 2026-08-17; EX-30. System status: **Actioned — A41.**
+### P37 — A value name's LEAPS entry band is FLAT, not a growth allowance
+
+P31 gave LEAPS a growth allowance — `price ≤ buy_under × (1+g)**years` — and it
+is the right model for the names it was built on. It is the wrong model for a
+value name, and the difference is not cosmetic.
+
+A growth allowance says *"I'll pay above my target because the company compounds
+into the price."* A value thesis says the opposite: the stock is mispriced today
+and the return comes from re-rating to fair value, with no compounding required.
+Applying a growth allowance to a value name pays up for growth the thesis never
+claimed.
+
+The numbers, from the 2026-08-17 diversification work (JD/ZTS, Dec-2028 expiry,
+~2.34 years):
+
+| name | spot | buy_under | bucket g | band at bucket g | band at g=0 |
+|------|------|-----------|----------|------------------|-------------|
+| JD   | $29  | $25       | 20% (C)  | **$38.32**       | $25.00      |
+| ZTS  | ~$74 | $70       | 15% (B)  | **$97.11**       | $70.00      |
+
+Both would have printed a LEAPS card **immediately**, on names John had just
+finished saying he wanted to buy only on a genuinely good entry. ZTS is the
+starker case: the band sat 31% ABOVE spot, so no price the stock could plausibly
+reach would ever have been "out of zone". The discipline would have been built
+and bypassed in the same change.
+
+Fix: `LEAPS_GROWTH_OVERRIDE = 0.0`, which collapses the band to a flat
+`price ≤ buy_under`. Three things worth recording about it:
+- **g = 0.0 is a setting, not an absence.** `leaps_growth_allowance` tests
+  membership (`ticker in LEAPS_GROWTH_OVERRIDE`), not truthiness, so 0.0 is
+  honoured. Anyone rewriting that to `LEAPS_GROWTH_OVERRIDE.get(t) or default`
+  silently restores the bucket band. It is the same class of bug as
+  `buy_under > 0` meaning "no restriction" (P30).
+- **A value name only ever reaches AT, never NEAR.** With g=0 the band equals
+  the target, and `compute_in_zone` returns AT at or below it. That is intended:
+  "approaching" is a growth concept.
+- **The implied-growth line stays useful, and is the number to read.** JD at $29
+  against a $25 target over 2.34 years implies 6.6%/yr. For a name John is not
+  an expert on, that single figure is judgeable on its own terms in a way that
+  "16% above target" is not — which was P31's original point, applied to a
+  thesis P31 did not anticipate.
+
+- Evidence: John, 2026-08-17 (Burry newsletter / AI-concentration review).
+  System status: **Actioned — A42.**
+
+### P38 — A borrowed thesis is long-only: no CSP, no CC, no spike CC
+
+John on the Burry names: *"I am not expert in those stocks. I somehow trust
+Burry, but at the same time I want to be more conservative and buy only if I can
+have really good entrance."* That is a precise risk statement and it maps to a
+precise strategy scope.
+
+- **A CSP is an offer to own at the strike.** Fine on a name whose downside John
+  can judge; on borrowed conviction it converts "I'd like a great entry" into
+  "I'm obligated at a mediocre one" on exactly the drop that would have made the
+  entry great.
+- **A CC caps the re-rating that IS the thesis.** This is the CC-on-explosive-
+  winners lesson (NBIS) arriving from the other direction: with a value name the
+  whole expected return sits in the move a written call would surrender.
+- **Spike CC is the trap.** It deliberately overrides `spreads_only`, on the
+  sound reasoning that a call on owned shares isn't naked. `leaps_only` is a
+  different statement and must NOT be overridden the same way — the argument for
+  the spreads_only override (it isn't naked) is irrelevant to the argument for
+  leaps_only (the upside is the thesis). ZTS is live proof this matters: John
+  holds 100 shares, so the spike-CC path was one 8% up-day from firing.
+
+Cheap convexity stays allowed — a far-OTM long call is long the thesis, not
+short it, and it is already EXEMPT from the target gate by P24/EX-15.
+
+- Evidence: John, 2026-08-17. System status: **Actioned — A42.**
 
 ## Trade Examples (raw log)
 
@@ -1587,6 +1657,37 @@ target reads differently from a Very Speculative name already at its 3% cap).
 Would fold into the existing Earnings Watcher message rather than adding a new
 alert, so it costs no extra Telegram volume. Deferred with C16.
 
+### C18 — Portfolio rows account for only 91.4% of net liquidation
+
+The Positions tab summed to 91.43% of the $19.59M portfolio on 2026-08-14.
+Likely broker cash sitting outside `exposure_map`, but unconfirmed. It matters
+for any concentration percentage quoted as a share of the portfolio, which is
+now a number John is actively steering by. Not investigated — raised while
+measuring AI exposure for A42.
+
+### C19 — The sizing framework cannot answer a diversification question
+
+Surfaced during A42; not fixed, and deliberately not fixed as a side effect of
+adding two tickers. Four separate defects, in rough priority order:
+1. **No sector or theme rollup.** `MAX_SECTOR_PCT = 0.25` is defined at
+   `whale_scanner.py:800` and **read nowhere**. There is no sector map at all,
+   so "am I 49% AI" had to be computed by hand — the exact question John asked.
+2. **Targets assume 100% invested.** `TICKER_TARGETS` sums to ~103% (~109% with
+   JD and ZTS) with no cash line, while John deliberately holds ~20% SGOV.
+   Result on 2026-08-14: **23 of 39 rows read "Underweight"**, 6 On Target, 10
+   Overweight. A framework that says buy nearly everything cannot rank a new
+   name against an existing one.
+3. **Three sizing tables, two of them dead.** `TICKER_TARGETS` (live),
+   `buckets.csv max_position_pct` (loaded by `bucket_config`, never read by the
+   scanner — and it disagrees: NVDA 12% vs 8%), and `buckets.csv target_pct`
+   (loaded, never read). This is the "never let a number exist in two files"
+   rule from CLAUDE.md, violated three ways.
+4. **Held-but-unclassified names get a made-up band.** They fall to tier "Other"
+   and `tier_target_range`'s `(1.0, 3.0)` fallback, so SGOV — a T-bill fund —
+   reads "Overweight" and ZTS read "Underweight" against a range nobody chose.
+   ZTS leaves this bucket with A42; SGOV, BRK-B, NLCP, ASML, OWL, FISV, IIPR-A,
+   ANGI and HTWSl remain in it.
+
 ## Actioned changes (already implemented, traceable to principles)
 
 - **A1 — CRDO CSPs unblocked** (`buckets.csv`, `spreads_only` → FALSE). The flag
@@ -1819,4 +1920,38 @@ alert, so it costs no extra Telegram volume. Deferred with C16.
   (`whale_scanner.py` ~7238, published into `results.json`). John's request was
   Telegram-scoped, and a browse surface is a weaker case than a push alert — but
   the 50-70% figure is just as wrong there, and the two surfaces now disagree.
+  Built 2026-08-17.
+- **A42 — Non-AI diversification sleeve: JD + ZTS added LEAPS-only** (P37, P38).
+  Trigger: John reviewed his AI concentration after the Michael Burry newsletter.
+  Measured from the 2026-08-14 `results.json` (portfolio $19.59M): AI-linked
+  names were **35.3% of the portfolio and ~49% of INVESTED capital** (SGOV is
+  19.8% and cash-like); adding AAPL and TSLA takes it to ~70%. The sharper
+  number is the LEAPS book — $4.88M across 56 positions, of which **~$2.69M
+  (55%) is AI-linked**, i.e. the leveraged, expiring quarter of the portfolio is
+  the most concentrated part of it. Rows sum to 91.4%; the missing 8.6% is
+  unexplained and is logged as C18.
+  Config: both TRADING, `buy_under` JD $25 (John's own number) / ZTS $70,
+  `sell_above` 0 (no sell view yet — reads NO_TARGET, not a target of zero),
+  bucket C / B, `leaps_only` TRUE, `LEAPS_GROWTH_OVERRIDE` 0.0, `TICKER_TARGETS`
+  3.0% each. JD carries `speculative: True` so a 0% holding reads "Not Held"
+  rather than "Underweight" — being flat while waiting for $25 is the intended
+  state.
+  **The load-bearing part of this change was fixing `leaps_only`, not adding the
+  tickers.** The flag existed for BABA and was enforced in exactly ONE place —
+  `csp_engine`, the dashboard CSP path. Seven candidate-generating paths exist;
+  six were unpatched: `find_best_csp` (Telegram CSP), `find_drop_csp` (post-drop
+  CSP), `find_best_cc`, `find_spike_cc`, `find_position_income_cc` (dormant
+  behind `ENABLE_PIO`), and the nested `find_best_csp_relaxed` /
+  `find_best_cc_relaxed` dashboard finders inside `run_scanner`. Shipping the
+  tickers without this would have produced a Telegram CSP ping with no dashboard
+  card — the EX-28/EX-29 shape — and written calls on the 100 ZTS shares John
+  already holds. It stayed latent only because BABA, the sole `leaps_only` name,
+  was never in `CLASSIFICATION` and so was never scanned: a config flag with no
+  live ticker behind it is an untested flag, which is the same lesson P35 drew
+  about `leaps_allowed`.
+  Verified per path with a live harness (all seven return None/SKIP for JD and
+  ZTS); LEAPS and convexity confirmed still allowed. `ALL_TICKERS` 29 → 31.
+  Zero change to alert volume on the existing 29 names — no shared gate was
+  touched, only per-ticker flags plus `leaps_only`, which today has no other
+  live members. BABA's behaviour would change if it were ever classified.
   Built 2026-08-17.

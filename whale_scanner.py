@@ -337,6 +337,12 @@ TICKER_TARGETS = {
     # Trading
     "CRDO":  {"target_pct":  3.0, "speculative": False},
     "FIX":   {"target_pct":  3.0, "speculative": False},
+    # Non-AI diversification sleeve (2026-08-17). JD carries speculative=True
+    # so a 0% holding reads "Not Held" rather than "Underweight" — being flat
+    # while waiting for a $25 entry is the intended state, not a shortfall.
+    # ZTS is already held (0.23%), so it reads Underweight, which is accurate.
+    "JD":    {"target_pct":  3.0, "speculative": True},
+    "ZTS":   {"target_pct":  3.0, "speculative": False},
     "MU":    {"target_pct":  4.0, "speculative": False},
     "NFLX":  {"target_pct":  4.0, "speculative": False},
     "PLTR":  {"target_pct":  4.0, "speculative": False},
@@ -494,12 +500,22 @@ SYMBOL_SETTINGS = {
     # Willing to hold long term, but more valuation/cycle/execution risk
     "CRDO": {"buy_under":  200, "sell_above":  300, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "FIX":  {"buy_under": 1400, "sell_above": 2200, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    # JD / ZTS — non-AI diversification sleeve, added 2026-08-17. LEAPS-ONLY
+    # (buckets.csv leaps_only = TRUE): no CSP, no CC, no spike CC. Borrowed
+    # conviction, so John should not be short puts or capping upside on them.
+    # sell_above = 0 is deliberate — there is no sell view yet, and 0 reads as
+    # NO_TARGET (not as a target of zero). No CC path can fire on them anyway.
+    # Both carry LEAPS_GROWTH_OVERRIDE = 0.0: the entry band is FLAT at
+    # buy_under, because the thesis is re-rating to fair value, not compounding
+    # into the price (see the growth-allowance note below).
+    "JD":   {"buy_under":   25, "sell_above":    0, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "KNX":  {"buy_under":   55, "sell_above":   80, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "LULU": {"buy_under":  105, "sell_above":  150, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "MU":   {"buy_under":  450, "sell_above": 1400, "csp_delta_min": 0.20, "csp_delta_max": 0.28, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "NVO":  {"buy_under":   38, "sell_above":   60, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "SPCX": {"buy_under":  110, "sell_above":  250, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "UBER": {"buy_under":   65, "sell_above":   95, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "ZTS":  {"buy_under":   70, "sell_above":    0, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     # ── SPECULATIVE ─────────────────────────────────────────────────────
     # Higher risk — smaller size, partial profit-taking, thesis check before adding
     "CLS":  {"buy_under":  275, "sell_above":  400, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
@@ -548,8 +564,9 @@ CLASSIFICATION = {
     "MELI": "CORE",  "MSFT": "CORE",  "NFLX":  "CORE", "NOW":  "CORE",
     "NVDA": "CORE",  "TSM":  "CORE",
     # ── TRADING ──
-    "CRDO": "TRADING", "FIX": "TRADING", "KNX": "TRADING", "LULU": "TRADING",
-    "MU":   "TRADING", "NVO": "TRADING", "SPCX": "TRADING", "UBER": "TRADING",
+    "CRDO": "TRADING", "FIX": "TRADING", "JD":   "TRADING", "KNX":  "TRADING",
+    "LULU": "TRADING", "MU":  "TRADING", "NVO":  "TRADING", "SPCX": "TRADING",
+    "UBER": "TRADING", "ZTS": "TRADING",
     # ── SPECULATIVE ──
     "CLS":  "SPECULATIVE", "GRAB": "SPECULATIVE", "GRBK": "SPECULATIVE",
     "IBIT": "SPECULATIVE", "PATH": "SPECULATIVE", "PLTR": "SPECULATIVE",
@@ -642,9 +659,22 @@ CC_NEAR_PCT  = 0.08   # CC  near = within 8% BELOW sell_above
 # names on the 2026-08-13 scan — a wall, not a band.
 # Bucket grades VOLATILITY, so it is only the default; use the override when a
 # name's growth profile and its volatility diverge.
+#
+# g = 0.0 is a legitimate, deliberate setting, NOT "unset". It collapses the
+# band to a flat `price <= buy_under` — the correct model for a VALUE name,
+# where the thesis is a re-rating to fair value rather than compounding into
+# today's price. Worked example (2026-08-17): JD at $29 with buy_under $25 and
+# a Dec-2028 expiry (~2.34y) would be IN ZONE at g=0.15 (band $34.67) and even
+# at g=0.10 (band $31.25) — i.e. a normal bucket default hands out a card TODAY
+# on a name John explicitly wants to buy at $25. At g=0.0 the band is $25 and
+# the card waits. `leaps_growth_allowance` tests `in` (not truthiness), so 0.0
+# is honoured rather than falling through to the bucket default.
 LEAPS_GROWTH_BY_BUCKET = {"A": 0.10, "B": 0.15, "C": 0.20, "D": 0.25}
 LEAPS_GROWTH_DEFAULT   = 0.15
-LEAPS_GROWTH_OVERRIDE  = {}          # e.g. {"NBIS": 0.35} — per-ticker g
+LEAPS_GROWTH_OVERRIDE  = {           # e.g. {"NBIS": 0.35} — per-ticker g
+    "JD":  0.0,   # value / re-rating thesis — flat band at buy_under
+    "ZTS": 0.0,   # value / re-rating thesis — flat band at buy_under
+}
 
 
 def is_no_buy(ticker: str) -> bool:
@@ -3239,6 +3269,12 @@ def find_position_income_cc(ticker, price, qty, avg_cost, contracts,
     if qty < 100:
         return None, {}
 
+    # LEAPS-only names produce no CC on ANY path (A42). Dormant today
+    # (ENABLE_PIO = False), gated anyway so flipping that flag can't quietly
+    # reopen premium selling on a long-only conviction name.
+    if ticker and BUCKETS and is_leaps_only(ticker, BUCKETS):
+        return None, {}
+
     # Delta range based on P&L status
     if pnl_status == "profit":
         d_min, d_max = 0.30, 0.40
@@ -3369,6 +3405,11 @@ def find_drop_csp(ticker, price, contracts, ivdata, pir, quality,
     - Strike below real support (MA50 or swing low)
     """
     # Quality gates
+    # LEAPS-only names produce no CSP on ANY path (A42) — this is the third
+    # CSP path (csp_engine / find_best_csp / here), same list A32 had to gate
+    # for NO BUY. A post-drop CSP is still an offer to own the shares.
+    if ticker and BUCKETS and is_leaps_only(ticker, BUCKETS):
+        return None, {"signal": "❌ LEAPS-only ticker — no premium selling"}
     if not drop_info["above_ma200"]:
         return None, {"signal": "❌ Below 200MA — skip (structurally broken)"}
     if tier not in DROP_CSP_ALLOWED_TIERS:
@@ -3493,6 +3534,14 @@ def find_spike_cc(ticker, price, qty, avg_cost, contracts, ivdata, spike_info) -
     """
     if qty < 100:
         return None, {}
+
+    # ── LEAPS-only names produce no spike CC either (A42) ─────────
+    # find_spike_cc deliberately OVERRIDES spreads_only (a CC on owned shares
+    # isn't naked). leaps_only is a different statement and must NOT be
+    # overridden: the point of the flag is that the upside is the thesis.
+    if ticker and BUCKETS and is_leaps_only(ticker, BUCKETS):
+        return None, {}
+
     # IVP is scoring context only — no hard gate (P2 punchlist)
     # Low IVP spike still shown, just scores lower on timing
 
@@ -3676,6 +3725,15 @@ def find_best_csp(ticker, price, contracts, ivdata, pir, quality, sizing=None, m
     """
     if not contracts: return None, {}
 
+    # ── LEAPS-only names produce no CSP on ANY path (A42) ─────────
+    # csp_engine (dashboard) has enforced this since the flag existed; this
+    # TELEGRAM path never did, so the flag would have pinged a CSP with no
+    # dashboard card behind it — the EX-28/EX-29 failure shape exactly. Latent
+    # until 2026-08-17 only because BABA, the sole leaps_only name, was never
+    # in CLASSIFICATION and so was never scanned.
+    if ticker and BUCKETS and is_leaps_only(ticker, BUCKETS):
+        return None, {}
+
     atm_iv     = ivdata.get("atm_iv", 0.3)
     candidates = []
 
@@ -3815,6 +3873,14 @@ def find_best_cc(ticker, price, qty, avg_cost, contracts, ivdata, pir, already_c
     timing = timing_score("CC", pir, ivdata["ivp"])
     if not contracts or price <= 0 or qty < 100: return None, timing
     # Note: timing["recommend"] is advisory only — dashboard shows all
+
+    # ── LEAPS-only names produce no CC on ANY path (A42) ──────────
+    # Unlike spreads_only (which a CC on OWNED shares legitimately overrides,
+    # since it isn't naked), leaps_only means "this name is a long-only
+    # conviction hold" — writing calls on it caps the exact re-rating being
+    # bought. Applies even when John holds the shares.
+    if ticker and BUCKETS and is_leaps_only(ticker, BUCKETS):
+        return None, timing
 
     # ── Phase 1.5: Zone-first master gate ───────────────────────
     # Only write CCs when stock is in the upper half of its target band.
@@ -6121,6 +6187,8 @@ def run_scanner():
     def find_best_csp_relaxed(ticker, price, contracts):
         """Relaxed CSP finder for dashboard — wider filters, no IVP minimum."""
         if not contracts or price <= 0: return None
+        # LEAPS-only names produce no CSP on ANY path (A42)
+        if ticker and BUCKETS and is_leaps_only(ticker, BUCKETS): return None
         best = None; best_score = 0
         for c in contracts:
             try:
@@ -6172,6 +6240,8 @@ def run_scanner():
     def find_best_cc_relaxed(ticker, price, qty, avg_cost, contracts):
         """Relaxed CC finder for dashboard."""
         if not contracts or price <= 0 or qty < 100: return None
+        # LEAPS-only names produce no CC on ANY path (A42)
+        if ticker and BUCKETS and is_leaps_only(ticker, BUCKETS): return None
         best = None; best_score = 0
         max_contracts = max(1, int(qty / 100))
         for c in contracts:

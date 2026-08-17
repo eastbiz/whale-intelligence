@@ -155,6 +155,15 @@ independently.**
   `buy_under × (1+g)**years`, NOT a flat percentage: a flat ×1.10 excluded 23 of
   23 LEAPS names. `g` per bucket (A 10 / B 15 / C 20 / D 25 %/yr) with
   `LEAPS_GROWTH_OVERRIDE` per ticker.
+  **A growth allowance is wrong for a VALUE name (A42/P37)** — the thesis is
+  re-rating to fair value, not compounding into today's price. Set
+  `LEAPS_GROWTH_OVERRIDE = 0.0` (JD, ZTS today) and the band collapses to a flat
+  `price ≤ buy_under`. At their bucket defaults JD's band was $38.32 against a
+  $25 target and ZTS's was **$97.11 against a $70 target — 31% ABOVE spot**, so
+  both would have printed a card instantly on names John had just said he wanted
+  to buy only on a great entry. `0.0` is a real setting, not "unset":
+  `leaps_growth_allowance` tests `in`, not truthiness — never rewrite it as
+  `.get(t) or DEFAULT`. A value name reaches AT and never NEAR, by design.
 - **`buy_under = 0` means NO BUY — no CSP, no LEAPS, ever.** Use `is_no_buy()`;
   do NOT test `buy_under > 0`. That test used to mean "no restriction", so a
   NO BUY name got an *unlimited* entry price (PATH printed a CSP for months).
@@ -311,8 +320,19 @@ call still marked at its pre-drop price). The engine guards against this:
   anyway. Audit every rule in it before wiring it in — doing so blind would
   change live behaviour for half the watchlist.
 - **Special flags:** `spreads_only` (NBIS, CRDO — block naked CSP/CC, route to
-  spreads), `leaps_only` (BABA), `cc_only` (MSTR, OWL — exit-waiting), and
-  `watchlist` tier (META).
+  spreads), `leaps_only` (BABA, **JD, ZTS**), `cc_only` (MSTR, OWL —
+  exit-waiting), and `watchlist` tier (META).
+- **`leaps_only` is enforced on all SEVEN candidate paths (A42/P38).** It means
+  LEAPS + convexity only: no CSP, no CC, no spike CC, on the dashboard or in
+  Telegram. Until 2026-08-17 it was checked in `csp_engine` ALONE; the other six
+  — `find_best_csp`, `find_drop_csp`, `find_best_cc`, `find_spike_cc`,
+  `find_position_income_cc`, and the nested `find_best_csp_relaxed` /
+  `find_best_cc_relaxed` inside `run_scanner` — had no check, which would have
+  meant a Telegram ping with no dashboard card (EX-28/EX-29) and CCs written on
+  held shares. **`find_spike_cc` deliberately overrides `spreads_only` but must
+  NEVER override `leaps_only`** — "a CC on owned shares isn't naked" is a fine
+  argument for the first flag and irrelevant to the second, where the upside IS
+  the thesis. If you add a new CSP/CC path, gate it.
 - **LEAPS are never banned by volatility class (2026-08-14, John's
   instruction).** `leaps_allowed` is TRUE for every bucket and every row.
   Buckets C and D used to default it FALSE, which read as "no LEAPS on volatile
@@ -534,8 +554,21 @@ it reads `results.json`.
   four consumers updated together.
 - `BABA`, `META` and `OWL` are configured in `buckets.csv` but are NOT in
   `CLASSIFICATION`, so they are not in `ALL_TICKERS` and have never been
-  scanned. Their `leaps_only` / `watchlist` / `cc_only` handling is live code
-  with no live ticker behind it. Either classify them or drop the rows.
+  scanned. Their `leaps_only` / `watchlist` / `cc_only` handling was live code
+  with no live ticker behind it — and that is precisely why `leaps_only` was
+  broken on six of seven paths until A42 found it. `leaps_only` now has real
+  members (JD, ZTS) and is tested; `watchlist` (META) and BABA's row still do
+  not. **A config flag with no live ticker is an untested flag** (P35 drew the
+  same lesson about `leaps_allowed`). Either classify them or drop the rows.
+- **Sizing framework can't answer a diversification question (C19).** Four
+  defects, all pre-existing, none fixed: no sector/theme rollup at all
+  (`MAX_SECTOR_PCT` is defined and read nowhere); `TICKER_TARGETS` assumes 100%
+  invested so 23 of 39 rows read "Underweight" while John holds ~20% SGOV; three
+  sizing tables of which two are dead and disagree (`TICKER_TARGETS` vs
+  `buckets.csv` `max_position_pct` / `target_pct`); and held-but-unclassified
+  names get a made-up 1–3% band, so SGOV reads "Overweight". John is now
+  steering by concentration numbers, so this matters more than it did.
+- **C18** — Positions rows sum to only 91.4% of net liquidation. Unexplained.
 - Spread scanner for CRDO/NBIS on normal (non-spike) days — built standalone
   (`spread_scanner.py`), never integrated.
 - PATH / cheap-stock spike-CC filters too strict (premium floor, liquidity).

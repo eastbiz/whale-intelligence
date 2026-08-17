@@ -31,3 +31,5 @@ PYPL,C,,1.0,28,22,30,TRUE,FALSE,FALSE,FALSE,0.15,0.20,0.20,0.30,21,35,5.0,Very s
 GRAB,D,,1.0,40,30,25,TRUE,FALSE,FALSE,FALSE,0.10,0.15,0.15,0.20,21,35,3.0,Very speculative SE Asia thin options
 PATH,D,,0.0,40,30,25,TRUE,FALSE,FALSE,FALSE,0.10,0.15,0.15,0.20,21,35,3.0,Very speculative UiPath - NO BUY
 SPCX,D,,1.0,40,30,25,TRUE,FALSE,FALSE,FALSE,0.10,0.15,0.15,0.20,21,35,3.0,Very speculative - matches GRAB/PATH profile
+JD,C,,3.0,999,999,999,TRUE,TRUE,FALSE,FALSE,0.20,0.30,0.20,0.30,0,0,5.0,LEAPS only - non-AI value sleeve borrowed conviction no premium selling
+ZTS,B,,3.0,999,999,999,TRUE,TRUE,FALSE,FALSE,0.20,0.30,0.20,0.30,0,0,8.0,LEAPS only - non-AI value sleeve borrowed conviction no premium selling
