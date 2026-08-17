@@ -4514,7 +4514,7 @@ def fmt_opp_cc(opp: dict) -> str:
         f"  Bid ${cc['bid']} / Ask ${cc['ask']} | Premium ${cc['premium']}",
         f"  δ{cc['delta']} | Annualized: {cc['annualized_return']}% | {cc['max_contracts']} contracts",
         f"  Protection: {cc['protection_pct']}% downside buffer",
-        f"  IVP: {opp['ivp']:.0f}% | Exit at 50-70% profit",
+        f"  IVP: {opp['ivp']:.0f}%",
         f"_Scanned {now_pt().strftime('%b %d %H:%M')} PT_"
     ]
     return "\n".join(lines)
@@ -4709,6 +4709,16 @@ def fmt_quality(q) -> str:
         lines.append(f"✅ {pullback:.1f}% off highs | Quality {score}/6")
 
     return " | ".join(lines) if lines else f"✅ Quality {score}/6 | {pullback:.1f}% off highs"
+
+
+def _fmt_money(v, dash: str = "—") -> str:
+    """2-decimal display for a price that may arrive as a raw broker float.
+    Spike CC printed 'Breakeven: $15.579963973' because avg_cost flows through
+    find_spike_cc unrounded."""
+    try:
+        return f"{float(v):.2f}"
+    except (TypeError, ValueError):
+        return dash
 
 
 def _earnings_tag(ticker: str, within_days: int = 21) -> str:
@@ -4941,11 +4951,12 @@ def fmt_spike_cc(opp) -> str:
         f"  Bid ${sc['bid']} / Ask ${sc['ask']} | Mid ${sc['premium']}",
         f"  δ{sc['delta']} | Annualized: {sc['annualized_return']}% | ${sc['premium']/sc['dte']:.2f}/day",
         f"  Protection: {sc['protection_pct']}% downside buffer",
-        f"  Breakeven: ${sc.get('avg_cost','—')} | Max {sc['max_contracts']} contracts",
+        f"  Breakeven: ${_fmt_money(sc.get('avg_cost'))} | Max {sc['max_contracts']} contracts",
         *([_earnings_tag(opp['ticker'])] if _earnings_tag(opp['ticker']) else []),
-        "",
-        f"  ⚠️ _Exit when 50-70% of premium captured_",
-        f"  ⚠️ _Close early if stock reverses sharply_",
+        # No exit advice here — this alert is an ENTRY. Exits come from the
+        # position management engine (TAKE PROFIT / BIG MOVE) once the position
+        # exists. John: "you're telling me to open the position but immediately
+        # giving me advice when to close it" (2026-08-17).
         f"_Scanned {now_pt().strftime('%b %d %H:%M')} PT_"
     ]
     return "\n".join([l for l in lines if l is not None])

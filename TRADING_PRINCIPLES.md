@@ -759,7 +759,63 @@ did not ask for them yet, since he is happy with how LEAPS behave today.
 
 - Evidence: John, 2026-08-14; EX-8. System status: **Actioned — A38.**
 
+### P36 — An entry alert says what to open. It does not say when to close.
+
+John, 2026-08-17: *"you telling me to open the position but immediately giving me
+advice when to close it. I would rather remove that part about closing early."*
+
+Entry and exit are different decisions made at different times on different
+information. An entry alert fires on today's chain and today's move; the exit
+depends on the mark, the P&L and the news that exist weeks later. Pre-printing
+the exit at entry time can only be boilerplate, because there is nothing to
+compute it from yet.
+
+The system already separates them properly: the position management engine
+watches every open position and sends TAKE PROFIT / BIG MOVE / P&L SWING off
+live marks, when the exit actually becomes a decision. Boilerplate in the entry
+alert competes with that real signal and, in the spike CC case, contradicted it
+(50-70% printed against the engine's 80-90% take-profit rule).
+
+Rules that follow:
+- **No static exit line in any entry alert.** If an exit instruction cannot be
+  computed from THIS contract and THIS position, it does not belong in the
+  message.
+- **Every line must vary.** A line identical on all 57 spike CCs is not
+  information; it is decoration on the most-read part of the message (P22 —
+  Telegram is decision pressure, not a browse list).
+- **Never restate a threshold in prose.** The 50-70% string sat in three files
+  and matched no constant in the code. If a number matters, read it from the
+  constant that enforces it; if nothing enforces it, do not print it.
+- Risk framing that IS entry-time information stays — the post-drop CSP's
+  "✅ Favorable if / ❌ Avoid if" lines describe whether to take THIS trade, and
+  the reduced-size warning is computed. Those are not exits.
+
+- Evidence: John, 2026-08-17; EX-30. System status: **Actioned — A41.**
+
 ## Trade Examples (raw log)
+
+### EX-30 — Exit advice inside the entry alert (2026-08-17)
+- Alert: `⚡ SPIKE CC — PLTR @ $174.63 … ⚠️ Exit when 50-70% of premium captured
+  / ⚠️ Close early if stock reverses sharply`.
+- John: *"the message about closing position is kind of redundant because you
+  telling me to open the position but immediately giving me advice when to close
+  it. I would rather remove that part about closing early."*
+- The two lines were **static boilerplate**, identical on every spike CC ever
+  sent. They were not computed from the contract, the position, or the move —
+  so they carried zero information while occupying the most-read lines of the
+  message (last before the footer).
+- Worse, they were **wrong against the system's own rules**: routine profit
+  taking is 80-90% of max premium (TAKE PROFIT in the position engine), not
+  50-70%, and "close early if the stock reverses sharply" contradicts the
+  standing rule that assignment is not a risk to manage away. A trader following
+  the line would close winners early and buy back losers into strength.
+- The real exit signal already exists and is event-driven: once the position is
+  open, the position management engine sends TAKE PROFIT / BIG MOVE / P&L SWING
+  from live marks. The boilerplate was competing with it.
+- Same defect, same message: `Breakeven: $15.579963973` — `avg_cost` reaches
+  `fmt_spike_cc` as a raw broker float and was printed unrounded. Nine decimals
+  in a price makes the whole message look unchecked.
+- Fixed as A41.
 
 ### EX-29 — TSLA CSP pinged Telegram with no card on the dashboard (2026-08-14)
 - Alert: `💰 CSP — TSLA @ $336.85 / 🔥 EXCELLENT / Sell Put $315 / 34 DTE /
@@ -1739,3 +1795,28 @@ alert, so it costs no extra Telegram volume. Deferred with C16.
   Also settled: John chose to KEEP the 3% buy_under grace on CSP effective entry
   (a $300 target admits assignment up to $309), on both paths, unchanged.
   Built 2026-08-14.
+
+- **A41 — Exit boilerplate removed from the spike CC Telegram alert** (P36/EX-30,
+  John 2026-08-17). `fmt_spike_cc` printed two fixed lines under every spike CC:
+  `⚠️ Exit when 50-70% of premium captured` and `⚠️ Close early if stock reverses
+  sharply`. Both are gone. Nothing else in the message changed, and no gate,
+  filter or threshold was touched — this is presentation only, so notifications
+  per day are unchanged (no replay needed).
+  Rationale: the lines were static on every send, so they carried no information;
+  and the numbers in them matched nothing in the code — the position engine takes
+  profit at 80-90%, and "close early if the stock reverses" contradicts the
+  standing rule that assignment is not a risk to manage away. Exits already
+  arrive as TAKE PROFIT / BIG MOVE / P&L SWING once the position exists.
+  Also fixed in the same formatter: `Breakeven: $15.579963973` — `avg_cost`
+  arrives from the broker unrounded and was interpolated raw. Now rendered
+  through a new `_fmt_money()` helper (2dp, falls back to `—`).
+  Third instance cleaned: the same `Exit at 50-70% profit` tail in `fmt_opp_cc`
+  ("VOLATILITY SPIKE"). **That formatter is dead code** — defined, never called,
+  no reference anywhere in the repo. Edited for consistency so a future revival
+  does not resurrect the boilerplate; it should probably just be deleted.
+  **Left alone, for John to decide:** the dashboard spike card still carries
+  `"risk_note": "⚠️ Exit at 50-70% profit. Close early if stock reverses."`
+  (`whale_scanner.py` ~7238, published into `results.json`). John's request was
+  Telegram-scoped, and a browse surface is a weaker case than a push alert — but
+  the 50-70% figure is just as wrong there, and the two surfaces now disagree.
+  Built 2026-08-17.
