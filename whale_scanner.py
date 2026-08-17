@@ -663,9 +663,10 @@ CC_NEAR_PCT  = 0.08   # CC  near = within 8% BELOW sell_above
 # g = 0.0 is a legitimate, deliberate setting, NOT "unset". It collapses the
 # band to a flat `price <= buy_under` — the correct model for a VALUE name,
 # where the thesis is a re-rating to fair value rather than compounding into
-# today's price. Worked example (2026-08-17): JD at $29 with buy_under $25 and
-# a Dec-2028 expiry (~2.34y) would be IN ZONE at g=0.15 (band $34.67) and even
-# at g=0.10 (band $31.25) — i.e. a normal bucket default hands out a card TODAY
+# today's price. Worked example (2026-08-17): JD at $28 with buy_under $25 and
+# a Dec-2028 expiry (~2.34y) would be IN ZONE at its own bucket-C g=0.20 (band
+# $38.32), at g=0.15 (band $34.68) and even at g=0.10 (band $31.25) — i.e. every
+# growth allowance on the ladder hands out a card TODAY
 # on a name John explicitly wants to buy at $25. At g=0.0 the band is $25 and
 # the card waits. `leaps_growth_allowance` tests `in` (not truthiness), so 0.0
 # is honoured rather than falling through to the bucket default.

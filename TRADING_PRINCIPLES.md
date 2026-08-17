@@ -808,7 +808,7 @@ The numbers, from the 2026-08-17 diversification work (JD/ZTS, Dec-2028 expiry,
 
 | name | spot | buy_under | bucket g | band at bucket g | band at g=0 |
 |------|------|-----------|----------|------------------|-------------|
-| JD   | $29  | $25       | 20% (C)  | **$38.32**       | $25.00      |
+| JD   | $28  | $25       | 20% (C)  | **$38.32**       | $25.00      |
 | ZTS  | ~$74 | $70       | 15% (B)  | **$97.11**       | $70.00      |
 
 Both would have printed a LEAPS card **immediately**, on names John had just
@@ -827,11 +827,17 @@ Fix: `LEAPS_GROWTH_OVERRIDE = 0.0`, which collapses the band to a flat
 - **A value name only ever reaches AT, never NEAR.** With g=0 the band equals
   the target, and `compute_in_zone` returns AT at or below it. That is intended:
   "approaching" is a growth concept.
-- **The implied-growth line stays useful, and is the number to read.** JD at $29
-  against a $25 target over 2.34 years implies 6.6%/yr. For a name John is not
+- **The implied-growth line stays useful, and is the number to read.** JD at $28
+  against a $25 target over 2.34 years implies 5.0%/yr. For a name John is not
   an expert on, that single figure is judgeable on its own terms in a way that
-  "16% above target" is not — which was P31's original point, applied to a
+  "12% above target" is not — which was P31's original point, applied to a
   thesis P31 did not anticipate.
+- Watch the spot figures in this entry: they are illustrative context, not
+  config. JD was written up at $29 on the first pass and corrected to $28 by
+  John the same day. The BANDS above do not depend on spot — they are
+  `buy_under × (1+g)**years` — so the argument is unchanged either way, and in
+  fact strengthens as the price falls: every growth allowance on the ladder
+  still admits JD at $28.
 
 - Evidence: John, 2026-08-17 (Burry newsletter / AI-concentration review).
   System status: **Actioned — A42.**
