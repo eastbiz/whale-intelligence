@@ -7,5 +7,7 @@
     "CRDO:up": true
   },
   "scan_trigger_count": 1,
-  "dispatched": {}
+  "dispatched": {
+    "13:47": true
+  }
 }
