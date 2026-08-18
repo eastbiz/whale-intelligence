@@ -1,15 +1,13 @@
 {
-  "date": "2026-08-17",
+  "date": "2026-08-18",
   "alerted": {
-    "CRDO:up": 5
+    "POWL:down": 5
   },
   "scan_triggered": {
-    "CRDO:up": true
+    "CRDO:down": true
   },
   "scan_trigger_count": 1,
   "dispatched": {
-    "13:47": true,
-    "16:41": true,
-    "18:47": true
+    "13:47": true
   }
 }
