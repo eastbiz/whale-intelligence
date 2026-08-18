@@ -37,7 +37,16 @@ Dashboard is authoritative; **Telegram is derived from it, not computed
 independently.**
 
 ### Automation
-- GitHub Actions runs the scan ~3× per weekday (approx 6:43, 9:37, 11:43 AM ET).
+- GitHub Actions runs the scan ~3× per weekday — 6:32, 9:41, 11:47 AM PT
+  (13:32/16:41/18:47 UTC). The first slot sits just after the 9:30 ET open
+  (A45): IBKR Flex positions are an overnight snapshot, so a scan BEFORE the
+  Move Watcher's first meaningful tick is what purges positions closed late
+  the prior day. Before A45 the first slot was 13:47 UTC and, with cron
+  jitter, a watcher tick could warn about a short strike John had already
+  closed (EX-33, POWL). Don't move the first slot later — and if you move any
+  slot, a manual scan <15 min BEFORE a slot makes the watchdog fire a
+  duplicate (a slot only counts as covered by a scan landing at/after
+  slot−5 min).
 - Results publish to `results.json`; alerts fire via Telegram (the primary
   action channel — John does NOT check the dashboard daily).
 - **Move Watcher** (`move_watcher.py` + `move-watcher.yml`): every 15 min
@@ -114,7 +123,7 @@ independently.**
   provides earnings *results* at all. Third-party is the only route.
 - **Watchdog self-heal** (inside the Move Watcher): GitHub's cron delivered
   every scheduled scan 60-105 min late in Jul 2026 and occasionally dropped
-  runs. The watcher checks each expected slot (13:47/16:41/18:47 UTC — keep
+  runs. The watcher checks each expected slot (13:32/16:41/18:47 UTC — keep
   `SCAN_TIMES_UTC` in `move_watcher.py` in sync with `scanner.yml` crons!)
   and fires a `workflow_dispatch` on scanner.yml if a slot is >10 min overdue
   with no scan landed. The scanner's `skip_redundant_scheduled_run()` makes

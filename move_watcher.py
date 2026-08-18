@@ -38,7 +38,7 @@ PT               = ZoneInfo("America/Los_Angeles")
 # anyway, it checks whether each expected scan actually happened and fires a
 # workflow_dispatch on scanner.yml if not. The scanner itself skips
 # late-arriving schedule duplicates (see skip_redundant_scheduled_run there).
-SCAN_TIMES_UTC     = ["13:47", "16:41", "18:47"]  # KEEP IN SYNC with scanner.yml crons
+SCAN_TIMES_UTC     = ["13:32", "16:41", "18:47"]  # KEEP IN SYNC with scanner.yml crons
 WATCHDOG_GRACE_MIN = 10                            # give the real cron this head start
 SCANNER_WORKFLOW   = "scanner.yml"
 GITHUB_TOKEN       = os.environ.get("GITHUB_TOKEN", "")

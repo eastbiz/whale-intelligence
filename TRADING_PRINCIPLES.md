@@ -870,6 +870,28 @@ short it, and it is already EXEMPT from the target gate by P24/EX-15.
 
 ## Trade Examples (raw log)
 
+### EX-33 — Strike warning on a POWL position closed the day before (2026-08-18)
+- 10:17 ET, Move Watcher: `🔴▼ POWL -6.1% today … You hold short CSP $200
+  20260821 — ⚠ moving toward your strike / You hold short CSP $165 20260918 —
+  ⚠ moving toward your strike`. John had closed both CSPs the previous day
+  (following their TAKE PROFIT flags).
+- The watcher reads positions from the last committed `results.json` (it makes
+  no broker calls, by design — IBKR Flex is ~10 requests/day). At 10:17 ET that
+  was the PRIOR day's 12:31 PT scan, and every prior-day scan still listed both
+  CSPs — IBKR Flex open-positions data is an overnight snapshot, so an intraday
+  close doesn't appear until the next morning's report.
+- The day's first scan would have purged them, but the 13:47 UTC slot ran 33
+  min late (cron jitter) and landed at 10:20 ET — three minutes AFTER the ping.
+  Same watcher run's watchdog had already dispatched the rescue.
+- Without the ghost positions there would have been NO ping at all: POWL sat
+  14.1% above the $180 buy-under, outside the 10% target band; only the
+  phantom strike proximity (2.7% from $200) passed the A13 gate.
+- Also answered for John: a manual scan at 6:30 AM PT would fix the data but
+  fire a watchdog duplicate ~30 min later — the watchdog counts a slot covered
+  only by a scan landing at/after slot−5 min, and a skipped cron commits
+  nothing. Manual pre-slot scans and the watchdog fight each other.
+- Fixed as A45 (first cron slot moved to the open).
+
 ### EX-32 — The Watchlist said John didn't own stock he owns (2026-08-17)
 - John: *"The Watchlist — some of the positions I own but they keep showing as
   nothing is owned. Is it because I do not have them on official list of stocks
@@ -2043,3 +2065,26 @@ adding two tickers. Four separate defects, in rough priority order:
      PLTR 115 vs 85) is now gone rather than merely unread, and no target
      literal survives outside `whale_scanner.py`.
   Built 2026-08-17.
+
+- **A45 — First scan slot moved to the 9:30 ET open** (EX-33, John's go-ahead
+  2026-08-18). `scanner.yml` first cron 13:47 → 13:32 UTC (6:32 AM PT);
+  `SCAN_TIMES_UTC` in `move_watcher.py` updated in step (they must match or
+  the watchdog mis-rescues); the commented PST block moved 14:47/14:53 →
+  14:32/14:38 so the winter flip inherits the fix. Later slots unchanged.
+  Why: the Move Watcher's held-position lines are only as fresh as the last
+  `results.json`. Positions closed after the prior day's last scan stay ghosts
+  until the first scan lands — under the old schedule a ~50-min morning window
+  (longer with cron jitter) in which a strike warning could fire on a closed
+  position, which is exactly EX-33. Now the purge scan starts at the open;
+  the exposure shrinks to at most the single 13:30 UTC watcher tick that runs
+  before the ~13:36 commit, and only on a gap open ≥5%.
+  Slot spacing stays legal: 13:32→16:41 is 189 min, above the 100-min
+  skip-redundant horizon; watchdog coverage for the new slot comes from the
+  13:45 UTC watcher tick (grace ends 13:42).
+  Trade-off, accepted: the first scan prices chains in the first minutes after
+  the open, when spreads are widest — cards from that scan can look worse than
+  the same contract 15 min later. Positions and quotes are unaffected.
+  This changes scan TIMING, not any gate or threshold — no replay needed;
+  notifications per day are unchanged in expectation (the same three scans run,
+  earlier).
+  Built 2026-08-18.

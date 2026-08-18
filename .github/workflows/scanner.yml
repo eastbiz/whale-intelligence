@@ -3,17 +3,18 @@ name: Whale Intelligence Scanner
 on:
   schedule:
     # ── PDT (UTC-7, Mar–Nov) ─────────────────────────────────
-    # 6:47 AM PT  (13:47 UTC) — morning scan
-    - cron: '47 13 * * 1-5'
+    # 6:32 AM PT  (13:32 UTC) — morning scan, just after the 9:30 ET open
+    # so the day's first Move Watcher ticks read TODAY'S positions (A45)
+    - cron: '32 13 * * 1-5'
     # 9:41 AM PT  (16:41 UTC) — midday scan
     - cron: '41 16 * * 1-5'
     # 11:47 AM PT (18:47 UTC) — pre-close scan
     - cron: '47 18 * * 1-5'
     # ── PST (UTC-8, Nov–Mar) — uncomment block below, comment block above ──
-    # 6:47 AM PT  (14:47 UTC)
-    # - cron: '47 14 * * 1-5'
-    # 6:53 AM PT  (14:53 UTC) — backup
-    # - cron: '53 14 * * 1-5'
+    # 6:32 AM PT  (14:32 UTC)
+    # - cron: '32 14 * * 1-5'
+    # 6:38 AM PT  (14:38 UTC) — backup
+    # - cron: '38 14 * * 1-5'
     # 9:41 AM PT  (17:41 UTC)
     # - cron: '41 17 * * 1-5'
     # 11:47 AM PT (19:47 UTC)
