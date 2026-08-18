@@ -409,6 +409,20 @@ it reads `results.json`.
   to review: the Telegram blocks in `whale_scanner.py`, `move_watcher.py`
   (`build_line` + `near_actionable`), and the dashboard's Actions tab
   (separate repo). Filter by type explicitly — never assume.
+  **The dashboard was the third one (A44, 2026-08-18).** Its "All Open CSP/CC
+  Positions" table filtered by nothing, so 57 of its 61 rows were LEAPS — the
+  `LEAPS_CALL` label alone widened the ticker column enough to push the
+  Action / Reason note off screen, and cost-to-close / cushion / DTE-urgency
+  columns are meaningless on a long call anyway. The CSP/CC table now filters
+  to short options via `isShortOptRow()`, LEAPS render in their own
+  `renderLeapsTable()` with LEAPS-appropriate columns, and the cards above have
+  an OTHER bucket so an action outside BIG MOVE / P&L SWING / EARNINGS WARNING /
+  TAKE PROFIT / HOLD can never again render nowhere at all (`NEAR 52W HIGH` and
+  `SELL TARGET HIT` had been invisible on that page since PR #2).
+  **`LEAPS_CALL` stays the wire value** — the dashboard shortens it to `LEAP`
+  for display only (`fmtPosType()`). Renaming it in `results.json` would break
+  `whale_scanner.py:7768` and `move_watcher.py`, which is exactly the class of
+  breakage this gotcha exists to prevent.
 
 - **RESOLVED (A43): the dashboard's stale `SYMBOL_SETTINGS` copy is gone.** It
   lived in `downloadPositionsCSV()` and went with it when John asked for the CSV
