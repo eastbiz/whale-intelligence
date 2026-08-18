@@ -4,9 +4,10 @@
     "POWL:down": 5
   },
   "scan_triggered": {
-    "CRDO:down": true
+    "CRDO:down": true,
+    "POWL:down": true
   },
-  "scan_trigger_count": 1,
+  "scan_trigger_count": 2,
   "dispatched": {
     "13:47": true
   }
