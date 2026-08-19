@@ -647,16 +647,38 @@ STRICT_ZONE_TELEGRAM = False
 # panel and the opportunity filter give the same answer for the same ticker.
 CSP_NEAR_PCT = 0.05   # CSP near = within 5% ABOVE buy_under
 CC_NEAR_PCT  = 0.08   # CC  near = within 8% BELOW sell_above
+# LEAPS near = the SAME 5% band as CSP (A47/P39, John 2026-08-19). The growth
+# allowance below still applies as a second, independent test — the zone is the
+# TIGHTER of the two — but it no longer sets the band on its own. Rationale: the
+# growth band answers "could the stock grow into this price by expiry?", which is
+# almost always yes on a 1-2 year option, so it passed nearly everything (20 of
+# 20 LEAPS rows were NEAR on 2026-08-19, gaps 10-27%). John's question is the CSP
+# one — "is the stock at/near my buy target right now?" — and for a LEAP entry
+# price matters MORE than for a CSP, not less: a CSP that goes against you ends
+# in assignment at your target, while a long call just decays. Expect this filter
+# to be EMPTY on most days; that is the intended signal, not a fault.
+LEAPS_NEAR_PCT = 0.05  # LEAPS near = within 5% ABOVE buy_under (CSP parity)
 
-# LEAPS entry band = a GROWTH ALLOWANCE, not a flat percentage:
-#     price ≤ buy_under × (1 + g) ** years
-# Two things fall out of this for free, both of which John asked for:
-#   • A longer-dated contract earns a wider band (more time for the stock to
-#     get there) — 20%/yr allows 31% headroom at 1.5y but 73% at 3y.
-#   • A big drop pulls a name back INTO the band without any special rule,
-#     because the drop cuts the growth today's price implies.
-# A flat band cannot do either: the previous ×1.10 excluded 23 of 23 LEAPS
-# names on the 2026-08-13 scan — a wall, not a band.
+# The GROWTH ALLOWANCE — price ≤ buy_under × (1 + g) ** years — is now the
+# SECOND of two tests, not the band itself. The zone is min(growth band, flat
+# LEAPS_NEAR_PCT band); see A47/P39 above.
+#
+# HISTORY — READ BEFORE WIDENING THIS AGAIN. The growth band replaced a flat
+# ×1.10 band precisely BECAUSE the flat band excluded 23 of 23 LEAPS names on
+# the 2026-08-13 scan ("a wall, not a band"). It then went too far the other
+# way: on 2026-08-19 it passed 20 of 20 rows at gaps of 10-27%, and John asked
+# for it back at 5% having been told explicitly that today's filter would be
+# EMPTY. He accepted that: "If it is empty today it is OK. And if I am curious
+# what else is found out I can unselect the filter and see all opportunities."
+# So an empty AT/NEAR filter is the DESIRED state, not the bug it looked like
+# in August. Do not re-widen it to fill the page — that is the same mistake in
+# the other direction, and the "Strict filters surface rare value" rule in
+# CLAUDE.md applies here exactly as it does to convexity.
+#
+# The growth allowance still earns its keep in two places: it is the tighter
+# test for a small-g name (GOOGL at g=0.10, and the g=0 value names), and the
+# implied-vs-allowed %/yr pair stays on the card as a quality read AFTER the
+# filter has narrowed the list.
 # Bucket grades VOLATILITY, so it is only the default; use the override when a
 # name's growth profile and its volatility diverge.
 #
@@ -729,7 +751,9 @@ def compute_in_zone(strategy: str, price: float, buy_under: float, sell_above: f
     Bands:
       CSP:   AT price ≤ buy_under        NEAR within CSP_NEAR_PCT above
       CC:    AT price ≥ sell_above       NEAR within CC_NEAR_PCT below
-      LEAPS: AT price ≤ buy_under        NEAR ≤ buy_under × (1+g)**years
+      LEAPS: AT price ≤ buy_under        NEAR within LEAPS_NEAR_PCT above,
+             AND inside the growth allowance — the band is the TIGHTER of
+             buy_under × (1+LEAPS_NEAR_PCT) and buy_under × (1+g)**years
 
     There is NO IV override. The old one (IVR ≥ 70 for CSP/CC, IVR ≤ 25 for
     LEAPS) cleared 14 of 24 names and accounted for 12 of the 12 rows the
@@ -768,15 +792,24 @@ def compute_in_zone(strategy: str, price: float, buy_under: float, sell_above: f
             # No expiry to work with — no growth allowance can be justified.
             gap = (price - buy_under) / buy_under * 100
             return (False, "OUT", f"Stock ${price:.2f} is {gap:.1f}% above Buy Below ${buy_under:.0f} (no DTE)")
-        band    = buy_under * (1 + g) ** years
+        # A47/P39: the zone is the TIGHTER of the flat 5% CSP-parity band and the
+        # growth allowance. min() means this can only ever tighten — a name with a
+        # small allowance keeps it, and a g=0 value name (JD/ZTS) still collapses
+        # to price <= buy_under with no special case.
+        growth_band = buy_under * (1 + g) ** years
+        near_band   = buy_under * (1 + LEAPS_NEAR_PCT)
+        band        = min(growth_band, near_band)
         implied = leaps_implied_growth(price, buy_under, dte)
+        gap     = (price - buy_under) / buy_under * 100
         if price <= band:
             return (True, "NEAR",
-                    f"Entry assumes {implied*100:.0f}%/yr from Buy Below ${buy_under:.0f} "
-                    f"over {years:.1f}y — within the {g*100:.0f}%/yr allowance")
+                    f"Stock ${price:.2f} is {gap:.1f}% above Buy Below ${buy_under:.0f} "
+                    f"— within {LEAPS_NEAR_PCT*100:.0f}% (entry assumes {implied*100:.0f}%/yr "
+                    f"over {years:.1f}y vs {g*100:.0f}%/yr allowed)")
         return (False, "OUT",
-                f"Entry assumes {implied*100:.0f}%/yr from Buy Below ${buy_under:.0f} "
-                f"over {years:.1f}y — above the {g*100:.0f}%/yr allowance")
+                f"Stock ${price:.2f} is {gap:.1f}% above Buy Below ${buy_under:.0f} "
+                f"— outside {LEAPS_NEAR_PCT*100:.0f}% (entry assumes {implied*100:.0f}%/yr "
+                f"over {years:.1f}y vs {g*100:.0f}%/yr allowed)")
 
     if strategy == "CONVEXITY":
         # Cheap convexity is EXEMPT from buy_under (EX-15/P24): a far-OTM long

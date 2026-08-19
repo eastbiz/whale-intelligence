@@ -868,7 +868,57 @@ short it, and it is already EXEMPT from the target gate by P24/EX-15.
 
 - Evidence: John, 2026-08-17. System status: **Actioned — A42.**
 
+### P39 — LEAPS entry deserves TIGHTER price discipline than a CSP, not looser
+The LEAPS target zone was a growth allowance — `price ≤ buy_under × (1+g)**years`
+— which answers "could the stock grow into this price by expiry?". On a 1-2 year
+option that is almost always yes, so it passed nearly everything: **20 of 20**
+LEAPS rows were NEAR on 2026-08-19 at gaps of 10-27%, and the band widened with
+DTE (SPCX: $110 buy target, band $151 at 1.4y, $185 at 2.34y — +68%). A filter
+that says yes to everything is not a filter.
+John's question is the CSP one: *is the stock at or near my buy target right
+now?* And the asymmetry runs the opposite way from how the band was built:
+- **CSP** — the stock falls through your strike and you own it at your target.
+  The drop IS the thesis working; assignment is the floor.
+- **LEAP** — you paid cash up front. The stock falls and the option just decays.
+  There is no assignment to catch you.
+So entry price matters MORE on a long call than on a short put. The growth band
+had made LEAPS the loosest zone in the system when it should be among the
+tightest. LEAPS now uses the same 5% band as CSP (`LEAPS_NEAR_PCT`), applied as
+`min(flat band, growth band)` so it can only tighten.
+- Evidence: EX-34; John's own SPCX entry (EX-32 context) was bought at $111 into
+  a ~20% drawdown — the CSP model applied to a LEAP, and it worked (+36%).
+- **An empty AT/NEAR filter is the DESIRED state.** John was told explicitly the
+  filter would be empty on the day he approved it and said: *"If it is empty
+  today it is OK. And if I am curious what else is found out I can unselect the
+  filter and see all opportunities."* The flat band was previously REMOVED for
+  exactly this reason (a ×1.10 band excluded 23 of 23 names on 2026-08-13, and
+  the growth band replaced it). Do not widen it again to fill the page — that is
+  the same mistake in the other direction. "Strict filters surface rare value"
+  applies here as it does to convexity.
+- The growth allowance is retained: it is still the tighter test for a small-g
+  name (GOOGL g=0.10, and the g=0 value names JD/ZTS), and implied-vs-allowed
+  %/yr stays on the card as a quality read AFTER the filter narrows the list.
+- System status: **Actioned — A47.**
+
 ## Trade Examples (raw log)
+
+### EX-34 — "30% above buy doesn't seem like near target" (2026-08-19)
+- John, filtering LEAPS by AT/NEAR TARGET, saw `SPCX — Near target · 30.1%
+  above buy` and challenged it: *"I can always unselect and see all, but the
+  goal is to filter out and see what is really closer to my buy below target
+  before going through big list."*
+- Diagnosis: not a display bug. `compute_in_zone` returned tier `NEAR` for two
+  structurally different ideas — CSP/CC `NEAR` is a few % from target, LEAPS
+  `NEAR` meant "inside the growth allowance", which is not a distance at all.
+  The dashboard rendered both as "Near target" and appended the raw gap, so the
+  badge contradicted itself. SPCX: buy_under $110, bucket D → g=25%/yr, 1.4y →
+  band $151.07; price $139.51 sat inside it.
+- Full picture at the time: 20 NEAR rows / 41 OUT, NEAR gaps 10.1% (CLS) to
+  26.8% (SPCX). Nothing was AT.
+- Fixed as A47 (zone) — after the fix all 61 rows are OUT and the filter is
+  empty, which is the accepted outcome (P39).
+- Separately surfaced and fixed in the same session: the LEAPS Table view had
+  disappeared entirely (A46).
 
 ### EX-33 — Strike warning on a POWL position closed the day before (2026-08-18)
 - 10:17 ET, Move Watcher: `🔴▼ POWL -6.1% today … You hold short CSP $200
@@ -2066,6 +2116,31 @@ adding two tickers. Four separate defects, in rough priority order:
      literal survives outside `whale_scanner.py`.
   Built 2026-08-17.
 
+- **A47 — LEAPS target zone cut to the 5% CSP band (P39/EX-34).** `LEAPS_NEAR_PCT`
+  = 0.05, and the LEAPS branch of `compute_in_zone` now uses
+  `min(buy_under × 1.05, buy_under × (1+g)**years)` — the tighter of the flat
+  band and the growth allowance, so it can only ever tighten. Reason strings now
+  lead with the distance ("Stock $X is N% above Buy Below $Y — within/outside
+  5%") and carry implied-vs-allowed %/yr as trailing context.
+  Validated by replaying all 61 LEAPS rows from the 2026-08-19 15:49 UTC scan:
+  20 NEAR + 41 OUT → **61 OUT, filter empty**, which John approved in advance.
+  Boundary checked exactly (CLS bu $275: $288.75 = 5.0% → NEAR, $289.00 = 5.1%
+  → OUT) and the g=0 collapse verified (ZTS bu $70: $69 → AT, $71 → OUT, no
+  special case). `STRICT_ZONE_TELEGRAM` is False, so this is dashboard-filter
+  only — no Telegram impact. Built 2026-08-19.
+- **A46 — LEAPS opportunities Table view restored (dashboard).** A44 added a
+  `renderLeapsTable()` for the Actions-tab positions table while
+  `renderLeapsTable(leaps)` already existed for the Opportunities-tab candidate
+  table. Both are top-level declarations in one script, so hoisting made the
+  later silently overwrite the earlier for every caller: clicking "Table" on the
+  LEAPS filter called the positions version, which ignores its argument and
+  writes to `#leaps-tbody`, leaving `#leaps-table-view` displayed but empty with
+  the cards grid hidden — the table appeared to vanish. Renamed the Actions-tab
+  one to `renderLeapsPositionsTable()`. **`node --check` does NOT catch this** —
+  a redeclared function is legal JS — so the dashboard syntax-check step should
+  also scan for duplicate top-level function names. Built 2026-08-19.
+  (NOTE: its commit message says "A45", which was already taken by the scan-slot
+  change below. The correct number is A46.)
 - **A45 — First scan slot moved to the 9:30 ET open** (EX-33, John's go-ahead
   2026-08-18). `scanner.yml` first cron 13:47 → 13:32 UTC (6:32 AM PT);
   `SCAN_TIMES_UTC` in `move_watcher.py` updated in step (they must match or

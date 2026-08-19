@@ -160,10 +160,21 @@ independently.**
   made 12 of 12 kept rows out-of-zone. NEAR bands: CSP 5% above buy_under, CC 8%
   below sell_above (both shared with the Price Watch panel — keep them in sync
   or the two surfaces disagree about the same ticker, which is exactly the bug
-  EX-27 was reported as). LEAPS uses a growth allowance,
-  `buy_under × (1+g)**years`, NOT a flat percentage: a flat ×1.10 excluded 23 of
-  23 LEAPS names. `g` per bucket (A 10 / B 15 / C 20 / D 25 %/yr) with
-  `LEAPS_GROWTH_OVERRIDE` per ticker.
+  EX-27 was reported as). **LEAPS = 5%, the same band as CSP (A47/P39)** —
+  `LEAPS_NEAR_PCT`, applied as `min(buy_under × 1.05, buy_under × (1+g)**years)`,
+  the tighter of the flat band and the growth allowance. The growth allowance
+  alone had made LEAPS the LOOSEST zone in the system (20 of 20 rows NEAR at
+  gaps of 10-27% on 2026-08-19, widening with DTE — SPCX's band was +68% at
+  2.34y) when it should be among the tightest: a CSP that goes against you ends
+  in assignment at your target, a long call just decays, so entry price matters
+  MORE on a LEAP. `g` per bucket (A 10 / B 15 / C 20 / D 25 %/yr) with
+  `LEAPS_GROWTH_OVERRIDE` per ticker; it still binds for small-`g` names and
+  supplies the implied-vs-allowed %/yr shown on the card.
+  **An EMPTY At/Near filter is the intended state, not a bug.** The flat band
+  was once removed for exactly this reason (×1.10 excluded 23 of 23 names on
+  2026-08-13), then the growth band overcorrected. John approved 5% having been
+  told the filter would be empty that day — he unselects the filter to see
+  everything. Do not re-widen it to fill the page.
   **A growth allowance is wrong for a VALUE name (A42/P37)** — the thesis is
   re-rating to fair value, not compounding into today's price. Set
   `LEAPS_GROWTH_OVERRIDE = 0.0` (JD, ZTS today) and the band collapses to a flat
