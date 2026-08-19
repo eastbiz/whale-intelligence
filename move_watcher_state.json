@@ -1,20 +1,11 @@
 {
-  "date": "2026-08-18",
-  "alerted": {
-    "POWL:down": 5
-  },
+  "date": "2026-08-19",
+  "alerted": {},
   "scan_triggered": {
-    "CRDO:down": true,
-    "POWL:down": true,
-    "CLS:down": true,
-    "FIX:down": true,
-    "MU:down": true,
     "NBIS:down": true
   },
-  "scan_trigger_count": 3,
+  "scan_trigger_count": 1,
   "dispatched": {
-    "13:47": true,
-    "16:41": true,
-    "18:47": true
+    "13:32": true
   }
 }
