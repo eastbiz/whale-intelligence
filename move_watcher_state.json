@@ -8,7 +8,8 @@
   "scan_triggered": {
     "NBIS:down": true,
     "MSTR:up": true,
-    "MELI:up": true
+    "MELI:up": true,
+    "NOW:up": true
   },
   "scan_trigger_count": 3,
   "dispatched": {
