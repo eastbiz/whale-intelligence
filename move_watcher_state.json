@@ -4,9 +4,10 @@
     "CLS:down": 5
   },
   "scan_triggered": {
-    "NBIS:down": true
+    "NBIS:down": true,
+    "MSTR:up": true
   },
-  "scan_trigger_count": 1,
+  "scan_trigger_count": 2,
   "dispatched": {
     "13:32": true
   }
