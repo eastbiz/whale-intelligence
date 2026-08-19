@@ -629,15 +629,22 @@ it reads `results.json`.
   members (JD, ZTS) and is tested; `watchlist` (META) and BABA's row still do
   not. **A config flag with no live ticker is an untested flag** (P35 drew the
   same lesson about `leaps_allowed`). Either classify them or drop the rows.
-- **Sizing framework can't answer a diversification question (C19).** Four
-  defects, all pre-existing, none fixed: no sector/theme rollup at all
-  (`MAX_SECTOR_PCT` is defined and read nowhere); `TICKER_TARGETS` assumes 100%
-  invested so 23 of 39 rows read "Underweight" while John holds ~20% SGOV; three
-  sizing tables of which two are dead and disagree (`TICKER_TARGETS` vs
-  `buckets.csv` `max_position_pct` / `target_pct`); and held-but-unclassified
-  names get a made-up 1–3% band, so SGOV reads "Overweight". John is now
-  steering by concentration numbers, so this matters more than it did.
-- **C18** — Positions rows sum to only 91.4% of net liquidation. Unexplained.
+- **C19 — MOSTLY RESOLVED by A49/P40.** `SIZING_BY_TIER` is now the single sizing
+  table (Core 5–12% cap 15, Trading 3–8% cap 10, Speculative 1–4% cap 6, Very
+  Speculative 0.25–1.5% cap 2); `TARGET_RANGES` / `TIER_ALLOCATIONS` /
+  `TIER_MAX_PCT` derive from it and `TICKER_TARGETS` is dead. Basis is INVESTED
+  CAPITAL — `CASH_EQUIVALENTS` (SGOV) is dry powder, not a position, so it no
+  longer reads "Overweight". Unclassified holdings get NO band rather than an
+  invented one. `results.json` → `sizing.breaches` is the actionable list (5 rows
+  out of 40 on 2026-08-19); `sizing.mix` carries the portfolio-level bands.
+  **Still open:** the sector/theme rollup. `MAX_SECTOR_PCT` (25%) remains read
+  nowhere because there is no ticker→sector map. Do NOT hand-write one from
+  guesswork — an attempt to reverse-engineer it from IBKR's own sector totals
+  failed to reconcile (Consumer Cyclicals $1.95M, but AMZN+MELI+LULU+GRBK alone
+  is $1.84M and adding TSLA overshoots). Seed it from the broker's classification
+  instead. For scale: Technology is ~56% of invested capital against that 25% cap.
+- **C18 — RESOLVED by A48.** Was the `PORTFOLIO_SIZE` double-count, not the
+  positions. See the Schwab-merge gotcha above.
 - Spread scanner for CRDO/NBIS on normal (non-spike) days — built standalone
   (`spread_scanner.py`), never integrated.
 - PATH / cheap-stock spike-CC filters too strict (premium floor, liquidity).

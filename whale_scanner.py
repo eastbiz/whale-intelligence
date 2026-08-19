@@ -297,32 +297,71 @@ SCHWAB_ACCOUNT_LABELS = {
     "62969383": "Personal",  # Schwab Personal 6296-9383
 }
 
-# ── Canonical tier target ranges (used everywhere) ───────────
-# Single source of truth — do not duplicate below
-TARGET_RANGES = {
-    "Core":             (5.0, 10.0),
-    "Trading":          (3.0,  6.0),
-    "Speculative":      (1.5,  4.0),
-    "Very Speculative": (0.5,  2.0),
+# ══ POSITION SIZING — John's framework, 2026-08-19 (A49/P40) ═════════════════
+# THE single source of truth for sizing. It replaced three overlapping tables
+# (TARGET_RANGES, TIER_ALLOCATIONS, TICKER_TARGETS) that disagreed with each
+# other — the "three sizing tables, two dead" half of C19. Everything below
+# DERIVES from this dict; never hand-edit a derived table.
+#
+# Sizing is a RISK CONTROL system, not a performance optimizer (John's words).
+# Consequences that follow from that and must not be quietly reverted:
+#   • These are MAXIMUM target ranges, not required allocations. Being under a
+#     target is NOT a call to action — the old TICKER_TARGETS emitted an
+#     "Underweight" verdict for 23 of 39 names with no action attached to any of
+#     them, and generated buy pressure with no reference to price (AAPL read
+#     maximum-underweight while trading 58% above its buy target). Only the
+#     OVER side is actionable. Report the under side, never alert on it.
+#   • Basis is INVESTED CAPITAL (PORTFOLIO_SIZE − CASH_EQUIVALENTS), not total
+#     portfolio. John's text says "% of Total Portfolio", but he also confirmed
+#     SGOV is dry powder awaiting deployment, and the portfolio-level band below
+#     (Core+Trading 70–90%) is unreachable on a total-portfolio basis while ~22%
+#     sits in SGOV. Invested capital is the only reading that makes both hold.
+#     Flip SIZING_BASIS_TOTAL to True to measure against the total instead.
+SIZING_BY_TIER = {
+    #                   target_lo, target_hi, cap,  min_meaningful   (% of basis)
+    "Core":             {"lo":  5.0, "hi": 12.0, "cap": 15.0, "min": 3.0},
+    "Trading":          {"lo":  3.0, "hi":  8.0, "cap": 10.0, "min": 2.0},
+    "Speculative":      {"lo":  1.0, "hi":  4.0, "cap":  6.0, "min": 1.0},
+    "Very Speculative": {"lo": 0.25, "hi":  1.5, "cap":  2.0, "min": 0.25},
 }
-# Canonical tier allocations: (normal_max, hard_max)
-# normal_max = On Target ceiling, hard_max = Overweight trigger
-# Ladder reflects the classification spec: Speculative takes smaller maximum
-# positions than Core or Trading, and Very Speculative is sized as a small
-# opportunistic position rather than a permanent holding.
-TIER_ALLOCATIONS = {
-    "Core":             (0.08,  0.12),
-    "Trading":          (0.05,  0.08),
-    "Speculative":      (0.03,  0.05),
-    "Very Speculative": (0.015, 0.03),
+# Held-but-unclassified names (BRK-B, NLCP, ASML, OWL, FISV, IIPR-A, ANGI …).
+# Deliberately NOT given a made-up 1–3% band — that is what made SGOV read
+# "Overweight" (C19). They are reported with no verdict until classified.
+SIZING_UNCLASSIFIED_TIER = "Other"
+
+# Portfolio-level risk controls (% of the same basis).
+PORTFOLIO_MIX_BANDS = {
+    "core_trading":   (70.0, 90.0),   # Core + Trading combined
+    "spec_total":     (10.0, 30.0),   # Speculative + Very Speculative combined
+    "very_spec_max":            5.0,  # Very Speculative alone — rarely above this
 }
-# Keep TIER_MAX_PCT as alias for backward compat
-TIER_MAX_PCT = {k: v[1] for k, v in TIER_ALLOCATIONS.items()}
+# Cash equivalents — excluded from sizing entirely and reported as dry powder.
+# SGOV is not a position; judging it against a ticker band is a category error.
+CASH_EQUIVALENTS = {"SGOV", "BIL", "SHV", "SGOV.US"}
+SIZING_BASIS_TOTAL = False   # False = invested capital; True = total portfolio
+# Options at delta-adjusted exposure rather than market value. OFF by default:
+# John's framework is written in plain "% of portfolio" terms and the scanner
+# already carries market value everywhere. Both figures are published either
+# way, so this can be flipped after comparing. Note the headline breach (TSLA
+# ~9.3% MV / ~13.9% delta-adjusted vs a 6% Speculative cap) holds on BOTH bases.
+SIZING_DELTA_ADJUSTED = False
+
+# ── Derived — do not hand-edit ───────────────────────────────
+TARGET_RANGES    = {k: (v["lo"], v["hi"]) for k, v in SIZING_BY_TIER.items()}
+# (normal_max, hard_max) as FRACTIONS: normal_max = target_hi, hard_max = cap.
+TIER_ALLOCATIONS = {k: (v["hi"] / 100.0, v["cap"] / 100.0)
+                    for k, v in SIZING_BY_TIER.items()}
+TIER_MAX_PCT     = {k: v[1] for k, v in TIER_ALLOCATIONS.items()}
 
 # ── Per-ticker allocation targets (updated Apr 17 2026) ──────
 # target_pct: desired portfolio weight
 # On Target zone: 80%–120% of target_pct (±20% tolerance band)
 # Speculative tickers at 0% show "Not Held" rather than "Underweight"
+# DEPRECATED (A49/P40) — superseded by SIZING_BY_TIER. Kept only so the numbers
+# are recoverable if John ever wants a per-ticker override layer; NOTHING reads
+# it any more. It summed to 106% of the portfolio, so every target was
+# structurally unreachable, and it was price-blind: AAPL carried an 8% target
+# while trading 58% above its own buy_under. Do not wire it back in.
 TICKER_TARGETS = {
     # Core
     "AAPL":  {"target_pct":  8.0, "speculative": False},
@@ -2205,25 +2244,64 @@ def tier_target_range(tier: str) -> tuple:
     return TARGET_RANGES.get(tier, (1.0, 3.0))
 
 def ticker_target_range(ticker: str, tier: str) -> tuple:
-    """Per-ticker target range using ±20% tolerance band around target_pct.
-    Falls back to tier range if ticker not in TICKER_TARGETS."""
-    tt = TICKER_TARGETS.get(ticker)
-    if tt:
-        mid = tt["target_pct"]
-        lo  = round(mid * (1 - TICKER_TOLERANCE), 2)
-        hi  = round(mid * (1 + TICKER_TOLERANCE), 2)
-        return (lo, hi)
+    """Target range for a ticker. A49/P40: sizing is tier-driven — there is no
+    per-ticker percentage to maintain any more. Signature kept for callers."""
     return tier_target_range(tier)
 
+def sizing_verdict(tier: str, exposure_pct: float, held: bool = True) -> tuple:
+    """
+    Position size against John's framework (A49/P40).
+    Returns (verdict, severity) where severity is 2 = over the hard cap,
+    1 = above the target range (trim candidate), 0 = informational.
+
+    ONLY severity >= 1 is actionable. "Below target" and "Starter" exist to be
+    displayed, never to generate buy pressure — that was the old framework's
+    central defect (see the SIZING_BY_TIER note).
+    """
+    s = SIZING_BY_TIER.get(tier)
+    if not s:
+        return ("Unclassified", 0)          # no made-up band — C19
+    if not held or exposure_pct <= 0:
+        return ("Not Held", 0)
+    if exposure_pct > s["cap"]:
+        return (f"OVER CAP ({s['cap']:.0f}%)", 2)
+    if exposure_pct > s["hi"]:
+        return (f"Above target ({s['lo']:.2g}–{s['hi']:.2g}%) — trim candidate", 1)
+    if exposure_pct < s["min"]:
+        return (f"Starter (under {s['min']:.2g}% meaningful)", 0)
+    if exposure_pct < s["lo"]:
+        return ("Below target range", 0)
+    return ("On target", 0)
+
 def ticker_position_status(ticker: str, tier: str, exposure_pct: float) -> str:
-    """Underweight / On Target / Overweight / Not Held using per-ticker targets."""
-    tt = TICKER_TARGETS.get(ticker)
-    if tt and tt.get("speculative") and exposure_pct == 0:
-        return "Not Held"
-    lo, hi = ticker_target_range(ticker, tier)
-    if exposure_pct == 0 or exposure_pct < lo:   return "Underweight"
-    elif exposure_pct <= hi:                      return "On Target"
-    else:                                         return "Overweight"
+    """Back-compat label for existing consumers (dashboard, Telegram, cards).
+    Maps the A49 verdict onto the old Overweight / On Target / Underweight
+    vocabulary so nothing downstream breaks mid-migration."""
+    verdict, sev = sizing_verdict(tier, exposure_pct,
+                                  held=(exposure_pct is not None and exposure_pct > 0))
+    if sev >= 1:                        return "Overweight"
+    if verdict == "Not Held":           return "Not Held"
+    if verdict == "Unclassified":       return "Unclassified"
+    if verdict == "On target":          return "On Target"
+    return "Underweight"
+
+def portfolio_mix(exposures: dict) -> dict:
+    """
+    Portfolio-level risk controls (A49/P40). `exposures` maps tier -> % of basis.
+    Returns the three rollups with their bands and whether each is inside.
+    """
+    core_trading = (exposures.get("Core", 0.0) + exposures.get("Trading", 0.0))
+    very_spec    = exposures.get("Very Speculative", 0.0)
+    spec_total   = exposures.get("Speculative", 0.0) + very_spec
+    out = {}
+    for key, val in (("core_trading", core_trading), ("spec_total", spec_total)):
+        lo, hi = PORTFOLIO_MIX_BANDS[key]
+        out[key] = {"pct": round(val, 2), "band": [lo, hi],
+                    "status": "low" if val < lo else "high" if val > hi else "ok"}
+    cap = PORTFOLIO_MIX_BANDS["very_spec_max"]
+    out["very_speculative"] = {"pct": round(very_spec, 2), "band": [0.0, cap],
+                               "status": "high" if very_spec > cap else "ok"}
+    return out
 
 def tier_position_status(tier: str, exposure_pct: float) -> str:
     """Legacy shim — prefer ticker_position_status for new code."""
@@ -7306,6 +7384,16 @@ def run_scanner():
             elif price_opp == "Neutral":  return "ADD"
             else:                         return "HOLD"   # Near High — never BUY
 
+    # ── A49/P40: sizing basis = invested capital (cash equivalents removed) ──
+    _cash_equiv_mv = sum(mv for _t, mv in mv_map_total.items()
+                         if _t.upper() in CASH_EQUIVALENTS)
+    _invested_capital = (PORTFOLIO_SIZE if SIZING_BASIS_TOTAL
+                         else max(0.0, PORTFOLIO_SIZE - _cash_equiv_mv))
+    print(f"   📐 Sizing basis: ${_invested_capital:,.0f} "
+          f"({'total portfolio' if SIZING_BASIS_TOTAL else 'invested capital'}; "
+          f"cash equivalents ${_cash_equiv_mv:,.0f} excluded as dry powder)")
+    _tier_exposure = {}          # tier -> % of basis, for portfolio_mix()
+
     pos_list = []
     for ticker in all_allocation_tickers:
         # Skip explicitly excluded symbols (Spec §4)
@@ -7328,7 +7416,12 @@ def run_scanner():
         _csp_mv_ticker   = sum(p.get("cso", 0) for p in portfolio_exposure.get("csp_positions", []) if p.get("ticker") == ticker)
         # Use CSP obligation only when no stock owned (shows what's at risk if assigned)
         _csp_contrib     = _csp_mv_ticker if _stock_mv_ticker == 0 else 0
-        combined_exposure = round((_stock_mv_ticker + _leaps_mv_ticker + _csp_contrib) / PORTFOLIO_SIZE * 100, 2) if PORTFOLIO_SIZE > 0 else exposure
+        # A49/P40: sizing is measured against INVESTED CAPITAL (cash equivalents
+        # removed), because SGOV is dry powder rather than a position. Using the
+        # total portfolio understates every weight by the SGOV share (~22%) and
+        # makes the Core+Trading 70–90% band unreachable by construction.
+        _sizing_basis = _invested_capital if _invested_capital > 0 else PORTFOLIO_SIZE
+        combined_exposure = round((_stock_mv_ticker + _leaps_mv_ticker + _csp_contrib) / _sizing_basis * 100, 2) if _sizing_basis > 0 else exposure
 
         # Ownership precedence (Spec §5): any exposure > 0 = Owned
         # Also owned if has open CSP, CC, or LEAPS contracts (even with no stock)
@@ -7339,6 +7432,15 @@ def run_scanner():
         )
         status = "Owned" if exposure > 0 or _leaps_mv_ticker > 0 or _has_open_options else "Watchlist"
         pos_status = ticker_position_status(ticker, tier, combined_exposure)
+        # A49/P40 verdict — severity 2 = over the hard cap, 1 = trim candidate.
+        # Cash equivalents are dry powder, not positions: no verdict, ever.
+        if ticker.upper() in CASH_EQUIVALENTS:
+            _size_verdict, _size_sev = ("Dry powder", 0)
+        else:
+            _size_verdict, _size_sev = sizing_verdict(
+                tier, combined_exposure, held=(status == "Owned"))
+            if status == "Owned":
+                _tier_exposure[tier] = _tier_exposure.get(tier, 0.0) + combined_exposure
 
         # Price opportunity
         md_t = mkt.get(ticker, {})
@@ -7401,6 +7503,12 @@ def run_scanner():
             "exposure_pct":    combined_exposure,  # stock + LEAPS MV / portfolio
             "target_range":    f"{target_low:.1f}–{target_high:.1f}%",
             "pos_status":      pos_status,
+            # A49/P40 sizing framework
+            "size_verdict":    _size_verdict,
+            "size_severity":   _size_sev,
+            "size_cap_pct":    (SIZING_BY_TIER.get(tier) or {}).get("cap"),
+            "size_min_pct":    (SIZING_BY_TIER.get(tier) or {}).get("min"),
+            "sizing_basis":    ("total" if SIZING_BASIS_TOTAL else "invested"),
             "price_opp":       price_opp,
             "action":          action,
             "score":           score,
@@ -7900,6 +8008,24 @@ def run_scanner():
         "exposure":       portfolio_exposure,
         "opportunities":  all_opps,
         "positions":      pos_list,
+        # A49/P40 — sizing framework rollup. `mix` carries the portfolio-level
+        # risk controls; `breaches` is the actionable list (severity >= 1) and is
+        # the ONLY part that should ever drive an alert.
+        "sizing": {
+            "basis":            ("total" if SIZING_BASIS_TOTAL else "invested"),
+            "basis_value":      round(_invested_capital, 0),
+            "cash_equivalents": round(_cash_equiv_mv, 0),
+            "delta_adjusted":   SIZING_DELTA_ADJUSTED,
+            "tiers":            SIZING_BY_TIER,
+            "tier_exposure":    {k: round(v, 2) for k, v in _tier_exposure.items()},
+            "mix":              portfolio_mix(_tier_exposure),
+            "breaches":         sorted(
+                [{"ticker": p["ticker"], "tier": p["tier"],
+                  "exposure_pct": p["exposure_pct"], "cap_pct": p.get("size_cap_pct"),
+                  "verdict": p["size_verdict"], "severity": p["size_severity"]}
+                 for p in pos_list if p.get("size_severity", 0) >= 1],
+                key=lambda x: (-x["severity"], -x["exposure_pct"])),
+        },
         "position_actions": _pos_actions,
         "tg_position_alerts": _tg_alert_log,   # P17 dedup: pos-key -> date pinged
         "analysis":       analysis,

@@ -900,6 +900,33 @@ tightest. LEAPS now uses the same 5% band as CSP (`LEAPS_NEAR_PCT`), applied as
   %/yr stays on the card as a quality read AFTER the filter narrows the list.
 - System status: **Actioned — A47.**
 
+### P40 — Position sizing is a RISK CONTROL system, not a performance optimizer
+John's framing, and it settles a defect that had been in the system from the
+start: `TICKER_TARGETS` produced two verdicts, Underweight and Overweight, and
+**only one of them had an action attached.** John does not buy because a table
+says underweight — he buys when price reaches `buy_under`. So the underweight
+half generated buy pressure with no reference to price (AAPL read maximum-
+underweight at 0.16% against an 8% target while trading 58% ABOVE its buy
+target), and 23 of 39 rows were noise he correctly ignored.
+Rules that follow, all of which must survive future edits:
+- **Only the OVER side is actionable.** Report "below target"; never alert on it.
+- **Ranges are MAXIMUMS, not required allocations.** Being under one is a
+  non-event. "Avoid recommending new exposure in a category already at its upper
+  bound" is the only direction sizing may push a trade.
+- **Tier-driven, never per-ticker.** John will not hand-maintain 31 percentages —
+  he said so directly. Conviction is `CLASSIFICATION` (4 tiers, already manual by
+  P33/A36); everything else derives. A per-ticker table also has to sum to 100%,
+  which is exactly the maintenance burden that made the old one drift to 106%.
+- **Held-but-unclassified names get NO band.** Inventing a 1–3% range is what
+  made SGOV read "Overweight" (C19). No classification, no verdict.
+- **Basis is invested capital, not total portfolio.** John's text says "% of Total
+  Portfolio", but he also confirmed SGOV is dry powder, and the Core+Trading
+  70–90% band is unreachable on a total basis while ~22% sits in SGOV. Invested
+  capital is the only reading under which both statements hold. `SIZING_BASIS_TOTAL`
+  flips it if he ever means the literal total.
+- Evidence: John's written framework, 2026-08-19; the C19 backlog item.
+- System status: **Actioned — A49.**
+
 ## Trade Examples (raw log)
 
 ### EX-35 — PORTFOLIO_SIZE double-counted every Schwab stock (2026-08-19)
@@ -2142,6 +2169,26 @@ adding two tickers. Four separate defects, in rough priority order:
      literal survives outside `whale_scanner.py`.
   Built 2026-08-17.
 
+- **A49 — Position sizing rebuilt on John's framework (P40, C19).**
+  `SIZING_BY_TIER` is now the ONE sizing table — Core 5–12% (cap 15, min 3),
+  Trading 3–8% (10, 2), Speculative 1–4% (6, 1), Very Speculative 0.25–1.5%
+  (2, 0.25). `TARGET_RANGES`, `TIER_ALLOCATIONS` and `TIER_MAX_PCT` are now
+  DERIVED from it; `TICKER_TARGETS` is dead (kept only for recoverability, read
+  by nothing). `PORTFOLIO_MIX_BANDS` adds the portfolio-level controls;
+  `CASH_EQUIVALENTS` removes SGOV from sizing entirely as dry powder;
+  `sizing_verdict()` returns a severity (2 = over cap, 1 = trim candidate,
+  0 = informational) and `portfolio_mix()` the rollup. `results.json` gains a
+  `sizing` block whose `breaches` list is the only part that may drive an alert.
+  Measured on the 2026-08-19 book (basis $13,844,605 of $17,715,142):
+  **5 actionable rows out of 40** — TSLA 9.29% and NBIS 5.00% over cap; AAPL
+  12.07%, PLTR 5.30%, IBIT 4.50% above target. Mix: Core+Trading 66.25% (below
+  the 70% floor), Spec+VerySpec 27.85% (inside), Very Speculative 5.38% (just
+  over its 5% guideline). Note Core+Trading is dragged under the floor partly by
+  5.91% of held-but-unclassified names (BRK-B, NLCP, ASML, OWL, FISV, IIPR-A,
+  ANGI) — classifying them is the cheapest way to close that gap.
+  `SIZING_DELTA_ADJUSTED` is False for now: John's framework is written in plain
+  market-value terms, and the headline breach (TSLA vs a 6% cap) holds on both
+  bases — 9.3% at market value, ~13.9% delta-adjusted. Built 2026-08-19.
 - **A48 — PORTFOLIO_SIZE: stop double-counting Schwab stock, start counting IBKR
   options (EX-35, C18).** `_ibkr_stk_total` / `_ibkr_opt_total` are snapshotted
   from the `ibkr` dict immediately BEFORE the Schwab merge — the only exact split,
