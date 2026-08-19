@@ -5253,6 +5253,11 @@ def run_scanner():
     # Fetch Schwab accounts for position awareness
     schwab_accounts  = schwab_get_accounts() if SCHWAB_APP_KEY else []
     schwab_positions = schwab_parse_positions(schwab_accounts) if schwab_accounts else {}
+    # IBKR-only stock total, snapshotted just before the Schwab merge (A48/EX-35).
+    # None until then; the PORTFOLIO_SIZE calc falls back to a direct sum when no
+    # Schwab positions were merged and `ibkr` is therefore still IBKR-only.
+    _ibkr_stk_total = None
+    _ibkr_opt_total = None
 
     # ── Schwab position-feed guard ───────────────────────────────────────────
     # IBKR has stale-data protection above; Schwab had NONE. When the accounts
@@ -5310,6 +5315,20 @@ def run_scanner():
         print(f"   Multi-account tickers: "
               + str({t: list(v.keys()) for t,v in schwab_mv_by_acct.items() if len(v) > 1}))
 
+        # Snapshot the IBKR-ONLY stock total BEFORE the merge below. The merge
+        # folds Schwab stock into this same dict — adding into an existing row
+        # when the ticker is held at both brokers — so after it runs there is no
+        # way to separate the two by `source`. Taking the total here is the only
+        # exact split. See the PORTFOLIO_SIZE calc for why it matters (A48/EX-35).
+        _ibkr_stk_total = sum(v.get("market_value", 0) or 0 for v in ibkr.values()
+                              if v.get("asset_class") == "STK")
+        # Same snapshot for OPTIONS. These were never in PORTFOLIO_SIZE at all,
+        # which is the other half of the error — and it partly cancelled the
+        # double-count, so fixing only one makes the total WORSE. Short rows carry
+        # a negative market_value, so this nets them automatically.
+        _ibkr_opt_total = sum(v.get("market_value", 0) or 0 for v in ibkr.values()
+                              if v.get("asset_class") == "OPT")
+
         # Merge into ibkr dict
         schwab_stk_added = 0; schwab_opt_added = 0
         for ticker, pos in schwab_positions.items():
@@ -5333,11 +5352,31 @@ def run_scanner():
         print(f"   Schwab merge: {schwab_stk_added} new stocks, {schwab_opt_added} options added")
 
     # ── Calculate real portfolio size from live account data ──
+    # A48/EX-35: `schwab_total` is Schwab NET LIQUIDATION, which already contains
+    # every Schwab stock. Summing asset_class=="STK" across `ibkr` AFTER the merge
+    # therefore counted all Schwab stock a SECOND time — ~$5.67M double-counted on
+    # 2026-08-19, inflating PORTFOLIO_SIZE to $19.64M against a true ~$18.20M
+    # (Schwab $6.37M + IBKR net liq $11.82M). Every exposure_pct read ~8% low as a
+    # result, which is the whole of C18 ("positions sum to 91.4% of net liq").
+    # John's own account values exposed it: the scanner implied Schwab ~$12M when
+    # IRA + CRT are $2.84M + $3.25M.
+    # Use the pre-merge snapshot so only genuine IBKR stock is added here.
     schwab_total = sum(a.get("net_liquidation", 0) for a in schwab_accounts)
-    ibkr_total   = sum(v.get("market_value", 0) for v in ibkr.values()
-                       if v.get("asset_class") == "STK")
-    _ibkr_stk_count = sum(1 for v in ibkr.values() if v.get("asset_class") == "STK")
-    print(f"   Portfolio calc: Schwab NLV=${schwab_total:,.0f} | IBKR STK count={_ibkr_stk_count} total MV=${ibkr_total:,.0f}")
+    if _ibkr_stk_total is None:
+        # No Schwab positions merged — `ibkr` is still IBKR-only, so sum directly.
+        _ibkr_stk_total = sum(v.get("market_value", 0) or 0 for v in ibkr.values()
+                              if v.get("asset_class") == "STK")
+    if _ibkr_opt_total is None:
+        _ibkr_opt_total = sum(v.get("market_value", 0) or 0 for v in ibkr.values()
+                              if v.get("asset_class") == "OPT")
+    ibkr_total   = _ibkr_stk_total + _ibkr_opt_total
+    _post_merge_stk = sum(v.get("market_value", 0) or 0 for v in ibkr.values()
+                          if v.get("asset_class") == "STK")
+    print(f"   Portfolio calc: Schwab NLV=${schwab_total:,.0f} | "
+          f"IBKR stock=${_ibkr_stk_total:,.0f} + IBKR options=${_ibkr_opt_total:,.0f} "
+          f"= ${ibkr_total:,.0f}")
+    print(f"     (Schwab stock excluded to avoid double-count: "
+          f"${_post_merge_stk - _ibkr_stk_total:,.0f}; IBKR cash still not in Flex — see A48)")
     live_total   = schwab_total + ibkr_total
     if live_total >= 100_000:  # sanity check — must be at least $100k to trust
         PORTFOLIO_SIZE = round(live_total, -3)  # round to nearest $1000

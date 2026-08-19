@@ -449,6 +449,18 @@ it reads `results.json`.
   button to be removed. No target literal exists in `index.html` any more — keep
   it that way; a new consumer reads `data.symbol_settings` from `results.json`.
 
+- **The Schwab merge folds Schwab positions INTO the `ibkr` dict — never
+  aggregate that dict after the merge and call the result IBKR (A48/EX-35).**
+  `PORTFOLIO_SIZE` did exactly that: `schwab_NLV + sum(STK across ibkr)`, where
+  `schwab_NLV` already contained every Schwab share, so all of it was counted
+  twice (~$5.67M on 2026-08-19) while IBKR's $4.08M of options was counted not at
+  all. Net +$1.45M, and it *is* C18 — positions summed to 90.3% of the inflated
+  total. Fixed by snapshotting `_ibkr_stk_total` / `_ibkr_opt_total` immediately
+  BEFORE the merge; after it runs, `source` cannot separate the two because the
+  merge ADDS Schwab market value into an existing IBKR row for any ticker held at
+  both brokers. **Two offsetting errors: fixing one alone made the total worse**
+  (−23.2% vs +7.9%) — always measure the combined result. Residual −0.8% is IBKR
+  cash, unavailable until `EquitySummaryInBase` is added to Flex query 1434153.
 - **A broker feed can fail SILENTLY and the page will still assert a number.**
   `schwab_get_accounts()` returns `[]` on failure rather than raising, and the
   2026-08-17 06:43 scan published a Positions tab in which every Schwab-held

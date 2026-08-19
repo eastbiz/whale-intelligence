@@ -902,6 +902,32 @@ tightest. LEAPS now uses the same 5% band as CSP (`LEAPS_NEAR_PCT`), applied as
 
 ## Trade Examples (raw log)
 
+### EX-35 — PORTFOLIO_SIZE double-counted every Schwab stock (2026-08-19)
+- Claude, reasoning about position sizing, inferred "Schwab ≈ $12.0M" by
+  subtracting the IBKR stock total from `PORTFOLIO_SIZE`. John: *"Are you sure:
+  IRA value $2,838,162.19, CRT value 3,252,789.61 as of today"* — i.e. roughly
+  $6.4M with Personal, about half the inferred figure.
+- The inference was wrong because the total it was derived from was wrong. The
+  Schwab merge folds Schwab stock rows INTO the `ibkr` dict, then
+  `PORTFOLIO_SIZE = schwab_NLV + sum(STK across ibkr)` — and `schwab_NLV`
+  already contains all Schwab stock. Every Schwab share was counted twice
+  (~$5.67M). Separately, IBKR's $4.08M of options was never counted at all.
+- The two errors partly cancelled: +$5.67M − $4.08M − $0.14M cash = **+$1.45M**,
+  so `PORTFOLIO_SIZE` read $19,644,000 against a true ~$18,197,046 (Schwab
+  $6.37M + IBKR net liq $11.82M). Confirmed two independent ways — by the
+  arithmetic above, and by simulating the merge, which reproduced $19,643,000.
+- **This is C18.** Position rows ($13.02M) + `leaps_mv` ($4.71M) = $17.73M
+  against the inflated $19.64M = 90.3%, i.e. the "positions sum to only 91.4% of
+  net liquidation" mystery was the denominator all along, not the positions.
+- Lesson beyond the bug: fixing the double-count ALONE would have made the total
+  worse — $13.97M, −23.2% error, versus +7.9% before. When two errors offset,
+  measure the combined result before shipping either half.
+- Unresolved: the scanner's per-account rows read ~$205k HIGH for both IRA and
+  CRT against John's actual values. Same gap on two accounts is a pattern, not
+  noise; not explained, and it needs the Schwab feed to chase. Do not assume the
+  A48 fix addressed it — it did not.
+- Fixed as A48.
+
 ### EX-34 — "30% above buy doesn't seem like near target" (2026-08-19)
 - John, filtering LEAPS by AT/NEAR TARGET, saw `SPCX — Near target · 30.1%
   above buy` and challenged it: *"I can always unselect and see all, but the
@@ -2116,6 +2142,23 @@ adding two tickers. Four separate defects, in rough priority order:
      literal survives outside `whale_scanner.py`.
   Built 2026-08-17.
 
+- **A48 — PORTFOLIO_SIZE: stop double-counting Schwab stock, start counting IBKR
+  options (EX-35, C18).** `_ibkr_stk_total` / `_ibkr_opt_total` are snapshotted
+  from the `ibkr` dict immediately BEFORE the Schwab merge — the only exact split,
+  since the merge adds Schwab market value into existing rows and `source` can no
+  longer separate them afterwards. `PORTFOLIO_SIZE` is now
+  `schwab_NLV + IBKR stock + IBKR options` (shorts net automatically via their
+  negative market_value). Measured against the 2026-08-19 book: $19,644,000 →
+  $18,052,542 against a true $18,197,046 — **error +7.9% → −0.8%**. The residual
+  is IBKR cash ($144,504), which the current Flex query cannot return: query
+  1434153 yields only `<OpenPositions>` and `<OptionEAE>`, no `EquitySummary`.
+  Adding `EquitySummaryInBase` to it in IBKR's web UI would close the last 0.8%
+  and give real NLV on both sides. Built 2026-08-19.
+  **Consequence to expect:** every `exposure_pct` rises ~8% at the next scan, so
+  more names read On Target / Overweight than before. That is the correction, not
+  a regression. C19's rebase onto invested capital (SGOV excluded as dry powder,
+  John 2026-08-19) is still pending his call on `TICKER_TARGETS`, which sums to
+  106% and must sum to 100% on an invested base.
 - **A47 — LEAPS target zone cut to the 5% CSP band (P39/EX-34).** `LEAPS_NEAR_PCT`
   = 0.05, and the LEAPS branch of `compute_in_zone` now uses
   `min(buy_under × 1.05, buy_under × (1+g)**years)` — the tighter of the flat
