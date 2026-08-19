@@ -1,13 +1,16 @@
 {
   "date": "2026-08-19",
   "alerted": {
-    "CLS:down": 5
+    "CLS:down": 5,
+    "IBIT:up": 5,
+    "MELI:up": 5
   },
   "scan_triggered": {
     "NBIS:down": true,
-    "MSTR:up": true
+    "MSTR:up": true,
+    "MELI:up": true
   },
-  "scan_trigger_count": 2,
+  "scan_trigger_count": 3,
   "dispatched": {
     "13:32": true
   }
