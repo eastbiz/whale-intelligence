@@ -533,7 +533,7 @@ SYMBOL_SETTINGS = {
     "MSFT": {"buy_under":  345, "sell_above":  550, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "NFLX": {"buy_under":    40, "sell_above":   90, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.32, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "NOW":  {"buy_under":   90, "sell_above":  150, "csp_delta_min": 0.20, "csp_delta_max": 0.25, "cc_delta_min": 0.20, "cc_delta_max": 0.25, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    "NVDA": {"buy_under":  180, "sell_above":  240, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "NVDA": {"buy_under":  180, "sell_above":  235, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.28, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     "TSM":  {"buy_under":  320, "sell_above":  450, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
     # ── TRADING ─────────────────────────────────────────────────────────
     # Willing to hold long term, but more valuation/cycle/execution risk
@@ -569,7 +569,7 @@ SYMBOL_SETTINGS = {
     # ── VERY_SPECULATIVE ────────────────────────────────────────────────
     # Small opportunistic positions — never average down on price alone
     "MSTR": {"buy_under":    50, "sell_above":  200, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
-    "NBIS": {"buy_under":  150, "sell_above":  280, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
+    "NBIS": {"buy_under":  150, "sell_above":  275, "csp_delta_min": 0.20, "csp_delta_max": 0.30, "cc_delta_min": 0.20, "cc_delta_max": 0.30, "leaps_delta_min": 0.75, "leaps_delta_max": 0.99},
 }
 
 # ── CLASSIFICATION — the single source of truth for conviction tier ──────────
