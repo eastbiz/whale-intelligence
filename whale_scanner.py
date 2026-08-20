@@ -2885,12 +2885,11 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
                  f"({profit_pct}% profit captured, {dte} DTE remaining)")
 
     # ── HOLD ───────────────────────────────────────────────────────────
-    if pos_type == "CSP":
-        return R("HOLD", f"{profit_pct}% profit, DTE {dte}, breakeven ${breakeven:.2f} "
-                         f"({dist_to_breakeven}% cushion)." + odds_txt)
-    else:
-        return R("HOLD", f"{profit_pct}% profit, DTE {dte}, "
-                         f"{dist_to_strike}% below call strike ${strike:.2f}." + odds_txt)
+    # Assignment odds ONLY (John, 2026-08-20): profit, DTE, breakeven/cushion
+    # and strike distance all have their own dashboard columns — restating
+    # them here made the table slow to read. Full prose stays on non-HOLD
+    # actions above, where there is a decision to make.
+    return R("HOLD", odds_txt.strip() if odds_txt else "Assignment odds unavailable.")
 
 
 def long_call_management_engine(pos: dict, mkt: dict) -> dict:
