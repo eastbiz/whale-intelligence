@@ -8172,7 +8172,12 @@ def run_scanner():
             continue
         if p["action"] not in ("TRIM", "STRONG SELL"):
             continue
-        _tgk = f"{p['ticker']}|LEAPS_CALL|{p['strike']:g}|{p['expiry']}"
+        # Tier is part of the dedup key: a TRIM that escalates to STRONG SELL
+        # the same day is a NEW decision and must ping again (found live on
+        # 2026-08-21 — PATH's 12:17 STRONG SELL was silenced because the
+        # morning's pre-A53 alert had consumed the tier-less key). Max two
+        # pings per position per day, one per tier.
+        _tgk = f"{p['ticker']}|LEAPS_CALL|{p['strike']:g}|{p['expiry']}|{p['action']}"
         if _tgk in _tg_alert_log:
             continue
         _tg_leaps_sell.append((_tgk, p))
