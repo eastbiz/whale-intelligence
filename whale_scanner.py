@@ -420,6 +420,32 @@ LONG_CALL_DTE_WARN    = 60    # held long call (any DTE) — warn to decide clos
 # formula. This constant gated that alert to deep-ITM calls (A29) and is
 # currently read by nothing; kept for when the formula arrives.
 LONG_CALL_ITM_MAX_STRIKE_PCT = 0.90   # strike <= 90% of spot = genuinely ITM
+
+# ── LEAPS sell formula (A53, John's spec 2026-08-21 — see P41) ──────────
+# Signal is PRICE vs sell_above + ATR bands ONLY (John: "clearly only based
+# on Sell above targets" — position sizing NEVER enters this signal):
+#   price <  sell_above            → HOLD
+#   price >= sell_above            → SELL REVIEW   (dashboard-only)
+#   price >= sell_above + 1×ATR14  → TRIM          (Telegram)
+#   price >= sell_above + 2×ATR14  → STRONG SELL   (Telegram)
+# ATR14 = simple mean of the last 14 daily true ranges (get_market_data).
+# If ATR is unavailable the tier is capped at SELL REVIEW — never escalate
+# on missing data. DTE is urgency CONTEXT only, it never changes the tier.
+LEAPS_DTE_LONG    = 540   # > this: long runway — prefer trim over full exit
+LEAPS_DTE_RAISE   = 365   # < this: raised sell priority (context line)
+LEAPS_DTE_URGENT  = 270   # < this: strong urgency (context line)
+# Tax layer: LTCG_DATE = lot open date + 1 calendar year + 1 day. Only
+# computed when UnrealizedGain > 0 AND the account is taxable — IRA/CRT
+# never see tax notes. Lot dates come from IBKR Flex `openDateTime`
+# (add the field to Flex query 1434153; parser picks it up automatically)
+# or the manual override below. STRONG SELL overrides any tax hold.
+LTCG_ALERT_DAYS       = 60    # ≤ this: "STCG — LTCG in XXd"
+LTCG_HOLD_DAYS        = 30    # ≤ this: prefer waiting unless STRONG SELL
+TAX_DEFERRED_ACCOUNTS = {"IRA", "CRT"}   # no cap-gains tax → skip tax logic
+LEAPS_PURCHASE_DATES  = {
+    # Manual escape hatch until Flex openDateTime lands, format:
+    # "TICKER STRIKE EXPIRY": "YYYY-MM-DD"   e.g. "PATH 8 20280121": "2026-03-14",
+}
 # CSP: default delta 0.25-0.30, up to 0.35 only when IVP > 50
 CSP_DELTA_MIN         = 0.25; CSP_DELTA_MAX   = 0.35  # target 0.25-0.30, hard max 0.35
 CSP_DELTA_MAX_HIGH_IV = 0.35  # allowed when IVP > 50
@@ -1371,8 +1397,29 @@ def get_market_data(tickers: list) -> dict:
             )
             j    = r.json()["chart"]["result"][0]
             meta = j["meta"]
-            closes = j.get("indicators",{}).get("quote",[{}])[0].get("close",[])
+            _quote = j.get("indicators",{}).get("quote",[{}])[0]
+            closes = _quote.get("close",[])
             closes = [c for c in closes if c]
+
+            # ATR(14) for the LEAPS sell bands (A53) — the same payload already
+            # carries highs/lows; simple mean of the last 14 true ranges.
+            # Bars with a missing high/low fall back to |close-to-close| so one
+            # null day can't zero the whole ATR.
+            _highs, _lows = _quote.get("high",[]), _quote.get("low",[])
+            _craw = _quote.get("close",[])
+            _trs, _prev_c = [], None
+            for _i in range(len(_craw)):
+                _c = _craw[_i]
+                if _c is None: continue
+                _h = _highs[_i] if _i < len(_highs) else None
+                _l = _lows[_i]  if _i < len(_lows)  else None
+                if _prev_c is not None:
+                    if _h is not None and _l is not None:
+                        _trs.append(max(_h-_l, abs(_h-_prev_c), abs(_l-_prev_c)))
+                    else:
+                        _trs.append(abs(_c-_prev_c))
+                _prev_c = _c
+            atr14 = round(sum(_trs[-14:]) / 14, 4) if len(_trs) >= 14 else 0.0
 
             closes_clean = [c for c in closes if c is not None]
             ma200 = sum(closes_clean[-200:]) / min(200, len(closes_clean)) if closes_clean else 0
@@ -1408,6 +1455,7 @@ def get_market_data(tickers: list) -> dict:
                 "avg_volume":     int(meta.get("averageDailyVolume3Month", 0)),
                 "ma200":          round(ma200, 2),
                 "ma50":           round(ma50, 2),
+                "atr14":          atr14,
                 "above_ma200":    price >= ma200 * 0.97,
                 "pct_above_ma50": (price - ma50) / ma50 if ma50 > 0 else 0,
                 "day_change_pct": round(day_change_pct, 4),
@@ -1559,7 +1607,16 @@ def _parse_ibkr_xml(root: "ET.Element") -> dict:
         underlying = pos.get("underlyingSymbol", sym).strip().replace("BRK B","BRK-B")
         # Infer side from signed position qty (Flex XML has no side attribute)
         _ibkr_side = "Short" if qty < 0 else "Long"
-        positions[sym] = {
+        # A53: lot open date for the LTCG countdown. Present once the Flex
+        # query's Open Positions section is set to LOT level (or the
+        # openDateTime field is added); "YYYYMMDD;HHMMSS" → "YYYY-MM-DD".
+        _od_raw = (pos.get("openDateTime", "") or pos.get("holdingPeriodDateTime", "") or "").strip()
+        _od = ""
+        if len(_od_raw) >= 8:
+            _d8 = _od_raw[:10].replace("-", "")[:8]
+            if _d8.isdigit():
+                _od = f"{_d8[:4]}-{_d8[4:6]}-{_d8[6:8]}"
+        row = {
             "market_value":   float(pos.get("positionValue",    0) or 0),
             "quantity":       qty,
             "avg_cost":       float(pos.get("costBasisPrice",   0) or 0),
@@ -1575,7 +1632,28 @@ def _parse_ibkr_xml(root: "ET.Element") -> dict:
             "account_type":   "IBKR",
             "side":           _ibkr_side,
             "source":         "ibkr",
+            "open_date":      _od,
         }
+        if sym in positions:
+            # Lot-level Flex data repeats the symbol once per LOT. The old code
+            # overwrote (last lot won — wrong qty, wrong cost); aggregate
+            # instead. With summary-level data this branch never runs.
+            prev = positions[sym]
+            _q_tot = prev["quantity"] + qty
+            if abs(_q_tot) > 1e-9:
+                prev["avg_cost"] = ((prev["avg_cost"] * prev["quantity"]
+                                     + row["avg_cost"] * qty) / _q_tot)
+            prev["quantity"]        = _q_tot
+            prev["market_value"]   += row["market_value"]
+            prev["unrealized_pnl"] += row["unrealized_pnl"]
+            prev["pct_nav"]        += row["pct_nav"]
+            prev["side"]            = "Short" if prev["quantity"] < 0 else "Long"
+            # NEWEST lot date wins: "LTCG eligible" is only claimed once every
+            # lot qualifies (a mixed position gets the conservative countdown).
+            if _od and (_od > (prev.get("open_date") or "")):
+                prev["open_date"] = _od
+        else:
+            positions[sym] = row
     stk  = sum(1 for v in positions.values() if v["asset_class"]=="STK")
     lopt = sum(1 for v in positions.values() if v["asset_class"]=="OPT" and v.get("side")=="Long")
     sopt = sum(1 for v in positions.values() if v["asset_class"]=="OPT" and v.get("side")=="Short")
@@ -1808,9 +1886,13 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
             _leaps_acct = pos.get("account_type", "") or ("IBKR" if source == "ibkr" else source)
             # Key by (ticker, strike, expiry, account) — preserves per-account rows
             _lkey = (underlying, _strike_f, str(expiry), _leaps_acct)
+            _pos_od = pos.get("open_date", "") or ""
             if _lkey in leaps_accum:
                 leaps_accum[_lkey]["contracts"]    += int(qty)
                 leaps_accum[_lkey]["market_value"] += round(_leaps_mv, 0)
+                # Newest lot date wins (conservative LTCG — see _parse_ibkr_xml)
+                if _pos_od and _pos_od > (leaps_accum[_lkey].get("open_date") or ""):
+                    leaps_accum[_lkey]["open_date"] = _pos_od
             else:
                 leaps_accum[_lkey] = {
                     "ticker":       underlying,
@@ -1824,6 +1906,7 @@ def compute_portfolio_exposure(ibkr: dict, portfolio_size: float) -> dict:
                     "market_value": round(_leaps_mv, 0),
                     "source":       source,
                     "account":      _leaps_acct,
+                    "open_date":    _pos_od,
                     "is_leaps":     _dte >= 400,
                     "near_expiry":  _dte <= LONG_CALL_DTE_WARN,
                 }
@@ -2892,21 +2975,66 @@ def position_management_engine(pos: dict, mkt: dict, portfolio_value: float,
     return R("HOLD", odds_txt.strip() if odds_txt else "Assignment odds unavailable.")
 
 
+def _leaps_ltcg_status(pos: dict, profit_pct: float, action: str) -> tuple:
+    """
+    Tax layer of the LEAPS sell formula (A53).
+    Returns (days_to_ltcg or None, tax_note str).
+    Only computed when the position shows a GAIN and sits in a taxable
+    account — IRA/CRT never produce a tax note. Lot open date comes from
+    IBKR Flex `openDateTime` (via the position feed) or the manual
+    LEAPS_PURCHASE_DATES override; with neither, status is honestly unknown.
+    """
+    account = str(pos.get("account", "") or "")
+    if account in TAX_DEFERRED_ACCOUNTS:
+        return None, ""
+    if profit_pct <= 0:
+        return None, ""
+    open_raw = pos.get("open_date", "") or LEAPS_PURCHASE_DATES.get(
+        f"{pos.get('ticker','')} {pos.get('strike',0):g} {str(pos.get('expiry','')).strip()}", "")
+    if not open_raw:
+        # Only worth saying on an active sell signal — a HOLD doesn't care.
+        if action in ("SELL REVIEW", "TRIM", "STRONG SELL"):
+            return None, "tax status unknown (no lot date — add openDateTime to Flex query)"
+        return None, ""
+    try:
+        od = datetime.strptime(str(open_raw)[:10].replace("/", "-"), "%Y-%m-%d")
+    except Exception:
+        return None, ""
+    # LTCG_DATE = purchase + 1 calendar year + 1 day (Feb 29 → Mar 1)
+    try:
+        ltcg = od.replace(year=od.year + 1) + timedelta(days=1)
+    except ValueError:
+        ltcg = od.replace(year=od.year + 1, month=3, day=1)
+    days = (ltcg.date() - datetime.now().date()).days
+    if days <= 0:
+        return days, "LTCG eligible"
+    if days <= LTCG_HOLD_DAYS:
+        note = f"⚠ STCG — LTCG in {days}d — prefer waiting"
+        note += " (STRONG SELL overrides the tax hold)" if action == "STRONG SELL" else " unless STRONG SELL"
+        return days, note
+    if days <= LTCG_ALERT_DAYS:
+        return days, f"⚠ STCG — LTCG in {days}d"
+    return days, ""
+
+
 def long_call_management_engine(pos: dict, mkt: dict) -> dict:
     """
     Exit-management for HELD long calls — LEAPS and any shorter-dated
     stock-replacement call that has aged under the 400-DTE LEAPS line.
     Distinct from position_management_engine, which only covers short
     CSP/CC premium-selling positions; this covers calls YOU OWN.
-    Actions, priority order:
-      1. SELL TARGET HIT   — underlying >= the ticker's sell_above (SYMBOL_SETTINGS)
-      2. NEAR 52W HIGH     — underlying within NEAR_HIGH_SKIP (8%) of week52_high.
-                              Proxy for all-time-high — true ATH isn't tracked
-                              (would need full price history, not just a 52w window).
-      3. DECIDE: EXPIRING SOON — DTE <= LONG_CALL_DTE_WARN, no sell signal yet
-      4. HOLD              — none of the above
-    Reason line stacks whichever flags apply (mirrors the BIG MOVE convention
-    for short positions — confluence in one message, not a priority pick).
+
+    A53 — John's sell formula (2026-08-21), price vs sell_above + ATR ONLY
+    (never position sizing):
+      price <  sell_above           → HOLD
+      price >= sell_above           → SELL REVIEW
+      price >= sell_above + 1×ATR14 → TRIM
+      price >= sell_above + 2×ATR14 → STRONG SELL
+      ATR unavailable → capped at SELL REVIEW (never escalate on missing data)
+      no sell signal and DTE <= LONG_CALL_DTE_WARN → DECIDE: EXPIRING SOON
+    DTE is urgency CONTEXT in the reason line, never a tier change.
+    Tax notes via _leaps_ltcg_status (taxable accounts with a gain only).
+    "Near 52w high" is a context flag, no longer an action of its own.
     """
     ticker       = pos.get("ticker", "")
     strike       = pos.get("strike", 0)
@@ -2917,6 +3045,7 @@ def long_call_management_engine(pos: dict, mkt: dict) -> dict:
     md           = mkt.get(ticker, {})
     underlying   = md.get("price", 0)
     week52_high  = md.get("week52_high", 0)
+    atr14        = float(md.get("atr14", 0) or 0)
 
     sell_above = SYMBOL_SETTINGS.get(ticker, {}).get("sell_above", 0)
 
@@ -2934,24 +3063,45 @@ def long_call_management_engine(pos: dict, mkt: dict) -> dict:
     at_sell_target = sell_above > 0 and underlying >= sell_above
     near_52w_high  = week52_high > 0 and underlying >= week52_high * (1 - NEAR_HIGH_SKIP)
     expiring_soon  = dte <= LONG_CALL_DTE_WARN
+    band_trim   = round(sell_above + atr14,     2) if sell_above > 0 and atr14 > 0 else None
+    band_strong = round(sell_above + 2 * atr14, 2) if sell_above > 0 and atr14 > 0 else None
+
+    # ── Tier: price vs sell_above + ATR bands, nothing else ──
+    if at_sell_target:
+        if band_strong and underlying >= band_strong:
+            action, sort_priority = "STRONG SELL", 0
+        elif band_trim and underlying >= band_trim:
+            action, sort_priority = "TRIM", 0
+        else:
+            action, sort_priority = "SELL REVIEW", 1
+    elif expiring_soon:
+        action, sort_priority = "DECIDE: EXPIRING SOON", 2
+    else:
+        action, sort_priority = "HOLD", 3
 
     flags = []
     if at_sell_target:
-        flags.append(f"at/above sell target ${sell_above:g}")
+        if band_trim and band_strong:
+            flags.append(f"above sell target ${sell_above:g} "
+                         f"(TRIM ≥ ${band_trim:g}, STRONG SELL ≥ ${band_strong:g}, ATR ${atr14:.2f})")
+        else:
+            flags.append(f"at/above sell target ${sell_above:g} (ATR unavailable — bands unknown)")
     if near_52w_high:
         flags.append(f"within {NEAR_HIGH_SKIP*100:.0f}% of 52-week high (${week52_high:.2f})")
     if expiring_soon:
         flags.append(f"{dte}d to expiration — decide close vs. roll")
+    # DTE urgency context (never changes the tier)
+    if action in ("SELL REVIEW", "TRIM", "STRONG SELL"):
+        if dte > LEAPS_DTE_LONG:
+            flags.append(f"{dte}d left — long runway, prefer trim over full exit if still bullish")
+        elif dte < LEAPS_DTE_URGENT:
+            flags.append(f"only {dte}d left — decide with urgency")
+        elif dte < LEAPS_DTE_RAISE:
+            flags.append(f"{dte}d left (under 1 year) — raised sell priority")
 
-    if at_sell_target or near_52w_high:
-        action        = "SELL TARGET HIT" if at_sell_target else "NEAR 52W HIGH"
-        sort_priority  = 0
-    elif expiring_soon:
-        action        = "DECIDE: EXPIRING SOON"
-        sort_priority  = 1
-    else:
-        action        = "HOLD"
-        sort_priority  = 3
+    days_to_ltcg, tax_note = _leaps_ltcg_status(pos, profit_pct, action)
+    if tax_note:
+        flags.append(tax_note)
 
     reason = (f"{ticker} ${underlying:.2f} — " + "; ".join(flags)) if flags else (
         f"{ticker} ${underlying:.2f}, {dte}d to expiry"
@@ -2969,6 +3119,11 @@ def long_call_management_engine(pos: dict, mkt: dict) -> dict:
         "breakeven":      breakeven,
         "dist_to_be_pct": dist_to_be_pct,
         "sell_above":     sell_above,
+        "atr14":          atr14,
+        "band_trim":      band_trim,
+        "band_strong":    band_strong,
+        "days_to_ltcg":   days_to_ltcg,
+        "tax_note":       tax_note,
         "near_52w_high":  near_52w_high,
         "at_sell_target": at_sell_target,
         "expiring_soon":  expiring_soon,
@@ -7906,6 +8061,12 @@ def run_scanner():
             "breakeven":      _result["breakeven"],
             "dist_to_be_pct": _result["dist_to_be_pct"],
             "sell_above":     _result["sell_above"],
+            "atr14":          _result["atr14"],
+            "band_trim":      _result["band_trim"],
+            "band_strong":    _result["band_strong"],
+            "days_to_ltcg":   _result["days_to_ltcg"],
+            "tax_note":       _result["tax_note"],
+            "open_date":      _pos.get("open_date", ""),
             "week52_high":    _result["week52_high"],
             "near_52w_high":  _result["near_52w_high"],
             "at_sell_target": _result["at_sell_target"],
@@ -7967,18 +8128,58 @@ def run_scanner():
     else:
         print(f"   🚨 No BIG MOVE reviews this scan")
 
-    # ── HELD LONG CALL — dashboard-only, NO Telegram (P41/EX-37) ─────────
-    # There used to be a Telegram alert here for deep-ITM LEAPS whose
-    # underlying crossed sell_above (A29, reworded A50). John removed it
-    # 2026-08-21: LEAPS are long-term holds, and "stock crossed sell_above"
-    # is NOT his sell signal for a LEAP — the right exit formula for long
-    # calls is different and not yet defined. Until he defines one, NO
-    # position alert on a LEAPS_CALL reaches Telegram, for any action
-    # (SELL TARGET HIT / NEAR 52W HIGH / EXPIRING included). The engine
-    # still computes those actions and the dashboard still shows them.
-    # Do not re-add a Telegram path here without a formula from John —
-    # this is the same lesson as P16 (EX-24: 10 LEAPS trim pushes).
-    print(f"   📞 Held long-call actions are dashboard-only (P41) — no Telegram")
+    # ── LEAPS SELL SIGNAL → Telegram (A53, John's formula 2026-08-21) ────
+    # P41 history: the old sell_above-crossing push was removed (A51) because
+    # a bare crossing is not John's LEAPS exit signal. He then supplied the
+    # formula this block implements: Telegram ONLY on TRIM (≥ sell_above +
+    # 1×ATR14) and STRONG SELL (≥ +2×ATR14). SELL REVIEW (bare crossing) and
+    # everything else stay dashboard-only — pinging REVIEW would resurrect
+    # exactly the alert A51 removed. Signal is price-vs-target ONLY; position
+    # sizing never enters it (John, explicit). Once per position per day,
+    # grouped per ticker, same dedup log as BIG MOVE.
+    _tg_leaps_sell = []
+    for p in _pos_actions:
+        if p["type"] != "LEAPS_CALL":
+            continue
+        if p["action"] not in ("TRIM", "STRONG SELL"):
+            continue
+        _tgk = f"{p['ticker']}|LEAPS_CALL|{p['strike']:g}|{p['expiry']}"
+        if _tgk in _tg_alert_log:
+            continue
+        _tg_leaps_sell.append((_tgk, p))
+    if _tg_leaps_sell:
+        _by_tkr = {}
+        for _tgk, p in _tg_leaps_sell:
+            _by_tkr.setdefault(p["ticker"], []).append((_tgk, p))
+        print(f"   📱 Sending {len(_by_tkr)} LEAPS sell signal(s) "
+              f"({len(_tg_leaps_sell)} contracts grouped)...")
+        send_telegram("━━━ *📈 LEAPS SELL SIGNAL — CALLS YOU OWN* ━━━"); time.sleep(1)
+        for _tkr, _rows in _by_tkr.items():
+            # Headline tier = strongest in the group; per-contract tier shown
+            # on each line only when it differs.
+            _top = "STRONG SELL" if any(p["action"] == "STRONG SELL" for _, p in _rows) else "TRIM"
+            _p0 = _rows[0][1]
+            _bt, _bs = _p0.get("band_trim"), _p0.get("band_strong")
+            _lines = [f"📈 *{_tkr} — {_top} — LEAPS calls you OWN*",
+                      f"  {_tkr} ${_p0['underlying']:.2f} vs sell target ${_p0['sell_above']:g} "
+                      + (f"(TRIM ≥ ${_bt:g}, STRONG SELL ≥ ${_bs:g})" if _bt and _bs else "")]
+            for _tgk, p in _rows:
+                _tg_alert_log[_tgk] = _today_str
+                _pl = (f"{p['profit_pct']:.0f}% gain" if p['profit_pct'] >= 0
+                       else f"{abs(p['profit_pct']):.0f}% loss")
+                _tier_tag = f" — {p['action']}" if p["action"] != _top else ""
+                _line = (f"  • ${p['strike']:g} call ({p.get('account','?')}) — "
+                         f"cost ${p['avg_cost']:.2f} → ~${p['mark']:.2f} ({_pl}), "
+                         f"{p['dte']}d left{_tier_tag}")
+                if p.get("tax_note"):
+                    _line += f"\n    {p['tax_note']}"
+                _lines.append(_line)
+            if any(p["dte"] > LEAPS_DTE_LONG for _tgk, p in _rows):
+                _lines.append(f"  Long runway — prefer trim over full exit if still bullish")
+            _lines.append(f"_Scanned {now_pt().strftime('%b %d %H:%M')} PT_")
+            send_telegram("\n".join(_lines)); time.sleep(2)
+    else:
+        print(f"   📈 No LEAPS sell signals at TRIM/STRONG SELL this scan")
 
     results = {
         "scan_time":           now_pt().strftime(SCAN_TS_FMT),

@@ -256,13 +256,19 @@ independently.**
 
 ## Position exit alerts (recent, important)
 
-**LEAPS_CALL positions NEVER alert on Telegram (P41, John 2026-08-21).** The
-held-long-call engine still computes SELL TARGET HIT / NEAR 52W HIGH /
-EXPIRING for the dashboard, but no LEAPS_CALL action may reach Telegram:
-sell_above is John's share/CC target, NOT his LEAPS exit signal — his
-long-call sell formula is different and not yet defined. The A29/A50 Telegram
-push was removed by A51. Do not re-add one without a formula designed with
-John (same lesson as P16/EX-24).
+**LEAPS_CALL sell signals follow John's A53 formula (P41, 2026-08-21).**
+`long_call_management_engine` tiers on price vs `sell_above` + ATR(14) bands
+ONLY — position sizing NEVER enters the signal (John, explicit):
+HOLD below target → SELL REVIEW at/above → TRIM at +1×ATR14 → STRONG SELL at
++2×ATR14; ATR missing caps the tier at SELL REVIEW. **Telegram gets TRIM and
+STRONG SELL only** — pinging the bare sell_above crossing is exactly the
+alert A51 removed (EX-36/EX-37); SELL REVIEW is dashboard-only. DTE is
+urgency context in the reason line, never a tier change. Tax layer: LTCG
+countdown (lot open date + 1 year + 1 day) only for gains in taxable
+accounts — `TAX_DEFERRED_ACCOUNTS` (IRA/CRT) never get tax notes; STRONG
+SELL overrides a tax hold. Lot dates come from Flex `openDateTime` (John to
+add it to query 1434153; `_parse_ibkr_xml` aggregates lot-level rows) or
+`LEAPS_PURCHASE_DATES`. Don't tighten/loosen bands without replaying (P34).
 
 The engine below covers SHORT options (CSP/CC) and returns ONE action per
 position, priority order:

@@ -946,7 +946,20 @@ Rules that follow, all of which must survive future edits:
 - If John later supplies a long-call sell formula, it gets designed with him
   first (real examples, expected outputs), then built — not derived from
   sell_above.
-- System status: **Actioned — A51.**
+- **UPDATE (same day, 2026-08-21): John supplied the formula — built as A53.**
+  sell_above is now the BASE of a band system, not the trigger itself:
+  crossing it alone is SELL REVIEW (dashboard-only, still no ping — pinging
+  the bare crossing would resurrect the alert A51 removed); Telegram fires
+  only at sell_above + 1×ATR14 (TRIM) and + 2×ATR14 (STRONG SELL). John's
+  explicit constraint: the signal is price-vs-target ONLY — position sizing
+  never enters it. DTE is urgency context, never a tier change. Tax layer
+  (LTCG countdown) applies only in taxable accounts with a gain, and a
+  STRONG SELL overrides any tax hold. Design was confirmed with John
+  question-by-question (Telegram tiers, ATR(14), DTE role, Flex openDateTime
+  as the lot-date source) and validated on the live 2026-08-21 book:
+  PATH $8C → STRONG SELL ($15.92 ≥ $14 + 2×$0.90), IBIT ×3 → SELL REVIEW
+  ($43.72, TRIM band starts $44.07) — exactly one Telegram message that day.
+- System status: **Actioned — A51, then A53.**
 
 ## Trade Examples (raw log)
 
@@ -2247,6 +2260,32 @@ adding two tickers. Four separate defects, in rough priority order:
      PLTR 115 vs 85) is now gone rather than merely unread, and no target
      literal survives outside `whale_scanner.py`.
   Built 2026-08-17.
+
+- **A53 — LEAPS sell formula built to John's spec (P41 update, 2026-08-21).**
+  `long_call_management_engine` rewritten: HOLD below sell_above; SELL REVIEW
+  at/above it; TRIM at +1×ATR14; STRONG SELL at +2×ATR14. ATR(14) computed in
+  `get_market_data` from the Yahoo highs/lows the fetch already downloaded
+  (bars missing high/low fall back to |close−close|; <14 bars → ATR 0). ATR
+  unavailable → tier CAPPED at SELL REVIEW — never escalate on missing data.
+  DTE is context only: >540 "prefer trim over full exit", <365 "raised sell
+  priority", <270 "decide with urgency"; ≤60 keeps DECIDE: EXPIRING SOON when
+  no sell signal. NEAR 52W HIGH demoted from action to context flag.
+  **Tax layer** (`_leaps_ltcg_status`): LTCG date = lot open + 1 calendar
+  year + 1 day; computed only for a GAIN in a taxable account
+  (`TAX_DEFERRED_ACCOUNTS` = IRA/CRT are silent). ≤60d "STCG — LTCG in Xd";
+  ≤30d adds "prefer waiting unless STRONG SELL"; STRONG SELL notes it
+  overrides the hold. Lot dates: IBKR Flex `openDateTime` once John adds it
+  to query 1434153 (parser reads it and now AGGREGATES duplicate symbol rows
+  so lot-level Flex can't collapse positions — newest lot date wins,
+  conservative for "LTCG eligible"), or `LEAPS_PURCHASE_DATES` manual
+  override; with neither, sell-tier rows say "tax status unknown" instead of
+  silently skipping (missing data must be loud — same lesson as the earnings
+  calendar). **Telegram:** TRIM + STRONG SELL only, grouped per ticker, once
+  per position per day; new `results.json` fields on LEAPS_CALL rows:
+  `atr14`, `band_trim`, `band_strong`, `days_to_ltcg`, `tax_note`,
+  `open_date`. Dashboard LEAPS table badge colors updated (legacy names kept
+  for pre-A53 data). Engine validated on 6 real-position cases with expected
+  outputs (all pass). Built 2026-08-21.
 
 - **A52 — Spike CC rows get zone fields; message labels fixed (EX-38).**
   `SPIKE_CC` rows in `results.json` now carry `in_zone` / `zone_tier` /
