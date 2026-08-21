@@ -1,16 +1,13 @@
 {
-  "date": "2026-08-20",
+  "date": "2026-08-21",
   "alerted": {
     "IBIT:up": 5
   },
-  "dispatched": {
-    "13:32": true,
-    "16:41": true,
-    "18:47": true
-  },
   "scan_triggered": {
-    "IBIT:up": true,
-    "MSTR:up": true
+    "IBIT:up": true
   },
-  "scan_trigger_count": 2
+  "scan_trigger_count": 1,
+  "dispatched": {
+    "13:32": true
+  }
 }
