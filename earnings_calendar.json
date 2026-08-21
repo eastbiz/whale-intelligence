@@ -1,10 +1,10 @@
 {
-  "built": "2026-08-20",
+  "built": "2026-08-21",
   "tickers": {
     "A": {
       "date": "2026-08-26",
       "eps_forecast": 1.48,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Agilent Technologies, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -12,7 +12,7 @@
     "AACG": {
       "date": "2026-08-26",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "ATA Creativity Global",
       "source": "nasdaq",
       "time": ""
@@ -28,7 +28,7 @@
     "AAME": {
       "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Atlantic American Corporation",
       "source": "nasdaq",
       "time": ""
@@ -52,15 +52,15 @@
     "AAP": {
       "date": "2026-08-20",
       "eps_forecast": 0.81,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Advance Auto Parts Inc.",
       "source": "nasdaq",
-      "time": "bmo"
+      "time": ""
     },
     "AAPG": {
       "date": "2026-08-19",
       "eps_forecast": -0.44,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Ascentage Pharma Group International",
       "source": "nasdaq",
       "time": "bmo"
@@ -92,7 +92,7 @@
     "ABAT": {
       "date": "2026-09-17",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "American Battery Technology Company",
       "source": "nasdaq",
       "time": ""
@@ -116,7 +116,7 @@
     "ABM": {
       "date": "2026-09-04",
       "eps_forecast": 1.01,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "ABM Industries Incorporated",
       "source": "nasdaq",
       "time": ""
@@ -172,7 +172,7 @@
     "ABVX": {
       "date": "2026-09-14",
       "eps_forecast": -1.08,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Abivax SA",
       "source": "nasdaq",
       "time": ""
@@ -324,7 +324,7 @@
     "ACN": {
       "date": "2026-10-01",
       "eps_forecast": 3.19,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Accenture plc",
       "source": "nasdaq",
       "time": "bmo"
@@ -428,7 +428,7 @@
     "ADBE": {
       "date": "2026-09-10",
       "eps_forecast": 4.86,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Adobe Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -460,7 +460,7 @@
     "ADI": {
       "date": "2026-08-19",
       "eps_forecast": 3.33,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Analog Devices, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -500,7 +500,7 @@
     "ADSK": {
       "date": "2026-08-27",
       "eps_forecast": 2.35,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Autodesk, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -532,7 +532,7 @@
     "ADXN": {
       "date": "2026-10-05",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Addex Therapeutics Ltd",
       "source": "nasdaq",
       "time": ""
@@ -548,7 +548,7 @@
     "AEG": {
       "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Aegon Ltd.",
       "source": "nasdaq",
       "time": "bmo"
@@ -556,7 +556,7 @@
     "AEHR": {
       "date": "2026-10-05",
       "eps_forecast": 0.05,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Aehr Test Systems",
       "source": "nasdaq",
       "time": ""
@@ -588,7 +588,7 @@
     "AENT": {
       "date": "2026-09-09",
       "eps_forecast": 0.02,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Alliance Entertainment Holding Corporation",
       "source": "nasdaq",
       "time": ""
@@ -596,7 +596,7 @@
     "AEO": {
       "date": "2026-09-02",
       "eps_forecast": 0.21,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "American Eagle Outfitters, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -644,7 +644,7 @@
     "AEXA": {
       "date": "2026-08-26",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "American Exceptionalism Acquisition Corp. A",
       "source": "nasdaq",
       "time": ""
@@ -692,7 +692,7 @@
     "AFRM": {
       "date": "2026-08-27",
       "eps_forecast": 0.33,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Affirm Holdings, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -772,7 +772,7 @@
     "AGX": {
       "date": "2026-09-02",
       "eps_forecast": 2.67,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Argan, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -812,15 +812,15 @@
     "AI": {
       "date": "2026-09-02",
       "eps_forecast": -0.63,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "C3.ai, Inc.",
       "source": "nasdaq",
-      "time": ""
+      "time": "amc"
     },
     "AIAI": {
       "date": "2026-09-28",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "AIAI Holdings Corporation",
       "source": "nasdaq",
       "time": ""
@@ -900,7 +900,7 @@
     "AIIR": {
       "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Air Global PLC",
       "source": "nasdaq",
       "time": "bmo"
@@ -948,7 +948,7 @@
     "AIR": {
       "date": "2026-09-22",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "AAR Corp.",
       "source": "nasdaq",
       "time": ""
@@ -1028,7 +1028,7 @@
     "AIV": {
       "date": "2026-08-24",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Apartment Investment and Management Company",
       "source": "nasdaq",
       "time": ""
@@ -1100,7 +1100,7 @@
     "ALAR": {
       "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Alarum Technologies Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -1252,7 +1252,7 @@
     "ALOT": {
       "date": "2026-09-08",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "AstroNova, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -1268,7 +1268,7 @@
     "ALPS": {
       "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "ALPS Group Inc",
       "source": "nasdaq",
       "time": ""
@@ -1324,7 +1324,7 @@
     "ALVO": {
       "date": "2026-08-19",
       "eps_forecast": -0.06,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Alvotech",
       "source": "nasdaq",
       "time": ""
@@ -1348,7 +1348,7 @@
     "ALZN": {
       "date": "2026-09-09",
       "eps_forecast": -0.67,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Alzamend Neuro, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -1364,7 +1364,7 @@
     "AMBA": {
       "date": "2026-09-03",
       "eps_forecast": -0.3,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Ambarella, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -1388,7 +1388,7 @@
     "AMBR": {
       "date": "2026-09-09",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Amber International Holding Limited",
       "source": "nasdaq",
       "time": ""
@@ -1556,7 +1556,7 @@
     "AMST": {
       "date": "2026-10-05",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Amesite Inc.",
       "source": "nasdaq",
       "time": ""
@@ -1604,7 +1604,7 @@
     "ANAB": {
       "date": "2026-08-26",
       "eps_forecast": -0.22,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "AnaptysBio, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -1635,8 +1635,8 @@
     },
     "ANF": {
       "date": "2026-08-26",
-      "eps_forecast": 1.9,
-      "fetched": "2026-08-20",
+      "eps_forecast": 1.95,
+      "fetched": "2026-08-21",
       "name": "Abercrombie & Fitch Company",
       "source": "nasdaq",
       "time": "bmo"
@@ -1652,7 +1652,7 @@
     "ANGO": {
       "date": "2026-10-01",
       "eps_forecast": -0.1,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "AngioDynamics, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -1676,7 +1676,7 @@
     "ANIX": {
       "date": "2026-09-09",
       "eps_forecast": -0.08,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Anixa Biosciences, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -1708,7 +1708,7 @@
     "ANTA": {
       "date": "2026-08-19",
       "eps_forecast": 0.0,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Antalpha Platform Holding Company",
       "source": "nasdaq",
       "time": ""
@@ -1764,7 +1764,7 @@
     "AOUT": {
       "date": "2026-09-03",
       "eps_forecast": -0.22,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "American Outdoor Brands, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -1820,7 +1820,7 @@
     "APLD": {
       "date": "2026-10-08",
       "eps_forecast": -0.22,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Applied Digital Corporation",
       "source": "nasdaq",
       "time": ""
@@ -1844,7 +1844,7 @@
     "APOG": {
       "date": "2026-10-08",
       "eps_forecast": 0.59,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Apogee Enterprises, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -1964,7 +1964,7 @@
     "ARAY": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Accuray Incorporated",
       "source": "nasdaq",
       "time": ""
@@ -2018,9 +2018,9 @@
       "time": ""
     },
     "AREC": {
-      "date": "2026-08-18",
+      "date": "2026-08-25",
       "eps_forecast": -0.09,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "American Resources Corporation",
       "source": "nasdaq",
       "time": ""
@@ -2156,7 +2156,7 @@
     "ARTW": {
       "date": "2026-10-06",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Art's-Way Manufacturing Co., Inc.",
       "source": "nasdaq",
       "time": ""
@@ -2196,7 +2196,7 @@
     "AS": {
       "date": "2026-08-18",
       "eps_forecast": 0.11,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Amer Sports, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -2204,7 +2204,7 @@
     "ASAN": {
       "date": "2026-09-03",
       "eps_forecast": -0.11,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Asana, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -2260,7 +2260,7 @@
     "ASO": {
       "date": "2026-09-01",
       "eps_forecast": 2.07,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Academy Sports and Outdoors, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -2292,7 +2292,7 @@
     "ASTC": {
       "date": "2026-09-24",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Astrotech Corporation",
       "source": "nasdaq",
       "time": ""
@@ -2348,15 +2348,15 @@
     "ATAT": {
       "date": "2026-08-20",
       "eps_forecast": 0.57,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Atour Lifestyle Holdings Limited",
       "source": "nasdaq",
-      "time": "bmo"
+      "time": ""
     },
     "ATCH": {
       "date": "2026-08-26",
       "eps_forecast": -0.01,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "AtlasClear Holdings, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -2396,7 +2396,7 @@
     "ATHE": {
       "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Alterity Therapeutics Limited",
       "source": "nasdaq",
       "time": ""
@@ -2404,10 +2404,10 @@
     "ATHM": {
       "date": "2026-08-20",
       "eps_forecast": 0.24,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Autohome Inc.",
       "source": "nasdaq",
-      "time": "bmo"
+      "time": ""
     },
     "ATHR": {
       "date": "2026-08-13",
@@ -2572,7 +2572,7 @@
     "AUNA": {
       "date": "2026-08-18",
       "eps_forecast": 0.26,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Auna SA",
       "source": "nasdaq",
       "time": ""
@@ -2644,7 +2644,7 @@
     "AVAT": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Avalanche Treasury Corporation",
       "source": "nasdaq",
       "time": ""
@@ -2652,7 +2652,7 @@
     "AVAV": {
       "date": "2026-09-08",
       "eps_forecast": 0.34,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "AeroVironment, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -2684,7 +2684,7 @@
     "AVGO": {
       "date": "2026-09-02",
       "eps_forecast": 2.83,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Broadcom Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -2716,7 +2716,7 @@
     "AVNW": {
       "date": "2026-09-09",
       "eps_forecast": 0.4,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Aviat Networks, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -2724,7 +2724,7 @@
     "AVO": {
       "date": "2026-09-14",
       "eps_forecast": 0.05,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Mission Produce, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -2772,7 +2772,7 @@
     "AVXL": {
       "date": "2026-08-25",
       "eps_forecast": -0.08,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Anavex Life Sciences Corp.",
       "source": "nasdaq",
       "time": ""
@@ -2804,7 +2804,7 @@
     "AXIL": {
       "date": "2026-08-18",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "AXIL Brands, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -2820,7 +2820,7 @@
     "AXR": {
       "date": "2026-09-08",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "AMREP Corporation",
       "source": "nasdaq",
       "time": ""
@@ -2844,7 +2844,7 @@
     "AYI": {
       "date": "2026-10-07",
       "eps_forecast": 5.32,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Acuity Inc.",
       "source": "nasdaq",
       "time": ""
@@ -2852,7 +2852,7 @@
     "AYTU": {
       "date": "2026-09-22",
       "eps_forecast": -0.22,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Aytu BioPharma, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -2868,7 +2868,7 @@
     "AZIO": {
       "date": "2026-08-18",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Azio AI Holdings, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -2876,7 +2876,7 @@
     "AZO": {
       "date": "2026-09-22",
       "eps_forecast": 55.08,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "AutoZone, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -2907,11 +2907,11 @@
     },
     "BABA": {
       "date": "2026-08-20",
-      "eps_forecast": 1.77,
-      "fetched": "2026-08-20",
+      "eps_forecast": 1.78,
+      "fetched": "2026-08-21",
       "name": "Alibaba Group Holding Limited",
       "source": "nasdaq",
-      "time": "bmo"
+      "time": ""
     },
     "BAER": {
       "date": "2026-08-06",
@@ -3004,7 +3004,7 @@
     "BB": {
       "date": "2026-09-24",
       "eps_forecast": 0.03,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "BlackBerry Limited",
       "source": "nasdaq",
       "time": ""
@@ -3012,7 +3012,7 @@
     "BBAR": {
       "date": "2026-08-27",
       "eps_forecast": 0.35,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Banco BBVA Argentina S.A.",
       "source": "nasdaq",
       "time": "amc"
@@ -3028,10 +3028,10 @@
     "BBCP": {
       "date": "2026-09-03",
       "eps_forecast": 0.08,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Concrete Pumping Holdings, Inc.",
       "source": "nasdaq",
-      "time": ""
+      "time": "amc"
     },
     "BBD": {
       "date": "2026-08-05",
@@ -3100,7 +3100,7 @@
     "BBW": {
       "date": "2026-08-27",
       "eps_forecast": 0.7,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Build-A-Bear Workshop, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -3108,15 +3108,15 @@
     "BBWI": {
       "date": "2026-08-26",
       "eps_forecast": 0.24,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Bath & Body Works, Inc.",
       "source": "nasdaq",
       "time": "bmo"
     },
     "BBY": {
       "date": "2026-08-27",
-      "eps_forecast": 1.34,
-      "fetched": "2026-08-20",
+      "eps_forecast": 1.35,
+      "fetched": "2026-08-21",
       "name": "Best Buy Co., Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -3292,7 +3292,7 @@
     "BEEM": {
       "date": "2026-08-19",
       "eps_forecast": -0.17,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Beam Global",
       "source": "nasdaq",
       "time": ""
@@ -3308,7 +3308,7 @@
     "BEKE": {
       "date": "2026-08-21",
       "eps_forecast": 0.25,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "KE Holdings Inc",
       "source": "nasdaq",
       "time": "bmo"
@@ -3348,7 +3348,7 @@
     "BF.A": {
       "date": "2026-09-02",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Brown Forman Corporation",
       "source": "nasdaq",
       "time": "bmo"
@@ -3356,7 +3356,7 @@
     "BF.B": {
       "date": "2026-09-02",
       "eps_forecast": 0.38,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Brown Forman Corporation",
       "source": "nasdaq",
       "time": "bmo"
@@ -3508,7 +3508,7 @@
     "BIDU": {
       "date": "2026-08-18",
       "eps_forecast": 1.19,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Baidu, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -3516,7 +3516,7 @@
     "BILI": {
       "date": "2026-08-27",
       "eps_forecast": 0.13,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Bilibili Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -3524,7 +3524,7 @@
     "BILL": {
       "date": "2026-08-19",
       "eps_forecast": 0.25,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "BILL Holdings, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -3556,7 +3556,7 @@
     "BIOX": {
       "date": "2026-09-08",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Bioceres Crop Solutions Corp.",
       "source": "nasdaq",
       "time": ""
@@ -3564,7 +3564,7 @@
     "BIRD": {
       "date": "2026-08-18",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Smartbird, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -3588,7 +3588,7 @@
     "BJ": {
       "date": "2026-08-21",
       "eps_forecast": 1.16,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "BJ's Wholesale Club Holdings, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -3612,7 +3612,7 @@
     "BKE": {
       "date": "2026-08-21",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Buckle, Inc. (The)",
       "source": "nasdaq",
       "time": "bmo"
@@ -3746,9 +3746,9 @@
       "time": "amc"
     },
     "BLRX": {
-      "date": "2026-08-20",
+      "date": "2026-08-27",
       "eps_forecast": 0.0,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "BioLineRx Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -3778,9 +3778,9 @@
       "time": ""
     },
     "BMA": {
-      "date": "2026-08-26",
+      "date": "2026-08-19",
       "eps_forecast": 1.59,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Macro Bank Inc.",
       "source": "nasdaq",
       "time": ""
@@ -3804,7 +3804,7 @@
     "BMO": {
       "date": "2026-08-25",
       "eps_forecast": 2.72,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Bank Of Montreal",
       "source": "nasdaq",
       "time": "bmo"
@@ -3812,7 +3812,7 @@
     "BMRA": {
       "date": "2026-09-04",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Biomerica, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -3860,7 +3860,7 @@
     "BNR": {
       "date": "2026-09-14",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Burning Rock Biotech Limited",
       "source": "nasdaq",
       "time": ""
@@ -3868,7 +3868,7 @@
     "BNS": {
       "date": "2026-08-25",
       "eps_forecast": 1.53,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Bank of Nova Scotia (The)",
       "source": "nasdaq",
       "time": "bmo"
@@ -3884,7 +3884,7 @@
     "BNTC": {
       "date": "2026-09-28",
       "eps_forecast": -0.25,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Benitec Biopharma Inc.",
       "source": "nasdaq",
       "time": ""
@@ -3964,10 +3964,10 @@
     "BOSC": {
       "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "B.O.S. Better Online Solutions",
       "source": "nasdaq",
-      "time": "bmo"
+      "time": ""
     },
     "BOW": {
       "date": "2026-08-03",
@@ -3980,7 +3980,7 @@
     "BOX": {
       "date": "2026-08-25",
       "eps_forecast": 0.09,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Box, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -4028,7 +4028,7 @@
     "BRC": {
       "date": "2026-09-03",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Brady Corporation",
       "source": "nasdaq",
       "time": ""
@@ -4060,7 +4060,7 @@
     "BRID": {
       "date": "2026-08-28",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Bridgford Foods Corporation",
       "source": "nasdaq",
       "time": ""
@@ -4090,9 +4090,9 @@
       "time": ""
     },
     "BRLS": {
-      "date": "2026-08-18",
+      "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Borealis Foods Inc.",
       "source": "nasdaq",
       "time": ""
@@ -4156,7 +4156,7 @@
     "BRTX": {
       "date": "2026-08-25",
       "eps_forecast": -0.15,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "BioRestorative Therapies, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -4164,7 +4164,7 @@
     "BRZE": {
       "date": "2026-09-08",
       "eps_forecast": -0.21,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Braze, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -4236,7 +4236,7 @@
     "BTCS": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "BTCS Inc.",
       "source": "nasdaq",
       "time": ""
@@ -4268,7 +4268,7 @@
     "BTLN": {
       "date": "2026-10-05",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Brightline Interactive, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -4284,15 +4284,15 @@
     "BTOC": {
       "date": "2026-09-24",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Armlogi Holding Corp.",
       "source": "nasdaq",
       "time": ""
     },
     "BTTC": {
-      "date": "2026-08-20",
+      "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Black Titan Corp",
       "source": "nasdaq",
       "time": ""
@@ -4308,7 +4308,7 @@
     "BULL": {
       "date": "2026-08-19",
       "eps_forecast": 0.01,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Webull Corporation",
       "source": "nasdaq",
       "time": ""
@@ -4324,7 +4324,7 @@
     "BURL": {
       "date": "2026-08-27",
       "eps_forecast": 2.18,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Burlington Stores, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -4380,7 +4380,7 @@
     "BWLP": {
       "date": "2026-08-28",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "BW LPG Limited",
       "source": "nasdaq",
       "time": "bmo"
@@ -4404,7 +4404,7 @@
     "BXBL": {
       "date": "2026-08-21",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "BOXABL, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -4444,7 +4444,7 @@
     "BYRN": {
       "date": "2026-10-08",
       "eps_forecast": -0.14,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Byrna Technologies, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -4460,7 +4460,7 @@
     "BZ": {
       "date": "2026-08-25",
       "eps_forecast": 0.25,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "KANZHUN LIMITED",
       "source": "nasdaq",
       "time": "bmo"
@@ -4492,7 +4492,7 @@
     "BZUN": {
       "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Baozun Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -4500,7 +4500,7 @@
     "CAAP": {
       "date": "2026-08-18",
       "eps_forecast": 0.51,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Corporacion America Airports SA",
       "source": "nasdaq",
       "time": ""
@@ -4572,7 +4572,7 @@
     "CAG": {
       "date": "2026-10-07",
       "eps_forecast": 0.31,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "ConAgra Brands, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -4596,7 +4596,7 @@
     "CAL": {
       "date": "2026-09-10",
       "eps_forecast": 0.38,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Caleres, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -4612,7 +4612,7 @@
     "CALM": {
       "date": "2026-10-07",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Cal-Maine Foods, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -4642,9 +4642,9 @@
       "time": ""
     },
     "CAN": {
-      "date": "2026-08-20",
+      "date": "2026-08-27",
       "eps_forecast": -0.1,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Canaan Inc.",
       "source": "nasdaq",
       "time": ""
@@ -4652,7 +4652,7 @@
     "CANG": {
       "date": "2026-09-03",
       "eps_forecast": -0.9,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Cango Inc.",
       "source": "nasdaq",
       "time": ""
@@ -4724,7 +4724,7 @@
     "CASY": {
       "date": "2026-09-08",
       "eps_forecast": 6.59,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Caseys General Stores, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -4740,7 +4740,7 @@
     "CATO": {
       "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Cato Corporation (The)",
       "source": "nasdaq",
       "time": ""
@@ -4764,7 +4764,7 @@
     "CBAT": {
       "date": "2026-08-24",
       "eps_forecast": -0.06,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "CBAK Energy Technology Limited",
       "source": "nasdaq",
       "time": ""
@@ -4796,7 +4796,7 @@
     "CBRL": {
       "date": "2026-09-16",
       "eps_forecast": 0.12,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Cracker Barrel Old Country Store, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -4860,7 +4860,7 @@
     "CCIF": {
       "date": "2026-08-19",
       "eps_forecast": 0.1,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Carlyle Credit Income Fund",
       "source": "nasdaq",
       "time": ""
@@ -4868,7 +4868,7 @@
     "CCL": {
       "date": "2026-10-05",
       "eps_forecast": 1.36,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Carnival Corporation Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -4940,7 +4940,7 @@
     "CDLR": {
       "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Cadeler A/S",
       "source": "nasdaq",
       "time": "bmo"
@@ -5052,7 +5052,7 @@
     "CELU": {
       "date": "2026-09-04",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Celularity Inc.",
       "source": "nasdaq",
       "time": ""
@@ -5098,9 +5098,9 @@
       "time": "amc"
     },
     "CEPF": {
-      "date": "2026-08-20",
+      "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Cantor Equity Partners IV, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -5114,9 +5114,9 @@
       "time": ""
     },
     "CEPO": {
-      "date": "2026-08-20",
+      "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Cantor Equity Partners I, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -5130,9 +5130,9 @@
       "time": ""
     },
     "CEPV": {
-      "date": "2026-08-20",
+      "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Cantor Equity Partners V, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -5156,7 +5156,7 @@
     "CETY": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Clean Energy Technologies, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -5220,7 +5220,7 @@
     "CGNT": {
       "date": "2026-09-08",
       "eps_forecast": 0.01,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Cognyte Software Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -5252,7 +5252,7 @@
     "CHA": {
       "date": "2026-09-04",
       "eps_forecast": 0.33,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Chagee Holdings Limited",
       "source": "nasdaq",
       "time": ""
@@ -5316,10 +5316,10 @@
     "CHPT": {
       "date": "2026-09-02",
       "eps_forecast": -1.58,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "ChargePoint Holdings, Inc.",
       "source": "nasdaq",
-      "time": ""
+      "time": "amc"
     },
     "CHRD": {
       "date": "2026-08-05",
@@ -5332,7 +5332,7 @@
     "CHRN": {
       "date": "2026-08-24",
       "eps_forecast": -0.06,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "ChronoScale Holdings Corporation",
       "source": "nasdaq",
       "time": ""
@@ -5356,10 +5356,10 @@
     "CHWY": {
       "date": "2026-09-09",
       "eps_forecast": 0.18,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Chewy, Inc.",
       "source": "nasdaq",
-      "time": ""
+      "time": "bmo"
     },
     "CHYM": {
       "date": "2026-08-05",
@@ -5388,7 +5388,7 @@
     "CIEN": {
       "date": "2026-09-03",
       "eps_forecast": 1.45,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Ciena Corporation",
       "source": "nasdaq",
       "time": "bmo"
@@ -5444,7 +5444,7 @@
     "CIRC": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Circle8 Group, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -5460,7 +5460,7 @@
     "CISS": {
       "date": "2026-09-01",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "C3is Inc.",
       "source": "nasdaq",
       "time": ""
@@ -5548,7 +5548,7 @@
     "CLGN": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "CollPlant Biotechnologies Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -5668,7 +5668,7 @@
     "CM": {
       "date": "2026-08-27",
       "eps_forecast": 1.78,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Canadian Imperial Bank of Commerce",
       "source": "nasdaq",
       "time": "bmo"
@@ -5676,7 +5676,7 @@
     "CMBT": {
       "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "CMB.TECH NV",
       "source": "nasdaq",
       "time": "bmo"
@@ -5692,7 +5692,7 @@
     "CMCM": {
       "date": "2026-09-10",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Cheetah Mobile Inc.",
       "source": "nasdaq",
       "time": ""
@@ -5724,7 +5724,7 @@
     "CMMB": {
       "date": "2026-08-19",
       "eps_forecast": 0.0,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Chemomab Therapeutics Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -5732,7 +5732,7 @@
     "CMND": {
       "date": "2026-09-10",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Clearmind Medicine Inc.",
       "source": "nasdaq",
       "time": ""
@@ -5828,7 +5828,7 @@
     "CNM": {
       "date": "2026-09-08",
       "eps_forecast": 0.91,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Core & Main, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -5916,7 +5916,7 @@
     "CNXC": {
       "date": "2026-09-24",
       "eps_forecast": 2.4,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Concentrix Corporation",
       "source": "nasdaq",
       "time": ""
@@ -5948,7 +5948,7 @@
     "CODA": {
       "date": "2026-09-21",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Coda Octopus Group, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -5972,7 +5972,7 @@
     "COE": {
       "date": "2026-09-02",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "51Talk Online Education Group",
       "source": "nasdaq",
       "time": ""
@@ -6044,7 +6044,7 @@
     "COO": {
       "date": "2026-09-09",
       "eps_forecast": 1.11,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "The Cooper Companies, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -6076,7 +6076,7 @@
     "COSM": {
       "date": "2026-08-19",
       "eps_forecast": 0.01,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Cosmos Health Inc.",
       "source": "nasdaq",
       "time": ""
@@ -6084,7 +6084,7 @@
     "COST": {
       "date": "2026-09-24",
       "eps_forecast": 6.51,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Costco Wholesale Corporation",
       "source": "nasdaq",
       "time": "amc"
@@ -6092,7 +6092,7 @@
     "COTY": {
       "date": "2026-08-19",
       "eps_forecast": -0.01,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Coty Inc.",
       "source": "nasdaq",
       "time": ""
@@ -6124,7 +6124,7 @@
     "CPB": {
       "date": "2026-09-03",
       "eps_forecast": 0.4,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "The Campbell's Company",
       "source": "nasdaq",
       "time": "bmo"
@@ -6188,7 +6188,7 @@
     "CPRT": {
       "date": "2026-09-03",
       "eps_forecast": 0.39,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Copart, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -6316,7 +6316,7 @@
     "CRDO": {
       "date": "2026-09-01",
       "eps_forecast": 0.91,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Credo Technology Group Holding Ltd",
       "source": "nasdaq",
       "time": "amc"
@@ -6324,7 +6324,7 @@
     "CRESY": {
       "date": "2026-09-03",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Cresud S.A.C.I.F. y A.",
       "source": "nasdaq",
       "time": ""
@@ -6372,7 +6372,7 @@
     "CRM": {
       "date": "2026-08-26",
       "eps_forecast": 2.35,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Salesforce, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -6388,7 +6388,7 @@
     "CRMT": {
       "date": "2026-09-03",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "America's Car-Mart, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -6492,7 +6492,7 @@
     "CRWD": {
       "date": "2026-08-26",
       "eps_forecast": 0.05,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "CrowdStrike Holdings, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -6516,7 +6516,7 @@
     "CSAI": {
       "date": "2026-08-18",
       "eps_forecast": -2.7,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Cloudastructure, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -6532,7 +6532,7 @@
     "CSBR": {
       "date": "2026-09-21",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Champions Oncology, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -6548,7 +6548,7 @@
     "CSHR": {
       "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "CoinShares PLC",
       "source": "nasdaq",
       "time": ""
@@ -6556,7 +6556,7 @@
     "CSIQ": {
       "date": "2026-08-27",
       "eps_forecast": -1.01,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Canadian Solar Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -6604,7 +6604,7 @@
     "CTAS": {
       "date": "2026-09-23",
       "eps_forecast": 1.35,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Cintas Corporation",
       "source": "nasdaq",
       "time": ""
@@ -6692,7 +6692,7 @@
     "CTRM": {
       "date": "2026-10-07",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Castor Maritime Inc.",
       "source": "nasdaq",
       "time": ""
@@ -6700,7 +6700,7 @@
     "CTRN": {
       "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Citi Trends, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -6740,7 +6740,7 @@
     "CULP": {
       "date": "2026-09-09",
       "eps_forecast": 0.44,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Culp, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -6756,7 +6756,7 @@
     "CURR": {
       "date": "2026-08-24",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Currenc Group Inc.",
       "source": "nasdaq",
       "time": ""
@@ -6764,7 +6764,7 @@
     "CURV": {
       "date": "2026-09-03",
       "eps_forecast": -0.03,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Torrid Holdings Inc.",
       "source": "nasdaq",
       "time": ""
@@ -6932,7 +6932,7 @@
     "CXM": {
       "date": "2026-09-02",
       "eps_forecast": 0.03,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Sprinklr, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -7044,7 +7044,7 @@
     "DAKT": {
       "date": "2026-09-09",
       "eps_forecast": 0.36,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Daktronics, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -7052,7 +7052,7 @@
     "DAL": {
       "date": "2026-10-08",
       "eps_forecast": 2.19,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Delta Air Lines, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -7068,10 +7068,10 @@
     "DAO": {
       "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Youdao, Inc.",
       "source": "nasdaq",
-      "time": "bmo"
+      "time": ""
     },
     "DARE": {
       "date": "2026-08-13",
@@ -7092,7 +7092,7 @@
     "DAVA": {
       "date": "2026-09-03",
       "eps_forecast": 0.05,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Endava plc",
       "source": "nasdaq",
       "time": ""
@@ -7108,18 +7108,18 @@
     "DBGI": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Digital Brands Group, Inc.",
       "source": "nasdaq",
       "time": ""
     },
     "DBI": {
-      "date": "2026-09-08",
+      "date": "2026-09-10",
       "eps_forecast": 0.25,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Designer Brands Inc.",
       "source": "nasdaq",
-      "time": ""
+      "time": "bmo"
     },
     "DBRG": {
       "date": "2026-08-04",
@@ -7172,7 +7172,7 @@
     "DCI": {
       "date": "2026-08-26",
       "eps_forecast": 1.12,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Donaldson Company, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -7228,7 +7228,7 @@
     "DDL": {
       "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Dingdong (Cayman) Limited",
       "source": "nasdaq",
       "time": "bmo"
@@ -7252,10 +7252,10 @@
     "DE": {
       "date": "2026-08-20",
       "eps_forecast": 4.79,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Deere & Company",
       "source": "nasdaq",
-      "time": "bmo"
+      "time": ""
     },
     "DEA": {
       "date": "2026-08-03",
@@ -7292,7 +7292,7 @@
     "DELL": {
       "date": "2026-09-01",
       "eps_forecast": 4.63,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Dell Technologies Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -7340,7 +7340,7 @@
     "DFNS": {
       "date": "2026-08-18",
       "eps_forecast": -3.11,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "T3 Defense Inc.",
       "source": "nasdaq",
       "time": ""
@@ -7364,7 +7364,7 @@
     "DG": {
       "date": "2026-08-27",
       "eps_forecast": 2.0,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Dollar General Corporation",
       "source": "nasdaq",
       "time": "bmo"
@@ -7500,7 +7500,7 @@
     "DKS": {
       "date": "2026-08-25",
       "eps_forecast": 3.78,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Dick's Sporting Goods Inc",
       "source": "nasdaq",
       "time": "bmo"
@@ -7508,7 +7508,7 @@
     "DLNG": {
       "date": "2026-09-14",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Dynagas LNG Partners LP",
       "source": "nasdaq",
       "time": ""
@@ -7532,15 +7532,15 @@
     "DLTH": {
       "date": "2026-09-03",
       "eps_forecast": -0.05,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Duluth Holdings Inc.",
       "source": "nasdaq",
-      "time": ""
+      "time": "bmo"
     },
     "DLTR": {
       "date": "2026-08-27",
       "eps_forecast": 1.11,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Dollar Tree, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -7668,7 +7668,7 @@
     "DOCU": {
       "date": "2026-09-03",
       "eps_forecast": 0.44,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "DocuSign, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -7692,7 +7692,7 @@
     "DOMO": {
       "date": "2026-08-26",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Domo, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -7700,7 +7700,7 @@
     "DOO": {
       "date": "2026-09-03",
       "eps_forecast": -0.46,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "BRP Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -7730,9 +7730,9 @@
       "time": ""
     },
     "DOYU": {
-      "date": "2026-08-24",
+      "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "DouYu International Holdings Limited",
       "source": "nasdaq",
       "time": ""
@@ -7754,9 +7754,9 @@
       "time": ""
     },
     "DQ": {
-      "date": "2026-08-25",
+      "date": "2026-08-20",
       "eps_forecast": -0.28,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "DAQO New Energy Corp.",
       "source": "nasdaq",
       "time": ""
@@ -7780,7 +7780,7 @@
     "DRI": {
       "date": "2026-09-17",
       "eps_forecast": 2.07,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Darden Restaurants, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -7828,7 +7828,7 @@
     "DSC": {
       "date": "2026-08-26",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "DSC Holdings Ltd.",
       "source": "nasdaq",
       "time": "bmo"
@@ -7852,7 +7852,7 @@
     "DSGX": {
       "date": "2026-09-10",
       "eps_forecast": 0.57,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "The Descartes Systems Group Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -7876,7 +7876,7 @@
     "DSWL": {
       "date": "2026-09-16",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Deswell Industries, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -7916,7 +7916,7 @@
     "DTSS": {
       "date": "2026-09-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Datasea Intelligent Technology Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -7980,7 +7980,7 @@
     "DVLT": {
       "date": "2026-08-19",
       "eps_forecast": -0.03,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Datavault AI Inc.",
       "source": "nasdaq",
       "time": ""
@@ -8012,7 +8012,7 @@
     "DXLG": {
       "date": "2026-09-09",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Destination XL Group, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -8028,7 +8028,7 @@
     "DY": {
       "date": "2026-08-26",
       "eps_forecast": 4.36,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Dycom Industries, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -8076,7 +8076,7 @@
     "EBF": {
       "date": "2026-09-28",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Ennis, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -8212,7 +8212,7 @@
     "EDUC": {
       "date": "2026-10-08",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Educational Development Corporation",
       "source": "nasdaq",
       "time": ""
@@ -8252,7 +8252,7 @@
     "EGAN": {
       "date": "2026-09-03",
       "eps_forecast": 0.0,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "eGain Corporation",
       "source": "nasdaq",
       "time": ""
@@ -8276,7 +8276,7 @@
     "EH": {
       "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "EHang Holdings Limited",
       "source": "nasdaq",
       "time": "bmo"
@@ -8324,7 +8324,7 @@
     "EL": {
       "date": "2026-08-19",
       "eps_forecast": 0.32,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Estee Lauder Companies, Inc. (The)",
       "source": "nasdaq",
       "time": ""
@@ -8388,7 +8388,7 @@
     "ELLO": {
       "date": "2026-08-18",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Ellomay Capital Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -8396,7 +8396,7 @@
     "ELMD": {
       "date": "2026-08-25",
       "eps_forecast": 0.32,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Electromed, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -8404,7 +8404,7 @@
     "ELME": {
       "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Elme Communities",
       "source": "nasdaq",
       "time": ""
@@ -8436,7 +8436,7 @@
     "ELTK": {
       "date": "2026-08-18",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Eltek Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -8476,7 +8476,7 @@
     "ELWT": {
       "date": "2026-08-18",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Elauwit Connection, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -8532,7 +8532,7 @@
     "ENGN": {
       "date": "2026-09-10",
       "eps_forecast": -0.47,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "enGene Therapeutics Inc.",
       "source": "nasdaq",
       "time": ""
@@ -8564,7 +8564,7 @@
     "ENLV": {
       "date": "2026-09-04",
       "eps_forecast": -0.31,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Enlivex Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -8588,7 +8588,7 @@
     "ENRD": {
       "date": "2026-08-18",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Einride AB",
       "source": "nasdaq",
       "time": "bmo"
@@ -8666,9 +8666,9 @@
       "time": ""
     },
     "EONR": {
-      "date": "2026-08-20",
+      "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "EON Resources Inc.",
       "source": "nasdaq",
       "time": ""
@@ -8708,7 +8708,7 @@
     "EPM": {
       "date": "2026-09-15",
       "eps_forecast": 0.02,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Evolution Petroleum Corporation, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -8876,7 +8876,7 @@
     "ESP": {
       "date": "2026-09-15",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Espey Mfg. & Electronics Corp.",
       "source": "nasdaq",
       "time": ""
@@ -8892,7 +8892,7 @@
     "ESTC": {
       "date": "2026-08-27",
       "eps_forecast": -0.15,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Elastic N.V.",
       "source": "nasdaq",
       "time": "amc"
@@ -8940,10 +8940,10 @@
     "EVAX": {
       "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Evaxion A/S",
       "source": "nasdaq",
-      "time": "bmo"
+      "time": ""
     },
     "EVC": {
       "date": "2026-08-10",
@@ -8980,7 +8980,7 @@
     "EVGN": {
       "date": "2026-08-18",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Evogene Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -9004,7 +9004,7 @@
     "EVI": {
       "date": "2026-09-10",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "EVI Industries, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -9212,7 +9212,7 @@
     "FCEL": {
       "date": "2026-09-08",
       "eps_forecast": -0.35,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "FuelCell Energy, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -9236,7 +9236,7 @@
     "FDS": {
       "date": "2026-09-17",
       "eps_forecast": 4.3,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "FactSet Research Systems Inc.",
       "source": "nasdaq",
       "time": ""
@@ -9260,7 +9260,7 @@
     "FEAM": {
       "date": "2026-10-05",
       "eps_forecast": -0.28,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "5E Advanced Materials, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -9276,7 +9276,7 @@
     "FEIM": {
       "date": "2026-09-10",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Frequency Electronics, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -9388,7 +9388,7 @@
     "FINV": {
       "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "FinVolution Group",
       "source": "nasdaq",
       "time": "amc"
@@ -9434,12 +9434,12 @@
       "time": ""
     },
     "FIVE": {
-      "date": "2026-08-26",
+      "date": "2026-09-02",
       "eps_forecast": 1.28,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Five Below, Inc.",
       "source": "nasdaq",
-      "time": ""
+      "time": "amc"
     },
     "FIVN": {
       "date": "2026-08-06",
@@ -9460,7 +9460,7 @@
     "FIZZ": {
       "date": "2026-09-10",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "National Beverage Corp.",
       "source": "nasdaq",
       "time": ""
@@ -9468,7 +9468,7 @@
     "FJET": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Starfighters Space, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -9476,7 +9476,7 @@
     "FKWL": {
       "date": "2026-10-05",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Franklin Wireless Corp.",
       "source": "nasdaq",
       "time": ""
@@ -9508,7 +9508,7 @@
     "FLNG": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "FLEX LNG Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -9524,10 +9524,10 @@
     "FLO": {
       "date": "2026-08-20",
       "eps_forecast": 0.23,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Flowers Foods, Inc.",
       "source": "nasdaq",
-      "time": "amc"
+      "time": ""
     },
     "FLOC": {
       "date": "2026-08-11",
@@ -9556,15 +9556,15 @@
     "FLUX": {
       "date": "2026-08-20",
       "eps_forecast": -0.11,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Flux Power Holdings, Inc.",
       "source": "nasdaq",
-      "time": "amc"
+      "time": ""
     },
     "FLWS": {
       "date": "2026-09-10",
       "eps_forecast": -0.72,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "1-800-FLOWERS.COM, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -9572,10 +9572,10 @@
     "FLX": {
       "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "BingEx Limited",
       "source": "nasdaq",
-      "time": "bmo"
+      "time": ""
     },
     "FLXS": {
       "date": "2026-08-17",
@@ -9594,9 +9594,9 @@
       "time": ""
     },
     "FLYE": {
-      "date": "2026-08-18",
+      "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Fly-E Group, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -9690,9 +9690,9 @@
       "time": ""
     },
     "FORTY": {
-      "date": "2026-08-18",
+      "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Formula Systems (1985) Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -9748,7 +9748,7 @@
     "FRGT": {
       "date": "2026-08-24",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Freight Technologies, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -9780,7 +9780,7 @@
     "FRO": {
       "date": "2026-09-04",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Frontline Plc",
       "source": "nasdaq",
       "time": ""
@@ -9844,7 +9844,7 @@
     "FSCO": {
       "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "FS Credit Opportunities Corp.",
       "source": "nasdaq",
       "time": "amc"
@@ -9988,7 +9988,7 @@
     "FUL": {
       "date": "2026-09-23",
       "eps_forecast": 1.46,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "H. B. Fuller Company",
       "source": "nasdaq",
       "time": ""
@@ -10028,10 +10028,10 @@
     "FUTU": {
       "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Futu Holdings Limited",
       "source": "nasdaq",
-      "time": "bmo"
+      "time": ""
     },
     "FVR": {
       "date": "2026-08-06",
@@ -10132,7 +10132,7 @@
     "GAP": {
       "date": "2026-08-27",
       "eps_forecast": 0.5,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Gap, Inc. (The)",
       "source": "nasdaq",
       "time": "amc"
@@ -10140,7 +10140,7 @@
     "GASS": {
       "date": "2026-08-24",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "StealthGas, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -10156,7 +10156,7 @@
     "GAUZ": {
       "date": "2026-08-26",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Gauzy Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -10202,12 +10202,12 @@
       "time": ""
     },
     "GCO": {
-      "date": "2026-08-27",
+      "date": "2026-09-03",
       "eps_forecast": -1.34,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Genesco Inc.",
       "source": "nasdaq",
-      "time": ""
+      "time": "bmo"
     },
     "GCT": {
       "date": "2026-08-06",
@@ -10244,7 +10244,7 @@
     "GDEV": {
       "date": "2026-09-01",
       "eps_forecast": 1.08,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "GDEV Inc.",
       "source": "nasdaq",
       "time": ""
@@ -10284,7 +10284,7 @@
     "GEG": {
       "date": "2026-09-01",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Great Elm Group, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -10412,7 +10412,7 @@
     "GGAL": {
       "date": "2026-08-25",
       "eps_forecast": 0.9,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Grupo Financiero Galicia S.A.",
       "source": "nasdaq",
       "time": ""
@@ -10428,7 +10428,7 @@
     "GGR": {
       "date": "2026-08-24",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Gogoro Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -10484,7 +10484,7 @@
     "GIII": {
       "date": "2026-09-03",
       "eps_forecast": 0.25,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "G-III Apparel Group, LTD.",
       "source": "nasdaq",
       "time": ""
@@ -10516,7 +10516,7 @@
     "GIS": {
       "date": "2026-09-16",
       "eps_forecast": 0.73,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "General Mills, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -10524,7 +10524,7 @@
     "GITS": {
       "date": "2026-08-21",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Global Interactive Technologies, Inc. Common Stock",
       "source": "nasdaq",
       "time": ""
@@ -10564,7 +10564,7 @@
     "GLDG": {
       "date": "2026-10-09",
       "eps_forecast": -0.02,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "GoldMining Inc.",
       "source": "nasdaq",
       "time": ""
@@ -10668,7 +10668,7 @@
     "GME": {
       "date": "2026-09-08",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "GameStop Corporation",
       "source": "nasdaq",
       "time": ""
@@ -10680,6 +10680,14 @@
       "name": "Globus Medical, Inc.",
       "source": "nasdaq",
       "time": "amc"
+    },
+    "GMHS": {
+      "date": "2026-09-08",
+      "eps_forecast": null,
+      "fetched": "2026-08-21",
+      "name": "Gamehaus Holdings Inc.",
+      "source": "nasdaq",
+      "time": "bmo"
     },
     "GMRS": {
       "date": "2026-08-12",
@@ -10772,7 +10780,7 @@
     "GOLD": {
       "date": "2026-09-02",
       "eps_forecast": 0.96,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Gold.com, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -10812,7 +10820,7 @@
     "GOTU": {
       "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Gaotu Techedu Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -10900,7 +10908,7 @@
     "GPUS": {
       "date": "2026-08-18",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Hyperscale Data, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -10946,9 +10954,9 @@
       "time": "amc"
     },
     "GRDX": {
-      "date": "2026-08-20",
+      "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "GridAI Technologies Corp.",
       "source": "nasdaq",
       "time": ""
@@ -10956,7 +10964,7 @@
     "GRFS": {
       "date": "2026-08-24",
       "eps_forecast": 0.27,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Grifols, S.A.",
       "source": "nasdaq",
       "time": ""
@@ -11020,7 +11028,7 @@
     "GROW": {
       "date": "2026-09-14",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "U.S. Global Investors, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -11042,12 +11050,12 @@
       "time": "amc"
     },
     "GRRR": {
-      "date": "2026-08-20",
+      "date": "2026-08-24",
       "eps_forecast": 0.27,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Gorilla Technology Group Inc.",
       "source": "nasdaq",
-      "time": ""
+      "time": "amc"
     },
     "GRSD": {
       "date": "2026-08-13",
@@ -11140,7 +11148,7 @@
     "GTEN": {
       "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Gores Holdings X, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -11156,7 +11164,7 @@
     "GTLB": {
       "date": "2026-09-01",
       "eps_forecast": -0.07,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "GitLab Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -11188,7 +11196,7 @@
     "GURE": {
       "date": "2026-08-26",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Gulf Resources, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -11204,7 +11212,7 @@
     "GWAV": {
       "date": "2026-08-18",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Greenwave Technology Solutions, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -11220,7 +11228,7 @@
     "GWRE": {
       "date": "2026-09-03",
       "eps_forecast": 0.49,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Guidewire Software, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -11276,7 +11284,7 @@
     "HAFN": {
       "date": "2026-08-28",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Hafnia Limited",
       "source": "nasdaq",
       "time": "bmo"
@@ -11284,7 +11292,7 @@
     "HAIN": {
       "date": "2026-09-14",
       "eps_forecast": -0.03,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "The Hain Celestial Group, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -11388,7 +11396,7 @@
     "HD": {
       "date": "2026-08-18",
       "eps_forecast": 4.71,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Home Depot, Inc. (The)",
       "source": "nasdaq",
       "time": ""
@@ -11396,7 +11404,7 @@
     "HDL": {
       "date": "2026-08-26",
       "eps_forecast": 0.03,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "SUPER HI INTERNATIONAL HOLDING LTD.",
       "source": "nasdaq",
       "time": "bmo"
@@ -11427,8 +11435,8 @@
     },
     "HEI": {
       "date": "2026-08-25",
-      "eps_forecast": 1.5,
-      "fetched": "2026-08-20",
+      "eps_forecast": 1.51,
+      "fetched": "2026-08-21",
       "name": "Heico Corporation",
       "source": "nasdaq",
       "time": "amc"
@@ -11436,7 +11444,7 @@
     "HEI.A": {
       "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Heico Corporation",
       "source": "nasdaq",
       "time": "amc"
@@ -11444,7 +11452,7 @@
     "HELE": {
       "date": "2026-10-08",
       "eps_forecast": 0.32,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Helen of Troy Limited",
       "source": "nasdaq",
       "time": ""
@@ -11468,7 +11476,7 @@
     "HERE": {
       "date": "2026-09-16",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Here Group Limited",
       "source": "nasdaq",
       "time": ""
@@ -11532,7 +11540,7 @@
     "HIFS": {
       "date": "2026-10-09",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Hingham Institution for Savings",
       "source": "nasdaq",
       "time": ""
@@ -11561,6 +11569,14 @@
       "source": "nasdaq",
       "time": ""
     },
+    "HIO": {
+      "date": "2026-08-20",
+      "eps_forecast": null,
+      "fetched": "2026-08-21",
+      "name": "Western Asset High Income Opportunity Fund, Inc.",
+      "source": "nasdaq",
+      "time": ""
+    },
     "HIT": {
       "date": "2026-08-13",
       "eps_forecast": -0.03,
@@ -11572,7 +11588,7 @@
     "HITI": {
       "date": "2026-09-21",
       "eps_forecast": 0.01,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "High Tide Inc.",
       "source": "nasdaq",
       "time": ""
@@ -11676,7 +11692,7 @@
     "HMR": {
       "date": "2026-08-24",
       "eps_forecast": 0.1,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Heidmar Maritime Holdings Corp.",
       "source": "nasdaq",
       "time": ""
@@ -11684,7 +11700,7 @@
     "HMY": {
       "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Harmony Gold Mining Company Limited",
       "source": "nasdaq",
       "time": "bmo"
@@ -11732,7 +11748,7 @@
     "HOFT": {
       "date": "2026-09-10",
       "eps_forecast": -0.02,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Hooker Furnishings Corporation",
       "source": "nasdaq",
       "time": ""
@@ -11756,15 +11772,15 @@
     "HOV": {
       "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Hovnanian Enterprises Inc",
       "source": "nasdaq",
-      "time": "bmo"
+      "time": ""
     },
     "HOVR": {
       "date": "2026-10-09",
       "eps_forecast": -0.08,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "New Horizon Aircraft Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -11780,7 +11796,7 @@
     "HPE": {
       "date": "2026-09-02",
       "eps_forecast": 0.81,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Hewlett Packard Enterprise Company",
       "source": "nasdaq",
       "time": "amc"
@@ -11804,7 +11820,7 @@
     "HPQ": {
       "date": "2026-08-26",
       "eps_forecast": 0.66,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "HP Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -11828,7 +11844,7 @@
     "HQY": {
       "date": "2026-08-27",
       "eps_forecast": 0.99,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "HealthEquity, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -11844,7 +11860,7 @@
     "HRL": {
       "date": "2026-08-27",
       "eps_forecast": 0.36,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Hormel Foods Corporation",
       "source": "nasdaq",
       "time": "bmo"
@@ -11892,7 +11908,7 @@
     "HSAI": {
       "date": "2026-08-18",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Hesai Group",
       "source": "nasdaq",
       "time": ""
@@ -11908,7 +11924,7 @@
     "HSCS": {
       "date": "2026-09-10",
       "eps_forecast": -0.78,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "HeartSciences Inc.",
       "source": "nasdaq",
       "time": ""
@@ -11988,7 +12004,7 @@
     "HTLM": {
       "date": "2026-09-04",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "HomesToLife Ltd",
       "source": "nasdaq",
       "time": ""
@@ -11996,7 +12012,7 @@
     "HTT": {
       "date": "2026-08-26",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "High Templar Tech Limited",
       "source": "nasdaq",
       "time": ""
@@ -12010,9 +12026,9 @@
       "time": "bmo"
     },
     "HUBG": {
-      "date": "2026-08-20",
+      "date": "2026-08-27",
       "eps_forecast": 0.52,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Hub Group, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -12028,7 +12044,7 @@
     "HUIZ": {
       "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Huize Holding Limited",
       "source": "nasdaq",
       "time": "bmo"
@@ -12052,7 +12068,7 @@
     "HURC": {
       "date": "2026-09-04",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Hurco Companies, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -12116,7 +12132,7 @@
     "HYFT": {
       "date": "2026-09-21",
       "eps_forecast": -0.05,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "MindWalk Holdings Corp.",
       "source": "nasdaq",
       "time": ""
@@ -12172,7 +12188,7 @@
     "IBEX": {
       "date": "2026-09-10",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "IBEX Limited",
       "source": "nasdaq",
       "time": ""
@@ -12180,7 +12196,7 @@
     "IBIO": {
       "date": "2026-09-04",
       "eps_forecast": -0.07,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "iBio, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -12260,7 +12276,7 @@
     "ICG": {
       "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Intchains Group Limited",
       "source": "nasdaq",
       "time": "amc"
@@ -12340,7 +12356,7 @@
     "IDT": {
       "date": "2026-10-05",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "IDT Corporation",
       "source": "nasdaq",
       "time": ""
@@ -12420,7 +12436,7 @@
     "IH": {
       "date": "2026-09-17",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "iHuman Inc.",
       "source": "nasdaq",
       "time": ""
@@ -12444,7 +12460,7 @@
     "IHT": {
       "date": "2026-09-11",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "InnSuites Hospitality Trust",
       "source": "nasdaq",
       "time": ""
@@ -12532,7 +12548,7 @@
     "IMMP": {
       "date": "2026-09-04",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Immutep Limited",
       "source": "nasdaq",
       "time": ""
@@ -12572,7 +12588,7 @@
     "IMPP": {
       "date": "2026-09-04",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Imperial Petroleum Inc.",
       "source": "nasdaq",
       "time": ""
@@ -12580,7 +12596,7 @@
     "IMRN": {
       "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Immuron Limited",
       "source": "nasdaq",
       "time": ""
@@ -12604,7 +12620,7 @@
     "IMTX": {
       "date": "2026-08-18",
       "eps_forecast": -0.43,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Immatics N.V.",
       "source": "nasdaq",
       "time": ""
@@ -12644,7 +12660,7 @@
     "INBS": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Intelligent Bio Solutions Inc.",
       "source": "nasdaq",
       "time": ""
@@ -12716,7 +12732,7 @@
     "INHD": {
       "date": "2026-08-18",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Inno Holdings Inc.",
       "source": "nasdaq",
       "time": ""
@@ -12740,7 +12756,7 @@
     "INM": {
       "date": "2026-09-28",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "InMed Pharmaceuticals Inc.",
       "source": "nasdaq",
       "time": ""
@@ -12772,7 +12788,7 @@
     "INNV": {
       "date": "2026-09-08",
       "eps_forecast": 0.07,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "InnovAge Holding Corp.",
       "source": "nasdaq",
       "time": ""
@@ -12852,7 +12868,7 @@
     "INTG": {
       "date": "2026-09-29",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "The Intergroup Corporation",
       "source": "nasdaq",
       "time": ""
@@ -12883,8 +12899,8 @@
     },
     "INTU": {
       "date": "2026-08-25",
-      "eps_forecast": 2.14,
-      "fetched": "2026-08-20",
+      "eps_forecast": 2.12,
+      "fetched": "2026-08-21",
       "name": "Intuit Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -12948,7 +12964,7 @@
     "IOND": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Ionic Digital Inc.",
       "source": "nasdaq",
       "time": ""
@@ -12980,7 +12996,7 @@
     "IOT": {
       "date": "2026-09-03",
       "eps_forecast": 0.02,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Samsara Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -13042,9 +13058,9 @@
       "time": ""
     },
     "IPST": {
-      "date": "2026-08-20",
+      "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "IP Strategy Holdings, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -13052,7 +13068,7 @@
     "IPW": {
       "date": "2026-10-08",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "iPower Inc.",
       "source": "nasdaq",
       "time": ""
@@ -13068,7 +13084,7 @@
     "IPX": {
       "date": "2026-09-29",
       "eps_forecast": -0.16,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "IperionX Limited",
       "source": "nasdaq",
       "time": ""
@@ -13076,7 +13092,7 @@
     "IQ": {
       "date": "2026-08-18",
       "eps_forecast": -0.04,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "iQIYI, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -13092,7 +13108,7 @@
     "IQST": {
       "date": "2026-08-18",
       "eps_forecast": -0.23,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "iQSTEL Inc.",
       "source": "nasdaq",
       "time": ""
@@ -13107,8 +13123,8 @@
     },
     "IREN": {
       "date": "2026-08-27",
-      "eps_forecast": -0.8,
-      "fetched": "2026-08-20",
+      "eps_forecast": -0.42,
+      "fetched": "2026-08-21",
       "name": "IREN Limited",
       "source": "nasdaq",
       "time": "amc"
@@ -13116,7 +13132,7 @@
     "IRIX": {
       "date": "2026-08-18",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "IRIDEX Corporation",
       "source": "nasdaq",
       "time": ""
@@ -13132,7 +13148,7 @@
     "IRS": {
       "date": "2026-09-01",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "IRSA Inversiones Y Representaciones S.A.",
       "source": "nasdaq",
       "time": ""
@@ -13172,7 +13188,7 @@
     "ISPR": {
       "date": "2026-09-21",
       "eps_forecast": -0.02,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Ispire Technology Inc.",
       "source": "nasdaq",
       "time": ""
@@ -13218,9 +13234,9 @@
       "time": ""
     },
     "ITP": {
-      "date": "2026-08-20",
+      "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "IT Tech Packaging, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -13300,7 +13316,7 @@
     "IXHL": {
       "date": "2026-10-05",
       "eps_forecast": 0.13,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Incannex Healthcare Inc.",
       "source": "nasdaq",
       "time": ""
@@ -13340,7 +13356,7 @@
     "JAGX": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Jaguar Health, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -13396,7 +13412,7 @@
     "JBL": {
       "date": "2026-09-24",
       "eps_forecast": 3.86,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Jabil Inc.",
       "source": "nasdaq",
       "time": ""
@@ -13412,7 +13428,7 @@
     "JBSS": {
       "date": "2026-08-19",
       "eps_forecast": 1.3,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "John B. Sanfilippo & Son, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -13444,7 +13460,7 @@
     "JEF": {
       "date": "2026-10-05",
       "eps_forecast": 0.87,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Jefferies Financial Group Inc.",
       "source": "nasdaq",
       "time": ""
@@ -13468,7 +13484,7 @@
     "JFIN": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Jiayin Group Inc.",
       "source": "nasdaq",
       "time": ""
@@ -13476,10 +13492,10 @@
     "JG": {
       "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Aurora Mobile Limited",
       "source": "nasdaq",
-      "time": "bmo"
+      "time": ""
     },
     "JHX": {
       "date": "2026-08-06",
@@ -13492,7 +13508,7 @@
     "JILL": {
       "date": "2026-09-02",
       "eps_forecast": 0.58,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "J. Jill, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -13508,7 +13524,7 @@
     "JKHY": {
       "date": "2026-08-18",
       "eps_forecast": 1.44,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Jack Henry & Associates, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -13516,7 +13532,7 @@
     "JKS": {
       "date": "2026-08-26",
       "eps_forecast": -0.75,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "JinkoSolar Holding Company Limited",
       "source": "nasdaq",
       "time": "bmo"
@@ -13556,7 +13572,7 @@
     "JOYY": {
       "date": "2026-08-25",
       "eps_forecast": 0.85,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "JOYY Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -13604,7 +13620,7 @@
     "JVA": {
       "date": "2026-09-11",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Coffee Holding Co., Inc.",
       "source": "nasdaq",
       "time": ""
@@ -13636,7 +13652,7 @@
     "KALA": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "KALA BIO, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -13676,7 +13692,7 @@
     "KBH": {
       "date": "2026-09-23",
       "eps_forecast": 0.88,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "KB Home",
       "source": "nasdaq",
       "time": ""
@@ -13684,7 +13700,7 @@
     "KC": {
       "date": "2026-08-19",
       "eps_forecast": -0.12,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Kingsoft Cloud Holdings Limited",
       "source": "nasdaq",
       "time": ""
@@ -13748,7 +13764,7 @@
     "KEN": {
       "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Kenon Holdings Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -13756,7 +13772,7 @@
     "KEP": {
       "date": "2026-09-21",
       "eps_forecast": 0.33,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Korea Electric Power Corporation",
       "source": "nasdaq",
       "time": ""
@@ -13764,7 +13780,7 @@
     "KEQU": {
       "date": "2026-09-09",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Kewaunee Scientific Corporation",
       "source": "nasdaq",
       "time": ""
@@ -13772,7 +13788,7 @@
     "KEYS": {
       "date": "2026-08-18",
       "eps_forecast": 2.16,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Keysight Technologies Inc.",
       "source": "nasdaq",
       "time": ""
@@ -13788,7 +13804,7 @@
     "KFY": {
       "date": "2026-09-08",
       "eps_forecast": 1.35,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Korn Ferry",
       "source": "nasdaq",
       "time": ""
@@ -13868,7 +13884,7 @@
     "KLAR": {
       "date": "2026-08-18",
       "eps_forecast": -0.07,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Klarna Group plc",
       "source": "nasdaq",
       "time": ""
@@ -13956,7 +13972,7 @@
     "KMTS": {
       "date": "2026-09-10",
       "eps_forecast": -0.61,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Kestra Medical Technologies, Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -13964,7 +13980,7 @@
     "KMX": {
       "date": "2026-09-24",
       "eps_forecast": 0.68,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "CarMax Inc",
       "source": "nasdaq",
       "time": ""
@@ -13980,7 +13996,7 @@
     "KNOP": {
       "date": "2026-09-04",
       "eps_forecast": -0.03,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "KNOT Offshore Partners LP",
       "source": "nasdaq",
       "time": "bmo"
@@ -14044,7 +14060,7 @@
     "KOSS": {
       "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Koss Corporation",
       "source": "nasdaq",
       "time": ""
@@ -14084,7 +14100,7 @@
     "KR": {
       "date": "2026-09-11",
       "eps_forecast": 1.05,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Kroger Company (The)",
       "source": "nasdaq",
       "time": "bmo"
@@ -14092,7 +14108,7 @@
     "KRKR": {
       "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "36Kr Holdings Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -14187,8 +14203,8 @@
     },
     "KSS": {
       "date": "2026-08-26",
-      "eps_forecast": 0.56,
-      "fetched": "2026-08-20",
+      "eps_forecast": 0.55,
+      "fetched": "2026-08-21",
       "name": "Kohl's Corporation",
       "source": "nasdaq",
       "time": "bmo"
@@ -14196,7 +14212,7 @@
     "KT": {
       "date": "2026-09-04",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "KT Corporation",
       "source": "nasdaq",
       "time": ""
@@ -14212,7 +14228,7 @@
     "KTCC": {
       "date": "2026-08-26",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Key Tronic Corporation",
       "source": "nasdaq",
       "time": ""
@@ -14348,7 +14364,7 @@
     "LAKE": {
       "date": "2026-09-08",
       "eps_forecast": -0.02,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Lakeland Industries, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -14466,12 +14482,12 @@
       "time": ""
     },
     "LE": {
-      "date": "2026-09-08",
+      "date": "2026-09-03",
       "eps_forecast": 0.1,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Lands' End, Inc.",
       "source": "nasdaq",
-      "time": ""
+      "time": "bmo"
     },
     "LEE": {
       "date": "2026-08-06",
@@ -14508,7 +14524,7 @@
     "LEN": {
       "date": "2026-09-17",
       "eps_forecast": 1.31,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Lennar Corporation",
       "source": "nasdaq",
       "time": ""
@@ -14516,7 +14532,7 @@
     "LEN.B": {
       "date": "2026-09-17",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Lennar Corporation",
       "source": "nasdaq",
       "time": ""
@@ -14548,7 +14564,7 @@
     "LEVI": {
       "date": "2026-10-08",
       "eps_forecast": 0.36,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Levi Strauss & Co.",
       "source": "nasdaq",
       "time": ""
@@ -14596,7 +14612,7 @@
     "LFVN": {
       "date": "2026-08-27",
       "eps_forecast": 0.15,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Lifevantage Corporation",
       "source": "nasdaq",
       "time": "amc"
@@ -14612,7 +14628,7 @@
     "LGCY": {
       "date": "2026-09-24",
       "eps_forecast": 0.12,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Legacy Education Inc.",
       "source": "nasdaq",
       "time": ""
@@ -14676,7 +14692,7 @@
     "LI": {
       "date": "2026-08-26",
       "eps_forecast": -0.01,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Li Auto Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -14796,7 +14812,7 @@
     "LITB": {
       "date": "2026-09-08",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "LightInTheBox Holding Co., Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -14812,7 +14828,7 @@
     "LITS": {
       "date": "2026-09-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Lite Strategy, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -14836,7 +14852,7 @@
     "LKSP": {
       "date": "2026-08-26",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Lake Superior Acquisition Corp.",
       "source": "nasdaq",
       "time": ""
@@ -14884,7 +14900,7 @@
     "LMNR": {
       "date": "2026-09-08",
       "eps_forecast": 0.13,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Limoneira Co",
       "source": "nasdaq",
       "time": ""
@@ -14900,7 +14916,7 @@
     "LNAI": {
       "date": "2026-08-21",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Lunai Bioworks Inc.",
       "source": "nasdaq",
       "time": ""
@@ -14908,7 +14924,7 @@
     "LND": {
       "date": "2026-09-03",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Brasilagro Cia Brasileira De Propriedades Agricolas",
       "source": "nasdaq",
       "time": "amc"
@@ -14988,7 +15004,7 @@
     "LOT": {
       "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Lotus Technology Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -14996,7 +15012,7 @@
     "LOVE": {
       "date": "2026-09-10",
       "eps_forecast": -0.39,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "The Lovesac Company",
       "source": "nasdaq",
       "time": ""
@@ -15004,7 +15020,7 @@
     "LOW": {
       "date": "2026-08-19",
       "eps_forecast": 4.22,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Lowe's Companies, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -15052,7 +15068,7 @@
     "LPTH": {
       "date": "2026-09-24",
       "eps_forecast": -0.02,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "LightPath Technologies, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -15084,7 +15100,7 @@
     "LRHC": {
       "date": "2026-08-24",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "La Rosa Holdings Corp.",
       "source": "nasdaq",
       "time": ""
@@ -15108,7 +15124,7 @@
     "LSAK": {
       "date": "2026-09-09",
       "eps_forecast": 0.03,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Lesaka Technologies, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -15172,7 +15188,7 @@
     "LTRX": {
       "date": "2026-08-26",
       "eps_forecast": -0.01,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Lantronix, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -15180,7 +15196,7 @@
     "LU": {
       "date": "2026-08-18",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Lufax Holding Ltd",
       "source": "nasdaq",
       "time": ""
@@ -15196,7 +15212,7 @@
     "LUCK": {
       "date": "2026-08-27",
       "eps_forecast": -0.05,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Lucky Strike Entertainment Corporation",
       "source": "nasdaq",
       "time": ""
@@ -15212,10 +15228,10 @@
     "LULU": {
       "date": "2026-09-03",
       "eps_forecast": 1.79,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "lululemon athletica inc.",
       "source": "nasdaq",
-      "time": ""
+      "time": "amc"
     },
     "LUMN": {
       "date": "2026-08-04",
@@ -15236,7 +15252,7 @@
     "LUXE": {
       "date": "2026-09-24",
       "eps_forecast": -0.15,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "LuxExperience B.V.",
       "source": "nasdaq",
       "time": ""
@@ -15260,7 +15276,7 @@
     "LW": {
       "date": "2026-09-29",
       "eps_forecast": 0.58,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Lamb Weston Holdings, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -15284,7 +15300,7 @@
     "LX": {
       "date": "2026-08-31",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "LexinFintech Holdings Ltd.",
       "source": "nasdaq",
       "time": "bmo"
@@ -15323,11 +15339,11 @@
     },
     "LYTS": {
       "date": "2026-08-20",
-      "eps_forecast": 0.28,
-      "fetched": "2026-08-20",
+      "eps_forecast": 0.29,
+      "fetched": "2026-08-21",
       "name": "LSI Industries Inc.",
       "source": "nasdaq",
-      "time": "bmo"
+      "time": ""
     },
     "LZ": {
       "date": "2026-08-05",
@@ -15340,15 +15356,15 @@
     "LZB": {
       "date": "2026-08-18",
       "eps_forecast": 0.48,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "La-Z-Boy Incorporated",
       "source": "nasdaq",
       "time": ""
     },
     "M": {
       "date": "2026-09-10",
-      "eps_forecast": 0.35,
-      "fetched": "2026-08-20",
+      "eps_forecast": 0.37,
+      "fetched": "2026-08-21",
       "name": "Macy's Inc",
       "source": "nasdaq",
       "time": "bmo"
@@ -15394,12 +15410,12 @@
       "time": ""
     },
     "MAMA": {
-      "date": "2026-09-14",
+      "date": "2026-09-03",
       "eps_forecast": 0.05,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Mama's Creations, Inc.",
       "source": "nasdaq",
-      "time": ""
+      "time": "amc"
     },
     "MAMO": {
       "date": "2026-08-13",
@@ -15420,7 +15436,7 @@
     "MANU": {
       "date": "2026-09-16",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Manchester United Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -15444,7 +15460,7 @@
     "MARPS": {
       "date": "2026-10-05",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Marine Petroleum Trust",
       "source": "nasdaq",
       "time": ""
@@ -15548,7 +15564,7 @@
     "MBUU": {
       "date": "2026-08-27",
       "eps_forecast": 0.69,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Malibu Boats, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -15572,7 +15588,7 @@
     "MCFT": {
       "date": "2026-08-26",
       "eps_forecast": 0.56,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "MasterCraft Boat Holdings, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -15644,7 +15660,7 @@
     "MDB": {
       "date": "2026-09-01",
       "eps_forecast": 0.08,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "MongoDB, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -15692,7 +15708,7 @@
     "MDT": {
       "date": "2026-09-01",
       "eps_forecast": 1.38,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Medtronic plc",
       "source": "nasdaq",
       "time": "bmo"
@@ -15756,7 +15772,7 @@
     "MEI": {
       "date": "2026-09-08",
       "eps_forecast": -0.47,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Methode Electronics, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -15780,7 +15796,7 @@
     "MESO": {
       "date": "2026-09-04",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Mesoblast Limited",
       "source": "nasdaq",
       "time": ""
@@ -15940,7 +15956,7 @@
     "MIND": {
       "date": "2026-09-08",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "MIND Technology, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -15988,7 +16004,7 @@
     "MITQ": {
       "date": "2026-09-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Moving iMage Technologies, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -16004,7 +16020,7 @@
     "MKC": {
       "date": "2026-10-06",
       "eps_forecast": 0.75,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "McCormick & Company, Incorporated",
       "source": "nasdaq",
       "time": ""
@@ -16012,7 +16028,7 @@
     "MKC.V": {
       "date": "2026-10-06",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "McCormick & Company, Incorporated",
       "source": "nasdaq",
       "time": ""
@@ -16060,7 +16076,7 @@
     "MLKN": {
       "date": "2026-09-22",
       "eps_forecast": 0.35,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "MillerKnoll, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -16108,7 +16124,7 @@
     "MMED": {
       "date": "2026-09-01",
       "eps_forecast": 0.09,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "MiniMed Group, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -16188,7 +16204,7 @@
     "MNSO": {
       "date": "2026-08-28",
       "eps_forecast": 0.29,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "MINISO Group Holding Limited",
       "source": "nasdaq",
       "time": "bmo"
@@ -16228,7 +16244,7 @@
     "MNY": {
       "date": "2026-09-18",
       "eps_forecast": -0.02,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "MoneyHero Limited",
       "source": "nasdaq",
       "time": ""
@@ -16268,7 +16284,7 @@
     "MOLN": {
       "date": "2026-08-24",
       "eps_forecast": -0.45,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Molecular Partners AG",
       "source": "nasdaq",
       "time": ""
@@ -16276,7 +16292,7 @@
     "MOMO": {
       "date": "2026-09-03",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Hello Group Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -16292,7 +16308,7 @@
     "MOV": {
       "date": "2026-08-26",
       "eps_forecast": 0.36,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Movado Group Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -16380,7 +16396,7 @@
     "MRCY": {
       "date": "2026-08-18",
       "eps_forecast": 0.2,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Mercury Systems Inc",
       "source": "nasdaq",
       "time": ""
@@ -16428,7 +16444,7 @@
     "MRT": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Marti Technologies, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -16444,7 +16460,7 @@
     "MRVL": {
       "date": "2026-08-27",
       "eps_forecast": 0.65,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Marvell Technology, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -16468,7 +16484,7 @@
     "MSB": {
       "date": "2026-09-21",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Mesabi Trust",
       "source": "nasdaq",
       "time": ""
@@ -16548,7 +16564,7 @@
     "MSS": {
       "date": "2026-09-28",
       "eps_forecast": 0.57,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Maison Solutions Inc.",
       "source": "nasdaq",
       "time": ""
@@ -16596,7 +16612,7 @@
     "MTLS": {
       "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Materialise NV",
       "source": "nasdaq",
       "time": "bmo"
@@ -16604,7 +16620,7 @@
     "MTN": {
       "date": "2026-10-05",
       "eps_forecast": -5.31,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Vail Resorts, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -16636,7 +16652,7 @@
     "MTRX": {
       "date": "2026-09-02",
       "eps_forecast": 0.17,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Matrix Service Company",
       "source": "nasdaq",
       "time": "amc"
@@ -16676,7 +16692,7 @@
     "MU": {
       "date": "2026-09-22",
       "eps_forecast": 31.17,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Micron Technology, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -16796,7 +16812,7 @@
     "MZTI": {
       "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "The Marzetti Company",
       "source": "nasdaq",
       "time": "bmo"
@@ -16820,7 +16836,7 @@
     "NAII": {
       "date": "2026-09-22",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Natural Alternatives International, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -16852,7 +16868,7 @@
     "NAT": {
       "date": "2026-08-27",
       "eps_forecast": 0.23,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Nordic American Tankers Limited",
       "source": "nasdaq",
       "time": ""
@@ -16892,7 +16908,7 @@
     "NB": {
       "date": "2026-08-21",
       "eps_forecast": -0.03,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "NioCorp Developments Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -16908,7 +16924,7 @@
     "NBP": {
       "date": "2026-08-19",
       "eps_forecast": -0.14,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "NovaBridge Biosciences",
       "source": "nasdaq",
       "time": ""
@@ -16930,9 +16946,9 @@
       "time": "bmo"
     },
     "NCL": {
-      "date": "2026-08-18",
+      "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Northann Corp.",
       "source": "nasdaq",
       "time": ""
@@ -16956,7 +16972,7 @@
     "NCNO": {
       "date": "2026-08-25",
       "eps_forecast": 0.11,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "nCino, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -16964,7 +16980,7 @@
     "NCPL": {
       "date": "2026-09-28",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Netcapital Inc.",
       "source": "nasdaq",
       "time": ""
@@ -16980,7 +16996,7 @@
     "NCTY": {
       "date": "2026-08-24",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "The9 Limited",
       "source": "nasdaq",
       "time": "bmo"
@@ -16996,7 +17012,7 @@
     "NDSN": {
       "date": "2026-08-19",
       "eps_forecast": 3.09,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Nordson Corporation",
       "source": "nasdaq",
       "time": ""
@@ -17012,7 +17028,7 @@
     "NEOG": {
       "date": "2026-10-08",
       "eps_forecast": 0.04,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Neogen Corporation",
       "source": "nasdaq",
       "time": ""
@@ -17028,7 +17044,7 @@
     "NEOV": {
       "date": "2026-10-05",
       "eps_forecast": -0.1,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "NeoVolta Inc.",
       "source": "nasdaq",
       "time": ""
@@ -17068,7 +17084,7 @@
     "NEUP": {
       "date": "2026-10-05",
       "eps_forecast": -0.56,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Neuphoria Therapeutics Inc.",
       "source": "nasdaq",
       "time": ""
@@ -17076,7 +17092,7 @@
     "NEWP": {
       "date": "2026-09-02",
       "eps_forecast": 0.0,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "New Pacific Metals Corp.",
       "source": "nasdaq",
       "time": ""
@@ -17140,7 +17156,7 @@
     "NG": {
       "date": "2026-10-07",
       "eps_forecast": -0.07,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Novagold Resources Inc.",
       "source": "nasdaq",
       "time": ""
@@ -17252,10 +17268,10 @@
     "NIO": {
       "date": "2026-09-01",
       "eps_forecast": -0.07,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "NIO Inc.",
       "source": "nasdaq",
-      "time": ""
+      "time": "bmo"
     },
     "NIQ": {
       "date": "2026-08-10",
@@ -17292,7 +17308,7 @@
     "NKE": {
       "date": "2026-09-29",
       "eps_forecast": 0.44,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Nike, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -17372,10 +17388,10 @@
     "NMM": {
       "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Navios Maritime Partners LP",
       "source": "nasdaq",
-      "time": "bmo"
+      "time": ""
     },
     "NMRA": {
       "date": "2026-08-14",
@@ -17444,7 +17460,7 @@
     "NNOX": {
       "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "NANO-X IMAGING LTD",
       "source": "nasdaq",
       "time": ""
@@ -17452,7 +17468,7 @@
     "NNVC": {
       "date": "2026-10-05",
       "eps_forecast": -0.11,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "NanoViricides, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -17468,7 +17484,7 @@
     "NOAH": {
       "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Noah Holdings Ltd.",
       "source": "nasdaq",
       "time": "amc"
@@ -17604,7 +17620,7 @@
     "NRIX": {
       "date": "2026-10-08",
       "eps_forecast": -0.56,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Nurix Therapeutics, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -17620,7 +17636,7 @@
     "NRT": {
       "date": "2026-09-04",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "North European Oil Royality Trust",
       "source": "nasdaq",
       "time": ""
@@ -17668,7 +17684,7 @@
     "NSSC": {
       "date": "2026-08-24",
       "eps_forecast": 0.41,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "NAPCO Security Technologies, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -17692,7 +17708,7 @@
     "NTAP": {
       "date": "2026-09-02",
       "eps_forecast": 1.7,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "NetApp, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -17708,10 +17724,10 @@
     "NTES": {
       "date": "2026-08-20",
       "eps_forecast": 2.2,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "NetEase, Inc.",
       "source": "nasdaq",
-      "time": "bmo"
+      "time": ""
     },
     "NTGR": {
       "date": "2026-08-06",
@@ -17748,7 +17764,7 @@
     "NTNX": {
       "date": "2026-08-26",
       "eps_forecast": 0.19,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Nutanix, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -17772,7 +17788,7 @@
     "NTRB": {
       "date": "2026-09-08",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Nutriband Inc.",
       "source": "nasdaq",
       "time": ""
@@ -17780,7 +17796,7 @@
     "NTSK": {
       "date": "2026-09-02",
       "eps_forecast": -0.26,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Netskope, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -17788,7 +17804,7 @@
     "NTWK": {
       "date": "2026-10-05",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "NetSol Technologies Inc.",
       "source": "nasdaq",
       "time": ""
@@ -17868,7 +17884,7 @@
     "NVDA": {
       "date": "2026-08-26",
       "eps_forecast": 2.01,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "NVIDIA Corporation",
       "source": "nasdaq",
       "time": "amc"
@@ -17948,7 +17964,7 @@
     "NX": {
       "date": "2026-09-03",
       "eps_forecast": 0.68,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Quanex Building Products Corporation",
       "source": "nasdaq",
       "time": ""
@@ -18124,7 +18140,7 @@
     "OCC": {
       "date": "2026-09-10",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Optical Cable Corporation",
       "source": "nasdaq",
       "time": ""
@@ -18164,7 +18180,7 @@
     "ODC": {
       "date": "2026-10-08",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Oil-Dri Corporation Of America",
       "source": "nasdaq",
       "time": ""
@@ -18172,7 +18188,7 @@
     "ODD": {
       "date": "2026-09-09",
       "eps_forecast": 0.0,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "ODDITY Tech Ltd.",
       "source": "nasdaq",
       "time": "bmo"
@@ -18292,7 +18308,7 @@
     "OKTA": {
       "date": "2026-08-26",
       "eps_forecast": 0.44,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Okta, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -18316,7 +18332,7 @@
     "OLLI": {
       "date": "2026-09-02",
       "eps_forecast": 1.14,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Ollie's Bargain Outlet Holdings, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -18332,7 +18348,7 @@
     "OLOX": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Olenox Industries Inc.",
       "source": "nasdaq",
       "time": ""
@@ -18420,7 +18436,7 @@
     "ONFO": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Onfolio Holdings Inc.",
       "source": "nasdaq",
       "time": ""
@@ -18476,7 +18492,7 @@
     "OOMA": {
       "date": "2026-08-26",
       "eps_forecast": 0.2,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Ooma, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -18532,7 +18548,7 @@
     "OPRA": {
       "date": "2026-08-19",
       "eps_forecast": 0.26,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Opera Limited",
       "source": "nasdaq",
       "time": ""
@@ -18564,7 +18580,7 @@
     "OPTT": {
       "date": "2026-09-21",
       "eps_forecast": 0.03,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Ocean Power Technologies, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -18620,7 +18636,7 @@
     "ORCL": {
       "date": "2026-09-08",
       "eps_forecast": 1.4,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Oracle Corporation",
       "source": "nasdaq",
       "time": ""
@@ -18684,10 +18700,10 @@
     "OSIS": {
       "date": "2026-08-20",
       "eps_forecast": 3.76,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "OSI Systems, Inc.",
       "source": "nasdaq",
-      "time": "amc"
+      "time": ""
     },
     "OSPN": {
       "date": "2026-08-04",
@@ -18804,7 +18820,7 @@
     "OXM": {
       "date": "2026-09-09",
       "eps_forecast": 1.32,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Oxford Industries, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -18828,7 +18844,7 @@
     "P": {
       "date": "2026-08-26",
       "eps_forecast": 0.19,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Everpure, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -18884,10 +18900,10 @@
     "PAHC": {
       "date": "2026-08-26",
       "eps_forecast": 0.72,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Phibro Animal Health Corporation",
       "source": "nasdaq",
-      "time": ""
+      "time": "amc"
     },
     "PAL": {
       "date": "2026-08-10",
@@ -18932,7 +18948,7 @@
     "PANW": {
       "date": "2026-09-01",
       "eps_forecast": 0.51,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Palo Alto Networks, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -18980,7 +18996,7 @@
     "PATH": {
       "date": "2026-09-03",
       "eps_forecast": 0.04,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "UiPath, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -19028,7 +19044,7 @@
     "PAYX": {
       "date": "2026-09-29",
       "eps_forecast": 1.33,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Paychex, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -19060,7 +19076,7 @@
     "PBK": {
       "date": "2026-10-01",
       "eps_forecast": -0.01,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "PowerBank Corporation",
       "source": "nasdaq",
       "time": ""
@@ -19076,7 +19092,7 @@
     "PBM": {
       "date": "2026-09-28",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Psyence Biomedical Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -19156,7 +19172,7 @@
     "PD": {
       "date": "2026-08-27",
       "eps_forecast": 0.12,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "PagerDuty, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -19172,7 +19188,7 @@
     "PDCC": {
       "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Pearl Diver Credit Company Inc.",
       "source": "nasdaq",
       "time": ""
@@ -19180,7 +19196,7 @@
     "PDD": {
       "date": "2026-08-24",
       "eps_forecast": 2.69,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "PDD Holdings Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -19188,7 +19204,7 @@
     "PDEX": {
       "date": "2026-09-03",
       "eps_forecast": 0.67,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Pro-Dex, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -19236,7 +19252,7 @@
     "PENG": {
       "date": "2026-10-06",
       "eps_forecast": 0.61,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Penguin Solutions, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -19252,7 +19268,7 @@
     "PEP": {
       "date": "2026-10-08",
       "eps_forecast": 2.31,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Pepsico, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -19324,7 +19340,7 @@
     "PFSA": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Profusa, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -19364,7 +19380,7 @@
     "PHGE": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "BiomX Inc.",
       "source": "nasdaq",
       "time": ""
@@ -19388,7 +19404,7 @@
     "PHR": {
       "date": "2026-09-02",
       "eps_forecast": 0.1,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Phreesia, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -19412,7 +19428,7 @@
     "PICS": {
       "date": "2026-08-24",
       "eps_forecast": 0.45,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "PicS N.V.",
       "source": "nasdaq",
       "time": "amc"
@@ -19444,7 +19460,7 @@
     "PKE": {
       "date": "2026-10-08",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Park Aerospace Corp.",
       "source": "nasdaq",
       "time": ""
@@ -19460,7 +19476,7 @@
     "PL": {
       "date": "2026-09-03",
       "eps_forecast": -0.18,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Planet Labs PBC",
       "source": "nasdaq",
       "time": "amc"
@@ -19468,7 +19484,7 @@
     "PLAB": {
       "date": "2026-08-26",
       "eps_forecast": 0.4,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Photronics, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -19484,7 +19500,7 @@
     "PLAY": {
       "date": "2026-09-21",
       "eps_forecast": 0.19,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Dave & Buster's Entertainment, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -19500,7 +19516,7 @@
     "PLCE": {
       "date": "2026-09-04",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Children's Place, Inc. (The)",
       "source": "nasdaq",
       "time": ""
@@ -19580,7 +19596,7 @@
     "PLUR": {
       "date": "2026-09-16",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Pluri Inc.",
       "source": "nasdaq",
       "time": ""
@@ -19612,7 +19628,7 @@
     "PMCB": {
       "date": "2026-09-21",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "PharmaCyte  Biotech, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -19620,7 +19636,7 @@
     "PMI": {
       "date": "2026-08-19",
       "eps_forecast": -1.5,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Picard Medical, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -19692,7 +19708,7 @@
     "POCI": {
       "date": "2026-10-05",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Precision Optics Corporation, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -19724,7 +19740,7 @@
     "POLA": {
       "date": "2026-08-18",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Polar Power, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -19732,7 +19748,7 @@
     "PONY": {
       "date": "2026-08-18",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Pony AI Inc.",
       "source": "nasdaq",
       "time": ""
@@ -19756,7 +19772,7 @@
     "POWL": {
       "date": "2026-08-03",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "",
       "source": "yahoo",
       "time": ""
@@ -19780,7 +19796,7 @@
     "PPCB": {
       "date": "2026-10-05",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Propanc Biopharma, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -19796,7 +19812,7 @@
     "PPIH": {
       "date": "2026-09-21",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Perma-Pipe International Holdings, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -19876,7 +19892,7 @@
     "PRE": {
       "date": "2026-08-18",
       "eps_forecast": -0.32,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Prenetics Global Limited",
       "source": "nasdaq",
       "time": ""
@@ -19892,7 +19908,7 @@
     "PRGS": {
       "date": "2026-10-05",
       "eps_forecast": 1.16,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Progress Software Corporation",
       "source": "nasdaq",
       "time": ""
@@ -20084,10 +20100,10 @@
     "PSEC": {
       "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Prospect Capital Corporation",
       "source": "nasdaq",
-      "time": "amc"
+      "time": ""
     },
     "PSFE": {
       "date": "2026-08-13",
@@ -20164,7 +20180,7 @@
     "PTN": {
       "date": "2026-08-26",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Palatin Technologies, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -20202,12 +20218,12 @@
       "time": ""
     },
     "PURR": {
-      "date": "2026-08-26",
+      "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Hyperliquid Strategies Inc",
       "source": "nasdaq",
-      "time": ""
+      "time": "bmo"
     },
     "PUSA": {
       "date": "2026-08-13",
@@ -20220,7 +20236,7 @@
     "PVH": {
       "date": "2026-09-02",
       "eps_forecast": 3.08,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "PVH Corp.",
       "source": "nasdaq",
       "time": "amc"
@@ -20268,7 +20284,7 @@
     "PXS": {
       "date": "2026-08-21",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Pyxis Tankers Inc.",
       "source": "nasdaq",
       "time": ""
@@ -20300,7 +20316,7 @@
     "PZG": {
       "date": "2026-09-24",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Paramount Gold Nevada Corp.",
       "source": "nasdaq",
       "time": ""
@@ -20348,7 +20364,7 @@
     "QFIN": {
       "date": "2026-08-25",
       "eps_forecast": 0.96,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Qfin Holdings, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -20380,7 +20396,7 @@
     "QMLS": {
       "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "QumulusAI, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -20580,7 +20596,7 @@
     "RAVE": {
       "date": "2026-09-24",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Rave Restaurant Group, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -20596,7 +20612,7 @@
     "RBNE": {
       "date": "2026-10-07",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Robin Energy Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -20604,7 +20620,7 @@
     "RBRK": {
       "date": "2026-08-27",
       "eps_forecast": -0.34,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Rubrik, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -20746,9 +20762,9 @@
       "time": "bmo"
     },
     "REBN": {
-      "date": "2026-08-20",
+      "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Reborn Coffee, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -20804,7 +20820,7 @@
     "RENT": {
       "date": "2026-09-10",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Rent the Runway, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -20836,10 +20852,10 @@
     "RERE": {
       "date": "2026-08-20",
       "eps_forecast": 0.09,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "ATRenew Inc.",
       "source": "nasdaq",
-      "time": "bmo"
+      "time": ""
     },
     "REVB": {
       "date": "2026-08-06",
@@ -20852,7 +20868,7 @@
     "REX": {
       "date": "2026-09-02",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "REX American Resources Corporation",
       "source": "nasdaq",
       "time": "bmo"
@@ -20868,7 +20884,7 @@
     "RFIL": {
       "date": "2026-09-10",
       "eps_forecast": 0.18,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "RF Industries, Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -20908,7 +20924,7 @@
     "RGS": {
       "date": "2026-09-01",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Regis Corporation",
       "source": "nasdaq",
       "time": "bmo"
@@ -20923,8 +20939,8 @@
     },
     "RH": {
       "date": "2026-09-10",
-      "eps_forecast": 0.29,
-      "fetched": "2026-08-20",
+      "eps_forecast": 0.42,
+      "fetched": "2026-08-21",
       "name": "RH",
       "source": "nasdaq",
       "time": ""
@@ -21044,7 +21060,7 @@
     "RLGT": {
       "date": "2026-09-21",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Radiant Logistics, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -21164,7 +21180,7 @@
     "RNW": {
       "date": "2026-08-18",
       "eps_forecast": 0.12,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "ReNew Energy Global plc",
       "source": "nasdaq",
       "time": ""
@@ -21244,10 +21260,10 @@
     "ROST": {
       "date": "2026-08-20",
       "eps_forecast": 1.93,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Ross Stores, Inc.",
       "source": "nasdaq",
-      "time": "amc"
+      "time": ""
     },
     "RPAY": {
       "date": "2026-08-10",
@@ -21284,7 +21300,7 @@
     "RPM": {
       "date": "2026-10-07",
       "eps_forecast": 1.96,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "RPM International Inc.",
       "source": "nasdaq",
       "time": ""
@@ -21300,7 +21316,7 @@
     "RR": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Richtech Robotics Inc.",
       "source": "nasdaq",
       "time": ""
@@ -21348,7 +21364,7 @@
     "RSSS": {
       "date": "2026-09-17",
       "eps_forecast": 0.03,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Research Solutions, Inc",
       "source": "nasdaq",
       "time": ""
@@ -21460,7 +21476,7 @@
     "RY": {
       "date": "2026-08-27",
       "eps_forecast": 2.89,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Royal Bank Of Canada",
       "source": "nasdaq",
       "time": "bmo"
@@ -21476,7 +21492,7 @@
     "RYDE": {
       "date": "2026-08-26",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Ryde Group Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -21516,7 +21532,7 @@
     "RZLT": {
       "date": "2026-09-16",
       "eps_forecast": -0.13,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Rezolute, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -21524,7 +21540,7 @@
     "RZLV": {
       "date": "2026-09-01",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Rezolve AI PLC",
       "source": "nasdaq",
       "time": "bmo"
@@ -21532,7 +21548,7 @@
     "S": {
       "date": "2026-08-27",
       "eps_forecast": -0.13,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "SentinelOne, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -21580,7 +21596,7 @@
     "SAIC": {
       "date": "2026-08-31",
       "eps_forecast": 2.25,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Science Applications International Corporation",
       "source": "nasdaq",
       "time": "bmo"
@@ -21588,7 +21604,7 @@
     "SAIL": {
       "date": "2026-09-09",
       "eps_forecast": 0.08,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "SailPoint, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -21604,7 +21620,7 @@
     "SANG": {
       "date": "2026-09-16",
       "eps_forecast": -0.06,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Sangoma Technologies Corporation",
       "source": "nasdaq",
       "time": ""
@@ -21612,7 +21628,7 @@
     "SAR": {
       "date": "2026-10-06",
       "eps_forecast": 0.47,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Saratoga Investment Corp",
       "source": "nasdaq",
       "time": ""
@@ -21660,7 +21676,7 @@
     "SBEV": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Splash Beverage Group, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -21748,7 +21764,7 @@
     "SCHL": {
       "date": "2026-09-17",
       "eps_forecast": -3.4,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Scholastic Corporation",
       "source": "nasdaq",
       "time": ""
@@ -21804,10 +21820,10 @@
     "SCSC": {
       "date": "2026-08-20",
       "eps_forecast": 1.11,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "ScanSource, Inc.",
       "source": "nasdaq",
-      "time": "bmo"
+      "time": ""
     },
     "SCWO": {
       "date": "2026-08-14",
@@ -21938,9 +21954,9 @@
       "time": ""
     },
     "SEGG": {
-      "date": "2026-08-18",
+      "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Sports Entertainment Gaming Global Corporation",
       "source": "nasdaq",
       "time": ""
@@ -22052,7 +22068,7 @@
     "SFIX": {
       "date": "2026-09-23",
       "eps_forecast": -0.06,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Stitch Fix, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -22060,7 +22076,7 @@
     "SFL": {
       "date": "2026-08-26",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "SFL Corporation Ltd",
       "source": "nasdaq",
       "time": "bmo"
@@ -22204,7 +22220,7 @@
     "SHMD": {
       "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "SCHMID Group N.V.",
       "source": "nasdaq",
       "time": "bmo"
@@ -22220,7 +22236,7 @@
     "SHOE": {
       "date": "2026-09-03",
       "eps_forecast": 0.32,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Shoe Station Group, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -22236,7 +22252,7 @@
     "SHPH": {
       "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Shuttle Pharmaceuticals Holdings, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -22292,7 +22308,7 @@
     "SIG": {
       "date": "2026-09-09",
       "eps_forecast": 1.69,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Signet Jewelers Limited",
       "source": "nasdaq",
       "time": "bmo"
@@ -22356,7 +22372,7 @@
     "SJ": {
       "date": "2026-08-26",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Scienjoy Holding Corporation",
       "source": "nasdaq",
       "time": ""
@@ -22364,7 +22380,7 @@
     "SJM": {
       "date": "2026-08-26",
       "eps_forecast": 2.21,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "The J.M. Smucker Company",
       "source": "nasdaq",
       "time": "bmo"
@@ -22388,7 +22404,7 @@
     "SKIL": {
       "date": "2026-09-08",
       "eps_forecast": 0.54,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Skillsoft Corp.",
       "source": "nasdaq",
       "time": ""
@@ -22514,9 +22530,9 @@
       "time": "amc"
     },
     "SLGL": {
-      "date": "2026-08-21",
+      "date": "2026-08-20",
       "eps_forecast": -2.31,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Sol-Gel Technologies Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -22556,7 +22572,7 @@
     "SLQT": {
       "date": "2026-08-25",
       "eps_forecast": -0.15,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "SelectQuote, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -22580,7 +22596,7 @@
     "SLSN": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Solesence, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -22684,7 +22700,7 @@
     "SMTC": {
       "date": "2026-08-25",
       "eps_forecast": 0.41,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Semtech Corporation",
       "source": "nasdaq",
       "time": "amc"
@@ -22714,9 +22730,9 @@
       "time": ""
     },
     "SMXT": {
-      "date": "2026-08-20",
+      "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Solarmax Technology Inc.",
       "source": "nasdaq",
       "time": ""
@@ -22820,7 +22836,7 @@
     "SNOW": {
       "date": "2026-09-02",
       "eps_forecast": -0.51,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Snowflake Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -22828,7 +22844,7 @@
     "SNPS": {
       "date": "2026-08-26",
       "eps_forecast": 2.67,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Synopsys, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -22836,7 +22852,7 @@
     "SNT": {
       "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Senstar Technologies Corporation",
       "source": "nasdaq",
       "time": "bmo"
@@ -22860,15 +22876,15 @@
     "SNX": {
       "date": "2026-09-24",
       "eps_forecast": 4.38,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "TD SYNNEX Corporation",
       "source": "nasdaq",
       "time": ""
     },
     "SNYR": {
-      "date": "2026-08-20",
+      "date": "2026-08-27",
       "eps_forecast": -0.01,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Synergy CHC Corp.",
       "source": "nasdaq",
       "time": ""
@@ -22924,7 +22940,7 @@
     "SONM": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "DNA X, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -22948,7 +22964,7 @@
     "SOWG": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Sow Good Inc.",
       "source": "nasdaq",
       "time": ""
@@ -23084,7 +23100,7 @@
     "SPWH": {
       "date": "2026-09-01",
       "eps_forecast": -0.12,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Sportsman's Warehouse Holdings, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -23100,7 +23116,7 @@
     "SQM": {
       "date": "2026-08-18",
       "eps_forecast": 2.03,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Sociedad Quimica y Minera S.A.",
       "source": "nasdaq",
       "time": ""
@@ -23220,7 +23236,7 @@
     "SSL": {
       "date": "2026-08-24",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Sasol Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -23299,8 +23315,8 @@
     },
     "STDN": {
       "date": "2026-08-26",
-      "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "eps_forecast": -0.04,
+      "fetched": "2026-08-21",
       "name": "Standard Nuclear, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -23340,7 +23356,7 @@
     "STG": {
       "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Sunlands Technology Group",
       "source": "nasdaq",
       "time": ""
@@ -23444,7 +23460,7 @@
     "STRT": {
       "date": "2026-08-25",
       "eps_forecast": 1.36,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Strattec Security Corporation",
       "source": "nasdaq",
       "time": "amc"
@@ -23508,7 +23524,7 @@
     "STZ": {
       "date": "2026-10-05",
       "eps_forecast": 3.63,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Constellation Brands Inc",
       "source": "nasdaq",
       "time": ""
@@ -23548,7 +23564,7 @@
     "SUNB": {
       "date": "2026-09-09",
       "eps_forecast": 0.98,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Sunbelt Rentals Holdings, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -23668,7 +23684,7 @@
     "SWBI": {
       "date": "2026-09-03",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Smith & Wesson Brands, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -23700,7 +23716,7 @@
     "SXTC": {
       "date": "2026-10-07",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "China SXT Pharmaceuticals, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -23716,7 +23732,7 @@
     "SY": {
       "date": "2026-08-31",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "So-Young International Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -23740,7 +23756,7 @@
     "SYPR": {
       "date": "2026-08-18",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Sypris Solutions, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -23844,7 +23860,7 @@
     "TAYD": {
       "date": "2026-08-18",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Taylor Devices, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -23884,7 +23900,7 @@
     "TBN": {
       "date": "2026-09-24",
       "eps_forecast": -0.25,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Tamboran Resources Corporation",
       "source": "nasdaq",
       "time": ""
@@ -23924,7 +23940,7 @@
     "TCOM": {
       "date": "2026-08-26",
       "eps_forecast": 0.84,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Trip.com Group Limited",
       "source": "nasdaq",
       "time": ""
@@ -23963,8 +23979,8 @@
     },
     "TD": {
       "date": "2026-08-27",
-      "eps_forecast": 1.73,
-      "fetched": "2026-08-20",
+      "eps_forecast": 1.74,
+      "fetched": "2026-08-21",
       "name": "Toronto Dominion Bank (The)",
       "source": "nasdaq",
       "time": "bmo"
@@ -24076,7 +24092,7 @@
     "TEN": {
       "date": "2026-09-09",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Tsakos Energy Navigation Ltd",
       "source": "nasdaq",
       "time": ""
@@ -24140,7 +24156,7 @@
     "TGS": {
       "date": "2026-08-26",
       "eps_forecast": 0.63,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Transportadora De Gas Sa Ord B",
       "source": "nasdaq",
       "time": ""
@@ -24148,7 +24164,7 @@
     "TGT": {
       "date": "2026-08-19",
       "eps_forecast": 2.3,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Target Corporation",
       "source": "nasdaq",
       "time": ""
@@ -24172,7 +24188,7 @@
     "THCH": {
       "date": "2026-08-18",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "TH International Limited",
       "source": "nasdaq",
       "time": ""
@@ -24188,7 +24204,7 @@
     "THO": {
       "date": "2026-09-23",
       "eps_forecast": 0.95,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Thor Industries, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -24220,7 +24236,7 @@
     "TIGR": {
       "date": "2026-08-26",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "UP Fintech Holding Limited",
       "source": "nasdaq",
       "time": "bmo"
@@ -24260,7 +24276,7 @@
     "TITN": {
       "date": "2026-08-27",
       "eps_forecast": -0.33,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Titan Machinery Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -24268,7 +24284,7 @@
     "TJX": {
       "date": "2026-08-19",
       "eps_forecast": 1.18,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "TJX Companies, Inc. (The)",
       "source": "nasdaq",
       "time": ""
@@ -24284,7 +24300,7 @@
     "TKLF": {
       "date": "2026-10-09",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Tokyo Lifestyle Co., Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -24348,7 +24364,7 @@
     "TLRY": {
       "date": "2026-10-08",
       "eps_forecast": -0.18,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Tilray Brands, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -24372,7 +24388,7 @@
     "TLYS": {
       "date": "2026-09-02",
       "eps_forecast": 0.17,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Tilly's, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -24428,7 +24444,7 @@
     "TMQ": {
       "date": "2026-09-29",
       "eps_forecast": -0.01,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Trilogy Metals Inc.",
       "source": "nasdaq",
       "time": ""
@@ -24500,7 +24516,7 @@
     "TOL": {
       "date": "2026-08-18",
       "eps_forecast": 2.9,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Toll Brothers, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -24556,7 +24572,7 @@
     "TORO": {
       "date": "2026-10-07",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Toro Corp.",
       "source": "nasdaq",
       "time": ""
@@ -24572,7 +24588,7 @@
     "TOUR": {
       "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Tuniu Corporation",
       "source": "nasdaq",
       "time": "bmo"
@@ -24588,8 +24604,16 @@
     "TOYO": {
       "date": "2026-08-19",
       "eps_forecast": 0.52,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "TOYO Co., Ltd",
+      "source": "nasdaq",
+      "time": ""
+    },
+    "TP": {
+      "date": "2026-08-20",
+      "eps_forecast": null,
+      "fetched": "2026-08-21",
+      "name": "Ticketplus Ltd.",
       "source": "nasdaq",
       "time": ""
     },
@@ -24620,7 +24644,7 @@
     "TPET": {
       "date": "2026-09-11",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Trio Petroleum Corp.",
       "source": "nasdaq",
       "time": ""
@@ -24668,7 +24692,7 @@
     "TRAK": {
       "date": "2026-10-05",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "ReposiTrak, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -24764,7 +24788,7 @@
     "TRMD": {
       "date": "2026-08-26",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "TORM plc",
       "source": "nasdaq",
       "time": "bmo"
@@ -24812,7 +24836,7 @@
     "TRT": {
       "date": "2026-09-18",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Trio-Tech International",
       "source": "nasdaq",
       "time": ""
@@ -24932,7 +24956,7 @@
     "TTAN": {
       "date": "2026-09-08",
       "eps_forecast": -0.09,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "ServiceTitan, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -24940,7 +24964,7 @@
     "TTC": {
       "date": "2026-09-03",
       "eps_forecast": 1.3,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Toro Company (The)",
       "source": "nasdaq",
       "time": "bmo"
@@ -25004,7 +25028,7 @@
     "TULP": {
       "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Bloomia Holdings, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -25020,7 +25044,7 @@
     "TUYA": {
       "date": "2026-08-24",
       "eps_forecast": 0.02,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Tuya Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -25068,10 +25092,10 @@
     "TWIN": {
       "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Twin Disc, Incorporated",
       "source": "nasdaq",
-      "time": "bmo"
+      "time": ""
     },
     "TWLO": {
       "date": "2026-08-06",
@@ -25204,7 +25228,7 @@
     "UCL": {
       "date": "2026-08-18",
       "eps_forecast": -0.05,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "uCloudlink Group Inc.",
       "source": "nasdaq",
       "time": ""
@@ -25228,7 +25252,7 @@
     "UEC": {
       "date": "2026-09-23",
       "eps_forecast": -0.04,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Uranium Energy Corp.",
       "source": "nasdaq",
       "time": ""
@@ -25252,7 +25276,7 @@
     "UFI": {
       "date": "2026-08-19",
       "eps_forecast": -0.06,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Unifi, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -25308,7 +25332,7 @@
     "UI": {
       "date": "2026-08-28",
       "eps_forecast": 3.67,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Ubiquiti Inc.",
       "source": "nasdaq",
       "time": ""
@@ -25331,8 +25355,8 @@
     },
     "ULTA": {
       "date": "2026-08-27",
-      "eps_forecast": 6.19,
-      "fetched": "2026-08-20",
+      "eps_forecast": 6.2,
+      "fetched": "2026-08-21",
       "name": "Ulta Beauty, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -25364,7 +25388,7 @@
     "UNFI": {
       "date": "2026-09-08",
       "eps_forecast": 0.62,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "United Natural Foods, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -25428,7 +25452,7 @@
     "UPXI": {
       "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Upexi, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -25436,7 +25460,7 @@
     "URBN": {
       "date": "2026-08-26",
       "eps_forecast": 1.72,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Urban Outfitters, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -25460,7 +25484,7 @@
     "UROY": {
       "date": "2026-09-10",
       "eps_forecast": 0.05,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Uranium Royalty Corp.",
       "source": "nasdaq",
       "time": ""
@@ -25492,7 +25516,7 @@
     "USAU": {
       "date": "2026-09-21",
       "eps_forecast": -0.23,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "U.S. Gold Corp.",
       "source": "nasdaq",
       "time": ""
@@ -25586,9 +25610,9 @@
       "time": ""
     },
     "UUU": {
-      "date": "2026-08-18",
+      "date": "2026-08-25",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Universal Safety Products, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -25644,7 +25668,7 @@
     "VALU": {
       "date": "2026-09-21",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Value Line, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -25676,7 +25700,7 @@
     "VBNK": {
       "date": "2026-09-03",
       "eps_forecast": 0.35,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "VersaBank",
       "source": "nasdaq",
       "time": ""
@@ -25716,7 +25740,7 @@
     "VEEV": {
       "date": "2026-08-26",
       "eps_forecast": 1.62,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Veeva Systems Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -25788,7 +25812,7 @@
     "VFS": {
       "date": "2026-09-03",
       "eps_forecast": -0.26,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "VinFast Auto Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -25868,7 +25892,7 @@
     "VIK": {
       "date": "2026-08-19",
       "eps_forecast": 1.25,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Viking Holdings Ltd",
       "source": "nasdaq",
       "time": ""
@@ -25892,7 +25916,7 @@
     "VIPS": {
       "date": "2026-08-25",
       "eps_forecast": 0.42,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Vipshop Holdings Limited",
       "source": "nasdaq",
       "time": "bmo"
@@ -25908,7 +25932,7 @@
     "VIRC": {
       "date": "2026-09-04",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Virco Manufacturing Corporation",
       "source": "nasdaq",
       "time": ""
@@ -25932,7 +25956,7 @@
     "VIVK": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Vivakor, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -25948,7 +25972,7 @@
     "VLGEA": {
       "date": "2026-10-06",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Village Super Market, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -25980,7 +26004,7 @@
     "VNCE": {
       "date": "2026-09-09",
       "eps_forecast": 0.27,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Vince Holding Corp.",
       "source": "nasdaq",
       "time": ""
@@ -25996,7 +26020,7 @@
     "VNET": {
       "date": "2026-08-18",
       "eps_forecast": -0.06,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "VNET Group, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -26084,7 +26108,7 @@
     "VRA": {
       "date": "2026-09-10",
       "eps_forecast": -0.08,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Vera Bradley, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -26092,7 +26116,7 @@
     "VRAX": {
       "date": "2026-10-01",
       "eps_forecast": -1.75,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Virax Biolabs Group Limited",
       "source": "nasdaq",
       "time": ""
@@ -26220,7 +26244,7 @@
     "VSXY": {
       "date": "2026-09-03",
       "eps_forecast": 0.77,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Victorias Secret & Co.",
       "source": "nasdaq",
       "time": "bmo"
@@ -26252,7 +26276,7 @@
     "VTIX": {
       "date": "2026-08-19",
       "eps_forecast": -0.25,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Virtuix Holdings Inc.",
       "source": "nasdaq",
       "time": ""
@@ -26332,7 +26356,7 @@
     "VWAV": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "VisionWave Holdings, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -26356,7 +26380,7 @@
     "VZLA": {
       "date": "2026-09-14",
       "eps_forecast": 0.0,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Vizsla Silver Corp.",
       "source": "nasdaq",
       "time": ""
@@ -26396,7 +26420,7 @@
     "WB": {
       "date": "2026-08-19",
       "eps_forecast": 0.33,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Weibo Corporation",
       "source": "nasdaq",
       "time": ""
@@ -26436,7 +26460,7 @@
     "WDAY": {
       "date": "2026-08-27",
       "eps_forecast": 1.26,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Workday, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -26452,7 +26476,7 @@
     "WDH": {
       "date": "2026-09-03",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Waterdrop Inc.",
       "source": "nasdaq",
       "time": ""
@@ -26641,10 +26665,18 @@
       "source": "nasdaq",
       "time": ""
     },
+    "WLTH": {
+      "date": "2026-09-09",
+      "eps_forecast": 0.09,
+      "fetched": "2026-08-21",
+      "name": "Wealthfront Corporation",
+      "source": "nasdaq",
+      "time": "amc"
+    },
     "WLY": {
       "date": "2026-09-03",
       "eps_forecast": 0.4,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "John Wiley & Sons, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -26652,7 +26684,7 @@
     "WLYB": {
       "date": "2026-09-03",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "John Wiley & Sons, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -26692,15 +26724,15 @@
     "WMT": {
       "date": "2026-08-20",
       "eps_forecast": 0.73,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Walmart Inc.",
       "source": "nasdaq",
-      "time": "bmo"
+      "time": ""
     },
     "WOLF": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Wolfspeed, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -26708,7 +26740,7 @@
     "WOOF": {
       "date": "2026-08-27",
       "eps_forecast": 0.03,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Petco Health and Wellness Company, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -26716,7 +26748,7 @@
     "WOR": {
       "date": "2026-09-22",
       "eps_forecast": 0.76,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Worthington Enterprises, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -26772,7 +26804,7 @@
     "WS": {
       "date": "2026-09-23",
       "eps_forecast": 1.16,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Worthington Steel, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -26788,7 +26820,7 @@
     "WSM": {
       "date": "2026-08-26",
       "eps_forecast": 2.05,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Williams-Sonoma, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -27002,9 +27034,9 @@
       "time": ""
     },
     "XMAX": {
-      "date": "2026-08-20",
+      "date": "2026-08-27",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "XMAX, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -27076,7 +27108,7 @@
     "XPEV": {
       "date": "2026-08-24",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "XPeng Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -27172,7 +27204,7 @@
     "XYF": {
       "date": "2026-08-24",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "X Financial",
       "source": "nasdaq",
       "time": "bmo"
@@ -27212,7 +27244,7 @@
     "YB": {
       "date": "2026-08-26",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Yuanbao Inc.",
       "source": "nasdaq",
       "time": ""
@@ -27244,7 +27276,7 @@
     "YEXT": {
       "date": "2026-09-01",
       "eps_forecast": 0.1,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Yext, Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -27252,7 +27284,7 @@
     "YHC": {
       "date": "2026-08-19",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "LQR House Inc.",
       "source": "nasdaq",
       "time": ""
@@ -27268,7 +27300,7 @@
     "YI": {
       "date": "2026-09-16",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "111, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -27276,7 +27308,7 @@
     "YJ": {
       "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Yunji Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -27284,7 +27316,7 @@
     "YMM": {
       "date": "2026-08-19",
       "eps_forecast": 0.18,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Full Truck Alliance Co. Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -27316,7 +27348,7 @@
     "YQ": {
       "date": "2026-09-02",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "17 Education & Technology Group Inc.",
       "source": "nasdaq",
       "time": ""
@@ -27324,7 +27356,7 @@
     "YRD": {
       "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Yiren Digital Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -27332,7 +27364,7 @@
     "YSG": {
       "date": "2026-08-20",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Yatsen Holding Limited",
       "source": "nasdaq",
       "time": ""
@@ -27372,7 +27404,7 @@
     "YYAI": {
       "date": "2026-09-21",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "AiRWA Inc.",
       "source": "nasdaq",
       "time": ""
@@ -27420,7 +27452,7 @@
     "ZENA": {
       "date": "2026-08-25",
       "eps_forecast": -0.21,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "ZenaTech, Inc.",
       "source": "nasdaq",
       "time": ""
@@ -27436,7 +27468,7 @@
     "ZEPP": {
       "date": "2026-09-01",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Zepp Health Corporation",
       "source": "nasdaq",
       "time": "bmo"
@@ -27460,7 +27492,7 @@
     "ZH": {
       "date": "2026-08-26",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Zhihu Inc.",
       "source": "nasdaq",
       "time": "bmo"
@@ -27468,7 +27500,7 @@
     "ZIM": {
       "date": "2026-08-19",
       "eps_forecast": -0.1,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "ZIM Integrated Shipping Services Ltd.",
       "source": "nasdaq",
       "time": ""
@@ -27484,7 +27516,7 @@
     "ZKH": {
       "date": "2026-08-21",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "ZKH Group Limited",
       "source": "nasdaq",
       "time": "bmo"
@@ -27500,7 +27532,7 @@
     "ZM": {
       "date": "2026-08-25",
       "eps_forecast": 1.01,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Zoom Communications, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -27516,7 +27548,7 @@
     "ZONE": {
       "date": "2026-08-28",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "CleanCore Solutions Inc.",
       "source": "nasdaq",
       "time": ""
@@ -27524,7 +27556,7 @@
     "ZS": {
       "date": "2026-09-03",
       "eps_forecast": 0.06,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Zscaler, Inc.",
       "source": "nasdaq",
       "time": "amc"
@@ -27548,7 +27580,7 @@
     "ZTO": {
       "date": "2026-08-18",
       "eps_forecast": null,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "ZTO Express (Cayman) Inc.",
       "source": "nasdaq",
       "time": ""
@@ -27564,7 +27596,7 @@
     "ZUMZ": {
       "date": "2026-09-03",
       "eps_forecast": -0.12,
-      "fetched": "2026-08-20",
+      "fetched": "2026-08-21",
       "name": "Zumiez Inc.",
       "source": "nasdaq",
       "time": ""
