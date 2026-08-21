@@ -7963,10 +7963,15 @@ def run_scanner():
             _by_tkr.setdefault(p["ticker"], []).append((_tgk, p))
         print(f"   📱 Sending {len(_by_tkr)} held long-call alert(s) "
               f"({len(_tg_longcall)} contracts grouped)...")
-        send_telegram("━━━ *📞 HELD LONG CALL — SELL TARGET HIT* ━━━"); time.sleep(1)
+        send_telegram("━━━ *📈 LEAPS CALLS YOU OWN — SELL TARGET HIT* ━━━"); time.sleep(1)
         for _tkr, _rows in _by_tkr.items():
             _p0 = _rows[0][1]
-            _lines = [f"📞 *{_tkr} — at/above your sell target*", f"  {_p0['reason']}"]
+            # EX-36: without "you own" framing this read as a CC recommendation
+            # (same "at/above sell target" language as the CC gate). Say whose
+            # calls these are and what the decision is.
+            _lines = [f"📈 *{_tkr} — LEAPS calls you OWN, stock at your sell target*",
+                      f"  {_p0['reason']}",
+                      f"  Decide: take profit on these long calls or keep riding — not a covered-call idea."]
             for _tgk, p in _rows:
                 _tg_alert_log[_tgk] = _today_str
                 _pl = (f"{p['profit_pct']:.0f}% gain" if p['profit_pct'] >= 0

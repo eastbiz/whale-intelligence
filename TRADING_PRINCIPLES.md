@@ -929,6 +929,27 @@ Rules that follow, all of which must survive future edits:
 
 ## Trade Examples (raw log)
 
+### EX-36 — Held-LEAPS sell-target alert read as a CC recommendation (2026-08-21)
+- Telegram, Aug 21 06:48 PT: *"📞 IBIT — at/above your sell target"* followed by
+  three IBIT calls ($20/$22/$25) with cost, mark, gain and DTE. John: *"This
+  message is confusing. I think it is mixing LEAPS with CC."*
+- No data was mixed. This is the A29 held-long-call alert — deep-ITM LEAPS John
+  OWNS, whose underlying (IBIT $43.72) reached his sell target ($43). The
+  costs/gains are his own P&L, exactly as intended.
+- The confusion was pure wording: "at/above your sell target" is the SAME phrase
+  the CC Telegram gate uses as its trigger condition (A14/P20 — CCs only ping
+  at/above `sell_above`), the message never said "you own these", and the 📞
+  emoji matched nothing. A per-ticker message must stand alone — the section
+  header ("HELD LONG CALL") is a separate Telegram send and can scroll away or
+  be read in isolation.
+- Fix (A50): the per-ticker message now opens with *"LEAPS calls you OWN, stock
+  at your sell target"* and closes with the decision line *"take profit on these
+  long calls or keep riding — not a covered-call idea"*. No gate, threshold, or
+  dedup change — wording only, notifications per day unchanged.
+- Lesson: two alert families keyed on the same trigger phrase ("at/above sell
+  target") must differ in the first line, not just the header. Say WHOSE
+  position and WHAT decision in every message body.
+
 ### EX-35 — PORTFOLIO_SIZE double-counted every Schwab stock (2026-08-19)
 - Claude, reasoning about position sizing, inferred "Schwab ≈ $12.0M" by
   subtracting the IBKR stock total from `PORTFOLIO_SIZE`. John: *"Are you sure:
@@ -2168,6 +2189,17 @@ adding two tickers. Four separate defects, in rough priority order:
      PLTR 115 vs 85) is now gone rather than merely unread, and no target
      literal survives outside `whale_scanner.py`.
   Built 2026-08-17.
+
+- **A50 — Held-LEAPS sell-target alert reworded to say "you OWN" (EX-36).**
+  The A29 Telegram alert's per-ticker message opened with "📞 {ticker} —
+  at/above your sell target" — the same trigger phrase the CC gate (A14/P20)
+  uses — and never said the listed calls were John's own holdings, so John read
+  it as LEAPS mixed into a CC recommendation. Now opens "📈 {ticker} — LEAPS
+  calls you OWN, stock at your sell target" and ends "Decide: take profit on
+  these long calls or keep riding — not a covered-call idea"; section header
+  updated to match. Wording only — the SELL-TARGET-HIT gate, deep-ITM filter
+  (`LONG_CALL_ITM_MAX_STRIKE_PCT`), dedup keys and volume are unchanged, so no
+  replay needed. Built 2026-08-21.
 
 - **A49 — Position sizing rebuilt on John's framework (P40, C19).**
   `SIZING_BY_TIER` is now the ONE sizing table — Core 5–12% (cap 15, min 3),
