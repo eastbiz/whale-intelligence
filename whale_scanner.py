@@ -1598,6 +1598,22 @@ def _parse_ibkr_xml(root: "ET.Element") -> dict:
     _all_stk = [p for p in _all_positions if p.get("assetCategory","") == "STK"]
     _all_opt = [p for p in _all_positions if p.get("assetCategory","") == "OPT"]
     print(f"   IBKR Flex XML: {len(_all_positions)} OpenPosition elements ({len(_all_stk)} STK, {len(_all_opt)} OPT)")
+    # A53 guard: with the Flex query at "Summary AND Lot" level, every position
+    # appears TWICE — one SUMMARY row plus one row per lot — and summing both
+    # would double the whole book (the A48 class of error). When levelOfDetail
+    # labels the rows, build totals from SUMMARY rows only and harvest lot
+    # open dates from the LOT rows afterwards. Lot-only or unlabeled data
+    # falls through to the aggregation path below, which handles it correctly.
+    _lod_vals   = {(p.get("levelOfDetail","") or "").upper() for p in _all_positions}
+    _mixed_lod  = "SUMMARY" in _lod_vals and "LOT" in _lod_vals
+    _lot_rows   = []
+    if _mixed_lod:
+        _lot_rows      = [p for p in _all_positions
+                          if (p.get("levelOfDetail","") or "").upper() == "LOT"]
+        _all_positions = [p for p in _all_positions
+                          if (p.get("levelOfDetail","") or "").upper() == "SUMMARY"]
+        print(f"   IBKR Flex XML: mixed summary+lot data — totals from "
+              f"{len(_all_positions)} SUMMARY rows, dates from {len(_lot_rows)} LOT rows")
     for pos in _all_positions:
         sym = pos.get("symbol","").strip()
         if not sym: continue
@@ -1654,6 +1670,19 @@ def _parse_ibkr_xml(root: "ET.Element") -> dict:
                 prev["open_date"] = _od
         else:
             positions[sym] = row
+    # Mixed summary+lot data: attach lot open dates to the summary-built rows.
+    # Newest lot wins — "LTCG eligible" is only claimed once every lot qualifies.
+    for pos in _lot_rows:
+        sym = pos.get("symbol","").strip().replace("BRK B", "BRK-B")
+        if sym not in positions:
+            continue
+        _od_raw = (pos.get("openDateTime", "") or pos.get("holdingPeriodDateTime", "") or "").strip()
+        if len(_od_raw) >= 8:
+            _d8 = _od_raw[:10].replace("-", "")[:8]
+            if _d8.isdigit():
+                _od = f"{_d8[:4]}-{_d8[4:6]}-{_d8[6:8]}"
+                if _od > (positions[sym].get("open_date") or ""):
+                    positions[sym]["open_date"] = _od
     stk  = sum(1 for v in positions.values() if v["asset_class"]=="STK")
     lopt = sum(1 for v in positions.values() if v["asset_class"]=="OPT" and v.get("side")=="Long")
     sopt = sum(1 for v in positions.values() if v["asset_class"]=="OPT" and v.get("side")=="Short")
