@@ -415,10 +415,10 @@ CC_DTE_MIN            = 30;   CC_DTE_MAX      = 60  # P25: never write a CC
                                                     # sweet spot 35-50
 LEAPS_DTE_MIN         = 500   # 2+ years
 LONG_CALL_DTE_WARN    = 60    # held long call (any DTE) — warn to decide close/roll within this window
-# A29/P16: a long-call Telegram alert only makes sense for a DEEP-ITM call
-# acting as stock replacement. A far-OTM convexity LEAP (NVDA $450 with NVDA at
-# $223) needs the stock to double — "the stock is near its 52w high" is an
-# argument FOR it, not a reason to sell. Strike must be at/below spot x this.
+# P41: the held-long-call Telegram alert is GONE (John, 2026-08-21) — LEAPS
+# exit prompts are dashboard-only until he defines a real long-call sell
+# formula. This constant gated that alert to deep-ITM calls (A29) and is
+# currently read by nothing; kept for when the formula arrives.
 LONG_CALL_ITM_MAX_STRIKE_PCT = 0.90   # strike <= 90% of spot = genuinely ITM
 # CSP: default delta 0.25-0.30, up to 0.35 only when IVP > 50
 CSP_DELTA_MIN         = 0.25; CSP_DELTA_MAX   = 0.35  # target 0.25-0.30, hard max 0.35
@@ -5146,10 +5146,14 @@ def fmt_spike_cc(opp) -> str:
     trigger = (f"📈 Up {si['today_change']:+.1f}% today"
                if si["trigger"] == "today"
                else f"📈 Extended {si['pct_above_ma50']:+.1f}% above 50MA")
+    # EX-38: only claim "IV spiked" when IVP actually says so — the 2026-08-21
+    # IBIT alert said "IV spiked" in the same message as "ATM IV 10%" (IVP 33).
+    vol_note = ("IV spiked, sell calls before vol contracts"
+                if opp.get("ivp", 0) >= OPP_IVP_MIN else "sell calls into strength")
 
     lines = [
         f"⚡ *SPIKE CC — {opp['ticker']} @ ${opp['price']}*",
-        f"_{trigger} — IV spiked, sell calls before vol contracts_",
+        f"_{trigger} — {vol_note}_",
         "",
         *([f"  {dp['label']}"] if dp.get("show") else []),
         f"  {iv_label(opp['ivp'], opp['ticker'])} | {opp['pullback_pct']}% off highs",
@@ -5157,7 +5161,10 @@ def fmt_spike_cc(opp) -> str:
         f"  Bid ${sc['bid']} / Ask ${sc['ask']} | Mid ${sc['premium']}",
         f"  δ{sc['delta']} | Annualized: {sc['annualized_return']}% | ${sc['premium']/sc['dte']:.2f}/day",
         f"  Protection: {sc['protection_pct']}% downside buffer",
-        f"  Breakeven: ${_fmt_money(sc.get('avg_cost'))} | Max {sc['max_contracts']} contracts",
+        # EX-38: this number is the SHARE cost basis, not a breakeven — labeled
+        # "Breakeven" it printed $223.81 on MSTR trading at $120 and read as a
+        # broken figure. Call it what it is.
+        f"  Your share cost basis: ${_fmt_money(sc.get('avg_cost'))} | Max {sc['max_contracts']} contracts",
         *([_earnings_tag(opp['ticker'])] if _earnings_tag(opp['ticker']) else []),
         # No exit advice here — this alert is an ENTRY. Exits come from the
         # position management engine (TAKE PROFIT / BIG MOVE) once the position
@@ -7219,13 +7226,23 @@ def run_scanner():
     for o in top_pmccs:  all_opps.append(opp_to_dict(o, "pmcc"))
     for o in spike_opps:
         s = o.get("spike_cc", {})
+        # EX-38: zone fields on every SPIKE_CC surface, so the dashboard's
+        # At/Near Target filter can never hide a row this path produced.
+        _spk_t  = o.get("ticker","")
+        _spk_ss = SYMBOL_SETTINGS.get(_spk_t, {})
+        if BUCKETS and is_cc_only(_spk_t, BUCKETS):
+            _iz_s, _iz_s_tier = True, "EXEMPT"
+        else:
+            _iz_s, _iz_s_tier, _ = compute_in_zone(
+                "CC", o.get("price",0), _spk_ss.get("buy_under",0), _spk_ss.get("sell_above",0))
         all_opps.append({
-            "ticker": o.get("ticker",""), "tier": o.get("tier",""),
+            "ticker": _spk_t, "tier": o.get("tier",""),
             "price": o.get("price",0), "ivp": round(o.get("ivp",0),1),
             "mode": "SPIKE_CC", "strike": s.get("strike",0),
             "expiry": s.get("expiry",""), "dte": s.get("dte",0),
             "premium": s.get("premium",0),
             "annualized_return": s.get("annualized_return",0),
+            "in_zone": _iz_s, "zone_tier": _iz_s_tier,
             "delta": s.get("delta",0), "signal": "", "below_min": False, "risk_note": None,
         })
     for o in drop_opps:
@@ -7556,8 +7573,24 @@ def run_scanner():
         s = o.get("spike_cc", {})
         if not s: continue
         ppd = round(s.get("premium",0) / max(1, s.get("dte",1)), 2)
+        # EX-38: spike rows carried NO in_zone field, and the dashboard's
+        # At/Near Target filter hides anything without in_zone == true — so a
+        # spike CC that PINGED Telegram (IBIT literally at its sell target)
+        # was invisible on the dashboard with that filter on. Same CC zone
+        # rules as everywhere else; cc_only names (MSTR/OWL) are exempt from
+        # the sell-target zone, matching their exemption in the CC gates.
+        _spk_t   = o.get("ticker","")
+        _spk_ss  = SYMBOL_SETTINGS.get(_spk_t, {})
+        if BUCKETS and is_cc_only(_spk_t, BUCKETS):
+            _iz_s, _iz_s_tier, _iz_s_reason = (
+                True, "EXEMPT", "cc_only — exit-waiting; spike CC exempt from sell-target zone")
+        else:
+            _iz_s, _iz_s_tier, _iz_s_reason = compute_in_zone(
+                "CC", o.get("price",0), _spk_ss.get("buy_under",0), _spk_ss.get("sell_above",0))
+        _zg_s, _zgl_s = zone_gap("CC", o.get("price",0),
+                                 _spk_ss.get("buy_under",0), _spk_ss.get("sell_above",0))
         dash_spikes.append({
-            "ticker": o.get("ticker",""), "tier": o.get("tier",""),
+            "ticker": _spk_t, "tier": o.get("tier",""),
             "price": o.get("price",0), "ivp": round(o.get("ivp",0),1),
             "mode": "SPIKE_CC",
             "strike": s.get("strike",0), "expiry": s.get("expiry",""),
@@ -7567,6 +7600,8 @@ def run_scanner():
             "below_min": False, "warnings": [], "passes_quality": True,
             "risk_level": "Medium",
             "breakeven": None, "premium_per_day": ppd,
+            "in_zone": _iz_s, "zone_tier": _iz_s_tier, "zone_reason": _iz_s_reason,
+            "zone_gap_pct": _zg_s, "zone_gap_label": _zgl_s,
             "signal": s.get("timing",{}).get("signal","") or f"IVP {o.get('ivp',0):.0f}% spike",
             "risk_note": "⚠️ Exit at 50-70% profit. Close early if stock reverses.",
         })
@@ -7932,56 +7967,18 @@ def run_scanner():
     else:
         print(f"   🚨 No BIG MOVE reviews this scan")
 
-    # ── HELD LONG CALL — REVIEW → Telegram ──────────────────────────────
-    # Sell-target hit, near 52-week high, or approaching expiration on a call
-    # you own. Same once-per-position-per-day dedup as BIG MOVE above.
-    # A29 (P16): LEAPS are long-term stock replacement — John does NOT want
-    # trimming prompts on them. Only ONE case is a real decision: a DEEP-ITM
-    # call (stock replacement) whose underlying reached his sell target. So:
-    #   - "NEAR 52W HIGH" is dashboard-only (fires constantly in a bull market)
-    #   - far-OTM convexity LEAPS are excluded entirely (NVDA $450 with NVDA at
-    #     $223 — a high stock price is the THESIS, not a sell signal)
-    #   - one grouped message per ticker, not one push per contract
-    _tg_longcall = []
-    for p in _pos_actions:
-        if p["type"] != "LEAPS_CALL":
-            continue
-        if p["action"] != "SELL TARGET HIT":
-            continue                      # NEAR 52W HIGH / EXPIRING → dashboard
-        _px = p.get("underlying", 0) or 0
-        _sk = p.get("strike", 0) or 0
-        if not (_px > 0 and _sk > 0 and _sk <= _px * LONG_CALL_ITM_MAX_STRIKE_PCT):
-            print(f"   🔕 long call {p['ticker']} ${_sk:g} dashboard-only: not deep ITM")
-            continue                      # far-OTM convexity — never a sell prompt
-        _tgk = f"{p['ticker']}|LEAPS_CALL|{p['strike']:g}|{p['expiry']}"
-        if _tgk in _tg_alert_log:
-            continue
-        _tg_longcall.append((_tgk, p))
-    if _tg_longcall:
-        _by_tkr = {}
-        for _tgk, p in _tg_longcall:
-            _by_tkr.setdefault(p["ticker"], []).append((_tgk, p))
-        print(f"   📱 Sending {len(_by_tkr)} held long-call alert(s) "
-              f"({len(_tg_longcall)} contracts grouped)...")
-        send_telegram("━━━ *📈 LEAPS CALLS YOU OWN — SELL TARGET HIT* ━━━"); time.sleep(1)
-        for _tkr, _rows in _by_tkr.items():
-            _p0 = _rows[0][1]
-            # EX-36: without "you own" framing this read as a CC recommendation
-            # (same "at/above sell target" language as the CC gate). Say whose
-            # calls these are and what the decision is.
-            _lines = [f"📈 *{_tkr} — LEAPS calls you OWN, stock at your sell target*",
-                      f"  {_p0['reason']}",
-                      f"  Decide: take profit on these long calls or keep riding — not a covered-call idea."]
-            for _tgk, p in _rows:
-                _tg_alert_log[_tgk] = _today_str
-                _pl = (f"{p['profit_pct']:.0f}% gain" if p['profit_pct'] >= 0
-                       else f"{abs(p['profit_pct']):.0f}% loss")
-                _lines.append(f"  • ${p['strike']:g} call — cost ${p['avg_cost']:.2f} → "
-                              f"~${p['mark']:.2f} ({_pl}), {p['dte']}d left")
-            _lines.append(f"_Scanned {now_pt().strftime('%b %d %H:%M')} PT_")
-            send_telegram("\n".join(_lines)); time.sleep(2)
-    else:
-        print(f"   📞 No held long-call alerts this scan")
+    # ── HELD LONG CALL — dashboard-only, NO Telegram (P41/EX-37) ─────────
+    # There used to be a Telegram alert here for deep-ITM LEAPS whose
+    # underlying crossed sell_above (A29, reworded A50). John removed it
+    # 2026-08-21: LEAPS are long-term holds, and "stock crossed sell_above"
+    # is NOT his sell signal for a LEAP — the right exit formula for long
+    # calls is different and not yet defined. Until he defines one, NO
+    # position alert on a LEAPS_CALL reaches Telegram, for any action
+    # (SELL TARGET HIT / NEAR 52W HIGH / EXPIRING included). The engine
+    # still computes those actions and the dashboard still shows them.
+    # Do not re-add a Telegram path here without a formula from John —
+    # this is the same lesson as P16 (EX-24: 10 LEAPS trim pushes).
+    print(f"   📞 Held long-call actions are dashboard-only (P41) — no Telegram")
 
     results = {
         "scan_time":           now_pt().strftime(SCAN_TS_FMT),

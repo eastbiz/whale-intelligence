@@ -927,7 +927,65 @@ Rules that follow, all of which must survive future edits:
 - Evidence: John's written framework, 2026-08-19; the C19 backlog item.
 - System status: **Actioned — A49.**
 
+### P41 — sell_above is a STOCK target. It is not a LEAPS exit signal.
+- John, 2026-08-21, on the IBIT held-LEAPS alert: *"I do not wish message about
+  LEAPS going above sell target. I plan to keep them long time and formula when
+  it makes sense to sell them will be different (not just going over sell
+  above). Please do not use those in Telegram."*
+- `sell_above` answers "where would I sell the SHARES / write a CC". A LEAP is
+  a leveraged long-term position; its exit depends on things the stock target
+  doesn't capture (remaining DTE, extrinsic left, the thesis, tax). The right
+  formula is NOT YET DEFINED — until John defines one, the system has no
+  license to prompt a LEAPS exit on Telegram at all.
+- Concretely: NO `LEAPS_CALL` position action reaches Telegram — SELL TARGET
+  HIT, NEAR 52W HIGH, EXPIRING, any of them. The engine still computes them
+  and the dashboard's LEAPS table still shows them; the phone stays quiet.
+- This extends P16 (no trimming logic on LEAPS): P16 banned invented exit
+  advice, P41 also bans the sell_above crossing as a Telegram trigger. The
+  A29→A50 alert was the last surviving LEAPS exit push; A51 removed it.
+- If John later supplies a long-call sell formula, it gets designed with him
+  first (real examples, expected outputs), then built — not derived from
+  sell_above.
+- System status: **Actioned — A51.**
+
 ## Trade Examples (raw log)
+
+### EX-38 — Spike CCs pinged Telegram but hid behind the At/Near filter (2026-08-21)
+- Same morning as EX-37: IBIT and MSTR spike CC alerts on Telegram (both
+  genuinely ~20.5% above their 50-day MA — verified independently against IBKR
+  price history; the identical "+20.4%" on two tickers was a coincidence of two
+  BTC proxies, not a leaked variable). John: *"I would expect to find those
+  Spike CC under Spike CC Dashboard. That we do not have duplicate system."*
+- The rows WERE in `results.json` (mode `SPIKE_CC`, both of them) — but they
+  carried NO `in_zone` field, and the dashboard's At/Near Target toggle hides
+  anything without `in_zone == true`. With that toggle on (it persists in
+  localStorage), a spike CC that pinged Telegram — IBIT literally AT its sell
+  target — was invisible. The ping-with-no-card rule (EX-28/EX-29) broken by a
+  FILTER rather than a missing row: a new variant of the same bug.
+- Two message defects in the same alerts: "Breakeven: $223.81" on MSTR trading
+  at $120.35 — the number is the SHARE COST BASIS, mislabeled; and "IV spiked,
+  sell calls before vol contracts" printed unconditionally, in the same message
+  as "ATM IV 10%" (IBIT IVP 33 — IV had not spiked).
+- Fixed as A52: spike rows now carry real zone fields (CC rules; cc_only names
+  EXEMPT, matching their CC-gate exemption), the label reads "Your share cost
+  basis", and the vol line only claims an IV spike when IVP ≥ 40.
+- Also answered: "Isn't IBIT over sell above already? I do not see anything on
+  CC." Not a bug — IBIT's routine CC window is bucket C (21–35 DTE, δ0.20–0.30,
+  22% annualized floor) and at IBIT's current low IV nothing in that window
+  clears the floor. The spike path's wider window (30–60 DTE, δ up to 0.40)
+  found the Oct $47 at 27.3% — the spike card IS the CC opportunity on IBIT
+  today, and it lives under ⚡ Spike CC.
+
+### EX-37 — "Do not use those in Telegram": LEAPS sell-target push removed (2026-08-21)
+- Hours after the EX-36 rewording, John: *"I do not wish message about LEAPS
+  going above sell target. I plan to keep them long time and formula when it
+  makes sense to sell them will be different (not just going over sell above).
+  Please do not use those in Telegram."*
+- The clearer wording exposed the real issue: the alert's TRIGGER was wrong,
+  not its words. sell_above is his share/CC target; his LEAPS exit formula is
+  different and not yet defined.
+- Removed as A51; principle recorded as P41. LEAPS_CALL actions remain on the
+  dashboard only.
 
 ### EX-36 — Held-LEAPS sell-target alert read as a CC recommendation (2026-08-21)
 - Telegram, Aug 21 06:48 PT: *"📞 IBIT — at/above your sell target"* followed by
@@ -2189,6 +2247,29 @@ adding two tickers. Four separate defects, in rough priority order:
      PLTR 115 vs 85) is now gone rather than merely unread, and no target
      literal survives outside `whale_scanner.py`.
   Built 2026-08-17.
+
+- **A52 — Spike CC rows get zone fields; message labels fixed (EX-38).**
+  `SPIKE_CC` rows in `results.json` now carry `in_zone` / `zone_tier` /
+  `zone_reason` / `zone_gap_pct` / `zone_gap_label` (CC zone rules via
+  `compute_in_zone`; cc_only names EXEMPT with in_zone true, matching their
+  CC-gate exemption), so the dashboard's At/Near Target toggle can no longer
+  hide a spike CC that pinged Telegram. Both spike surfaces updated
+  (`dash_spikes` → review_candidates, and the `all_opps` builder). Telegram
+  message: "Breakeven" → "Your share cost basis" (it always printed
+  `avg_cost` — $223.81 on MSTR at $120.35 read as a broken number), and the
+  "IV spiked" tagline is now conditional on IVP ≥ `OPP_IVP_MIN` (40); below
+  that it says "sell calls into strength". No gate or threshold changed —
+  the same rows fire, they are just visible and honestly labeled.
+  Built 2026-08-21.
+
+- **A51 — Held-LEAPS Telegram alert REMOVED (P41/EX-37, John's instruction).**
+  Supersedes A50 same day: the `_tg_longcall` block in `run_scanner` is gone,
+  so no `LEAPS_CALL` position action reaches Telegram for any reason — SELL
+  TARGET HIT included. The long-call engine still runs and the dashboard still
+  shows its actions; `LONG_CALL_ITM_MAX_STRIKE_PCT` stays defined (read by
+  nothing) for whenever John supplies a real long-call sell formula. That
+  formula must be designed with him first — sell_above is not it (P41).
+  Built 2026-08-21.
 
 - **A50 — Held-LEAPS sell-target alert reworded to say "you OWN" (EX-36).**
   The A29 Telegram alert's per-ticker message opened with "📞 {ticker} —

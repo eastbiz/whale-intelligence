@@ -243,6 +243,10 @@ independently.**
   100+ share position. Overrides `spreads_only` (a CC on owned shares isn't
   naked). Goes to Telegram — but through the SAME CC gates as routine CCs
   (A15/P21): at/above `sell_above` AND earnings not inside the option expiry.
+  Dashboard rows carry zone fields since A52 (CC rules, cc_only EXEMPT) so the
+  At/Near Target toggle can't hide a spike CC that pinged Telegram (EX-38).
+  The Telegram "Your share cost basis" line prints `avg_cost` — do not
+  relabel it "Breakeven", that's the EX-38 bug.
 - **Post-Drop CSP** — sell puts into a drop. Over-gated historically; TRADING
   tier excluded. Known limited.
 - **Position management engine** (`position_management_engine`) — per-position
@@ -252,7 +256,16 @@ independently.**
 
 ## Position exit alerts (recent, important)
 
-The engine returns ONE action per position, priority order:
+**LEAPS_CALL positions NEVER alert on Telegram (P41, John 2026-08-21).** The
+held-long-call engine still computes SELL TARGET HIT / NEAR 52W HIGH /
+EXPIRING for the dashboard, but no LEAPS_CALL action may reach Telegram:
+sell_above is John's share/CC target, NOT his LEAPS exit signal — his
+long-call sell formula is different and not yet defined. The A29/A50 Telegram
+push was removed by A51. Do not re-add one without a formula designed with
+John (same lesson as P16/EX-24).
+
+The engine below covers SHORT options (CSP/CC) and returns ONE action per
+position, priority order:
 
 1. **BIG MOVE** (priority 0, event-driven) — the main one. Fires when a big
    FAVORABLE move happens on a name you hold a short option:
